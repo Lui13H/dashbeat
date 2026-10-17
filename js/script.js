@@ -513,6 +513,26 @@ function renderRank(){
 }
 
 /* ---------------- render ---------------- */
+let flSortK = "n", flSortDir = 1;
+function renderFilteredList(R){
+  const card = $("#filtered-list-card");
+  const active = state.bands.size + state.albums.size > 0;
+  card.style.display = active ? "" : "none";
+  if (!active) return;
+  const list = [...R].sort((a, b) => {
+    const x = a[flSortK], y = b[flSortK];
+    return (typeof x === "number" && typeof y === "number" ? x - y : coll.compare(String(x), String(y))) * flSortDir || a.n - b.n;
+  });
+  $("#filtered-list-body").innerHTML = list.map(t =>
+    `<tr><td class="num">${t.n}</td><td class="tt">${esc(t.title)}</td><td>${esc(t.artist)}</td><td>${esc(t.album)}</td><td class="num"><span class="durchip">${durTxt(t.sec)}</span></td><td>${esc(t.date || NI)}</td></tr>`).join("");
+  $("#filtered-list-hint").textContent = `${faixas(list.length)} no filtro atual`;
+  card.querySelectorAll("th[data-k]").forEach(th => th.setAttribute("aria-sort", th.dataset.k === flSortK ? (flSortDir > 0 ? "ascending" : "descending") : "none"));
+}
+$("#filtered-list-card").querySelectorAll("th[data-k]").forEach(th => {
+  const go = () => { if (flSortK === th.dataset.k) flSortDir *= -1; else { flSortK = th.dataset.k; flSortDir = 1; } render(); };
+  th.addEventListener("click", go);
+  th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
+});
 function render(){
   renderFilters();
   const R = rows();
@@ -521,6 +541,7 @@ function render(){
   $("#empty").classList.toggle("on", empty);
   if (empty){ hideTip(); return; }
   renderKPIs(R); renderWave(R); renderYears(R); renderTree(); renderAlbums(); renderRank();
+  renderFilteredList(R);
 }
 
 /* ---------------- tabs ---------------- */
@@ -1630,10 +1651,11 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
   const body = document.createElement("div");
   body.innerHTML = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add">Adicionar músicas</button><button type="button" data-m="replace">Nova playlist</button></div>
     <p class="mdesc" id="im-desc"></p>
-    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Cole aqui a lista (uma faixa por linha, colunas separadas por TAB), um link de playlist/álbum do Spotify, ou links de faixas do Spotify (um por linha):&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26&#10;https://open.spotify.com/track/0G7mYkFpOp7HFRfiuNzoru&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;https://open.spotify.com/album/2H1WUWFEOWwfyIl1aMFsML&#10;&#10;Também aceita .txt, .tsv, .csv ou .xlsx: arraste o arquivo para cá."></textarea></label>
+    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Aceita: link de playlist/faixa/álbum do Spotify, lista colada (1 faixa por linha, colunas separadas por TAB), ou arquivo .txt/.tsv/.csv/.xlsx (arraste para cá).&#10;&#10;Link do Spotify:&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;&#10;Ou lista colada:&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26"></textarea></label>
     <div class="imrow"><label class="gbtn file">${ICON.up}<span>Escolher arquivo</span><input type="file" id="im-file" accept=".txt,.tsv,.csv,.xlsx,text/plain,text/csv"></label></div>
     <div id="sp-fields" style="display:none">
       <p class="mdesc" id="sp-detect-msg"></p>
+      <button class="lnk" type="button" id="sp-why">Por que isso?</button>
       <div id="sp-cc">
         <form id="sp-form" autocomplete="on">
           <div class="imrow"><input type="text" id="sp-id" name="username" placeholder="Client ID" autocomplete="username"><input type="password" id="sp-secret" name="password" placeholder="Client Secret" autocomplete="current-password">
@@ -1778,6 +1800,14 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     clearSpotifyOAuth();
     renderSpAccountBar();
     setSpotifyMode(true, parseSpotifyIds(ta.value).length, parseSpotifyPlaylistIds(ta.value).length, parseSpotifyAlbumIds(ta.value).length);
+  });
+  q("#sp-why").addEventListener("click", () => {
+    openModal({
+      title: "Por que pedimos isso?",
+      body: `<p class="mdesc">O Client ID (e o Client Secret, quando pedido) servem só para autenticar a busca de música, artista, álbum, duração e lançamento direto na API oficial do Spotify. Essa busca acontece aqui mesmo, no seu navegador — nada passa por um servidor nosso.</p>
+        <p class="mdesc">Este site nem tem banco de dados: não existe nenhum lugar nosso guardando essas informações, então não há como o dono do site acessar o que você digita aqui. Tudo fica salvo só no seu próprio navegador (localStorage), e some quando você sair da conta, desmarcar "Salvar neste navegador" ou limpar os dados do site.</p>`,
+      size: "sm"
+    });
   });
   if (prefillText){
     ta.value = prefillText;
@@ -1951,5 +1981,12 @@ function boot(){
   renderSpAccountBar();
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
   if (location.hash === "#insights") showTab("insights");
+  const params = new URLSearchParams(location.search);
+  if (params.get("import") === "nova-playlist"){
+    params.delete("import");
+    const qs = params.toString();
+    history.replaceState({}, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
+    openImport("replace");
+  }
 }
 (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(boot).then(handleSpotifyRedirectAndResume);

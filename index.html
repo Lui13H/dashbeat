@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tutorial: Dashboard de Playlist do Spotify</title>
+    <script>
+        // Quem já está logado no Spotify pula o tutorial e vai direto para a ferramenta
+        (function () {
+            try {
+                // ?tutoriais=1 é usado pelo botão "Tutoriais" do painel para forçar a volta a esta página
+                if (new URLSearchParams(location.search).get('tutoriais') === '1') return;
+                var oauth = JSON.parse(localStorage.getItem('catalogo-musical:spotify-oauth') || 'null');
+                if (oauth && oauth.profile) location.replace('painel_musical.html');
+            } catch (e) {}
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -91,52 +102,87 @@
 
         <!-- Tabs Navigation -->
         <div class="flex border-b border-base-300 mb-8 overflow-x-auto no-scrollbar">
-            <button onclick="switchTab('premium')" id="btn-premium" class="flex-1 py-4 px-6 text-center font-medium text-base-400 hover:text-white border-b-2 border-transparent hover:border-base-300 transition-colors whitespace-nowrap outline-none focus:outline-none">
-                <span class="mr-2">⚡</span> Método Profissional (Premium)
+            <button onclick="switchTab('premium')" id="btn-premium" class="flex-1 py-4 px-6 text-center font-medium text-spotify border-b-2 border-spotify bg-spotify/5 transition-colors whitespace-nowrap outline-none focus:outline-none">
+                <span class="mr-2">⚡</span> Método Profissional (Premium) <span class="text-spotify">(Recomendado)</span>
             </button>
-            <button onclick="switchTab('manual')" id="btn-manual" class="flex-1 py-4 px-6 text-center font-medium text-spotify border-b-2 border-spotify bg-spotify/5 transition-colors whitespace-nowrap outline-none focus:outline-none">
+            <button onclick="switchTab('manual')" id="btn-manual" class="flex-1 py-4 px-6 text-center font-medium text-base-400 hover:text-white border-b-2 border-transparent hover:border-base-300 transition-colors whitespace-nowrap outline-none focus:outline-none">
                 <span class="mr-2">🤖</span> Método Manual (Gratuito/IA)
             </button>
         </div>
 
         <!-- Tab 1: Premium -->
-        <section id="tab-premium" class="tab-content">
+        <section id="tab-premium" class="tab-content active">
             <div class="bg-base-200 border border-base-300 rounded-2xl p-6 md:p-10">
 
-                <div class="bg-blue-900/20 border-l-4 border-blue-500 p-5 rounded-r-lg mb-8">
-                    <div class="flex items-start">
-                        <span class="text-blue-400 text-xl mr-3">ℹ️</span>
-                        <p class="text-blue-100 leading-relaxed">
-                            <strong>Aviso:</strong> Este método é mais rápido e o resultado da análise sai mais profissional, sendo gerado automaticamente por uma ferramenta dedicada.
-                        </p>
-                    </div>
-                </div>
+                <p class="text-base-400 leading-relaxed text-lg mb-6">
+                    Envie o link da sua playlist e a ferramenta monta o site de estatísticas automaticamente, sem copiar textos ou usar outras IAs. Leva de <strong class="text-white">poucos segundos a alguns minutos</strong> (depende do tamanho da playlist), mas exige <strong class="text-white">Spotify Premium</strong> e um app criado gratuitamente no painel de desenvolvedor do Spotify.
+                </p>
 
-                <div class="grid md:grid-cols-2 gap-8 mb-10">
-                    <div class="bg-black/40 p-6 rounded-xl border border-base-300">
-                        <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">⭐</span> Requisitos</h3>
-                        <p class="text-base-400">
-                            Precisa de informações exclusivas de contas <strong>Spotify Premium</strong> (pago). A API necessita de permissões ativas para leitura avançada de catálogos e ordem de inserção.
-                        </p>
-                    </div>
-                    <div class="bg-black/40 p-6 rounded-xl border border-base-300">
-                        <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-yellow-500 mr-2">⏱️</span> Limites</h3>
-                        <p class="text-base-400">
-                            Possui um <strong>limite diário</strong> (consideravelmente grande) de requisições de músicas devido às restrições da API do Spotify para desenvolvedores.
-                        </p>
-                    </div>
-                </div>
+                <button type="button" onclick="toggleDetails('premium')" id="toggle-premium-btn" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm mb-8 outline-none focus:outline-none">
+                    <span id="toggle-premium-label">Acessar tutorial</span>
+                    <svg id="toggle-premium-icon" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
 
-                <div class="mb-10">
-                    <h3 class="text-2xl font-bold mb-4 border-b border-base-300 pb-2">Como funciona?</h3>
-                    <p class="text-base-400 leading-relaxed text-lg">
-                        Você enviará diretamente o link da sua playlist para o sistema. O site já vai montar tudo automaticamente, processando os dados e gerando a visualização no mesmo instante, sem precisar de múltiplos prompts em IAs ou copiar textos manualmente.
-                    </p>
+                <div id="details-premium" class="hidden">
+                    <div class="bg-blue-900/20 border-l-4 border-blue-500 p-5 rounded-r-lg mb-8">
+                        <div class="flex items-start">
+                            <span class="text-blue-400 text-xl mr-3">ℹ️</span>
+                            <p class="text-blue-100 leading-relaxed">
+                                <strong>Aviso:</strong> Este método é mais rápido e o resultado da análise sai mais profissional, sendo gerado automaticamente por uma ferramenta dedicada.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-8 mb-8">
+                        <div class="bg-black/40 p-6 rounded-xl border border-base-300">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">⭐</span> Requisitos</h3>
+                            <p class="text-base-400">
+                                Precisa de informações exclusivas de contas <strong>Spotify Premium</strong> (pago). A API necessita de permissões ativas para leitura avançada de catálogos e ordem de inserção.
+                            </p>
+                        </div>
+                        <div class="bg-black/40 p-6 rounded-xl border border-base-300">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-yellow-500 mr-2">⏱️</span> Limites</h3>
+                            <p class="text-base-400">
+                                Possui um <strong>limite diário</strong> (consideravelmente grande) de requisições de músicas devido às restrições da API do Spotify para desenvolvedores.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-8 mb-10">
+                        <div class="bg-black/40 p-6 rounded-xl border border-base-300">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">🔑</span> Acesso ao Spotify</h3>
+                            <p class="text-base-400">
+                                Além do Premium, você precisa criar um app gratuito em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" class="text-spotify underline">developer.spotify.com/dashboard</a> (login com sua conta Spotify) para conseguir o <strong>Client ID</strong>. Para importar por link de playlist, também é preciso cadastrar a <strong>Redirect URI</strong> da ferramenta nas configurações desse app; para importar por arquivo, é usado o <strong>Client ID e Secret</strong> em vez disso. Esses dados são gratuitos e levam só alguns minutos para gerar.
+                            </p>
+                        </div>
+                        <div class="bg-black/40 p-6 rounded-xl border border-base-300">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-yellow-500 mr-2">⏳</span> Tempo estimado</h3>
+                            <p class="text-base-400">
+                                Playlists pequenas são importadas em poucos segundos. Em playlists grandes (centenas de músicas), o Spotify passa a limitar as requisições e a ferramenta espera automaticamente entre elas, podendo levar alguns minutos até concluir.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-yellow-900/20 border-l-4 border-yellow-500 p-5 rounded-r-lg mb-10">
+                        <div class="flex items-start">
+                            <span class="text-yellow-400 text-xl mr-3">⚠️</span>
+                            <p class="text-yellow-100 leading-relaxed">
+                                <strong>Atenção:</strong> Playlists muito pequenas podem gerar gráficos e análises com viés estatístico (enviesadas), pois faltam dados suficientes para conclusões relevantes — isso vale para qualquer método. Use listas maiores para análises mais ricas.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mb-10">
+                        <h3 class="text-2xl font-bold mb-4 border-b border-base-300 pb-2">Como funciona?</h3>
+                        <p class="text-base-400 leading-relaxed text-lg">
+                            Você enviará diretamente o link da sua playlist para o sistema. O site já vai montar tudo automaticamente, processando os dados e gerando a visualização no mesmo instante, sem precisar de múltiplos prompts em IAs ou copiar textos manualmente.
+                        </p>
+                    </div>
                 </div>
 
                 <div class="text-center pt-4">
-                    <a href="painel_musical.html" class="bg-spotify hover:bg-spotify-light text-black font-bold py-4 px-10 rounded-full transition-transform transform hover:scale-105 shadow-lg shadow-spotify/20 text-lg inline-flex items-center justify-center mx-auto">
-                        Acessar Ferramenta <span class="ml-2">↗</span>
+                    <a href="painel_musical.html?import=nova-playlist" class="bg-spotify hover:bg-spotify-light text-black font-semibold py-2 px-5 rounded-full transition-transform transform hover:scale-105 shadow-md shadow-spotify/20 text-sm inline-flex items-center justify-center mx-auto">
+                        Acessar Ferramenta <span class="ml-1.5">↗</span>
                     </a>
                 </div>
 
@@ -144,21 +190,31 @@
         </section>
 
         <!-- Tab 2: Manual (IA) -->
-        <section id="tab-manual" class="tab-content active">
+        <section id="tab-manual" class="tab-content">
 
-            <div class="bg-base-200 border border-base-300 rounded-2xl p-6 md:p-10 mb-8">
-                <div class="bg-spotify/10 border-l-4 border-spotify p-5 rounded-r-lg mb-8">
-                    <div class="flex items-start">
-                        <span class="text-spotify text-xl mr-3">✓</span>
-                        <p class="text-gray-200 leading-relaxed">
-                            <strong>Aviso:</strong> Este método <strong>não necessita de Spotify pago</strong> e não possui limite de requisições de músicas da API. Porém, é mais demorado e depende do limite de tokens de contexto do Grok e do Claude.
-                        </p>
+            <div class="bg-base-200 border border-base-300 rounded-2xl p-6 md:p-10 mb-8 min-h-[220px]">
+                <h3 class="text-xl font-bold mb-3 text-white">Como funciona?</h3>
+                <p class="text-base-400 leading-relaxed text-lg mb-8">
+                    Copie e cole dois prompts prontos — um no Grok para coletar os dados da sua playlist, outro no Claude para gerar o painel visual. Não precisa de Spotify pago, mas leva de <strong class="text-white">10 a 25 minutos</strong>.
+                </p>
+
+                <button type="button" onclick="toggleDetails('manual')" id="toggle-manual-btn" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm outline-none focus:outline-none">
+                    <span id="toggle-manual-label">Acessar tutorial</span>
+                    <svg id="toggle-manual-icon" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+
+                <div id="details-manual" class="hidden mt-8">
+                    <div class="bg-spotify/10 border-l-4 border-spotify p-5 rounded-r-lg mb-8">
+                        <div class="flex items-start">
+                            <span class="text-spotify text-xl mr-3">✓</span>
+                            <p class="text-gray-200 leading-relaxed">
+                                <strong>Aviso:</strong> Este método <strong>não necessita de Spotify pago</strong> e não possui limite de requisições de músicas da API. Porém, é mais demorado e depende do limite de tokens de contexto do Grok e do Claude.
+                            </p>
+                        </div>
                     </div>
-                </div>
 
-                <h3 class="text-2xl font-bold mb-4 text-white">⏳ Expectativas de Tempo e Dados</h3>
-                <div class="grid md:grid-cols-2 gap-6 text-base-400">
-                    <div>
+                    <h3 class="text-2xl font-bold mb-4 text-white">⏳ Expectativas de Tempo e Dados</h3>
+                    <div class="text-base-400 mb-10">
                         <p class="mb-3">
                             O processo pode levar de <strong>10 a 25 minutos</strong> dependendo do tamanho da playlist.
                         </p>
@@ -169,17 +225,20 @@
                             + tempo de transição/leitura.
                         </p>
                     </div>
-                    <div>
-                        <h4 class="font-bold text-gray-300 mb-2">⚠️ O Problema do Viés</h4>
-                        <p class="text-sm">
-                            Playlists muito pequenas podem gerar gráficos e análises com viés estatístico (enviesadas), pois faltam dados suficientes para conclusões relevantes. Use listas maiores para análises mais ricas.
-                        </p>
+
+                    <div class="bg-yellow-900/20 border-l-4 border-yellow-500 p-5 rounded-r-lg">
+                        <div class="flex items-start">
+                            <span class="text-yellow-400 text-xl mr-3">⚠️</span>
+                            <p class="text-yellow-100 leading-relaxed">
+                                <strong>Atenção:</strong> Playlists muito pequenas podem gerar gráficos e análises com viés estatístico (enviesadas), pois faltam dados suficientes para conclusões relevantes — isso vale para qualquer método. Use listas maiores para análises mais ricas.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Steps -->
-            <div class="space-y-12">
+            <div id="manual-steps" class="space-y-12 hidden">
 
                 <!-- Step 1 -->
                 <div class="relative pl-8 md:pl-0">
@@ -336,6 +395,27 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
     </footer>
 
     <script>
+        // Expande/recolhe o tutorial original de cada método
+        const toggleLabels = {
+            premium: { open: 'Acessar tutorial', closed: 'Ocultar tutorial' },
+            manual: { open: 'Acessar tutorial', closed: 'Ocultar tutorial' }
+        };
+
+        function toggleDetails(id) {
+            const box = document.getElementById('details-' + id);
+            const icon = document.getElementById('toggle-' + id + '-icon');
+            const label = document.getElementById('toggle-' + id + '-label');
+            const willExpand = box.classList.contains('hidden');
+
+            box.classList.toggle('hidden');
+            label.textContent = willExpand ? toggleLabels[id].closed : toggleLabels[id].open;
+            icon.classList.toggle('rotate-180');
+
+            if (id === 'manual') {
+                document.getElementById('manual-steps').classList.toggle('hidden');
+            }
+        }
+
         // Tab switching logic
         function switchTab(tabId) {
             // Hide all tabs
@@ -405,9 +485,9 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
             }, 2500);
         }
 
-        // Initialize on manual tab (since it has the active class by default)
+        // Initialize on premium tab (since it has the active class by default)
         // Tab styling is already correct in initial HTML, but we can enforce it:
-        switchTab('manual');
+        switchTab('premium');
 
         // Mostra a conta do Spotify já logada pelo painel (mesma origem, mesmo localStorage)
         (function () {
