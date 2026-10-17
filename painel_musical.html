@@ -19,13 +19,21 @@
         <p id="srcline"></p>
       </div>
     </div>
-    <div class="topr"><div class="dtools"><button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button><button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button><button class="dbtn" id="dt-export" type="button" title="Baixar a lista em Excel ou texto"></button></div>
+    <div class="sp-chip" id="sp-account-bar" style="display:none"></div>
+  </header>
+
+  <div class="toolbar rise" style="--d:0">
     <nav class="tabs" role="tablist" aria-label="Seções">
       <span class="pill" aria-hidden="true"></span>
       <button role="tab" id="tab-painel" aria-selected="true" aria-controls="painel">Painel</button>
       <button role="tab" id="tab-insights" aria-selected="false" aria-controls="insights">Insights</button>
-    </nav></div>
-  </header>
+    </nav>
+    <div class="dtools">
+      <button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button>
+      <button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button>
+      <button class="dbtn" id="dt-export" type="button" title="Baixar a lista em Excel ou texto"></button>
+    </div>
+  </div>
 
   <!-- ================= PAINEL ================= -->
   <section id="painel" class="tabpanel on" role="tabpanel" aria-labelledby="tab-painel">

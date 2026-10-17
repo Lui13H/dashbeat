@@ -1320,6 +1320,11 @@ function parseSpotifyPlaylistIds(text){
   for (const tok of text.split(/\s+/)){ const m = tok.match(/playlist[/:]([A-Za-z0-9]{22})/); if (m) ids.push(m[1]); }
   return [...new Set(ids)];
 }
+function parseSpotifyAlbumIds(text){
+  const ids = [];
+  for (const tok of text.split(/\s+/)){ const m = tok.match(/album[/:]([A-Za-z0-9]{22})/); if (m) ids.push(m[1]); }
+  return [...new Set(ids)];
+}
 async function spotifyToken(id, secret){
   let r;
   try { r = await fetch("https://accounts.spotify.com/api/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded", "Authorization": "Basic " + btoa(`${id}:${secret}`)}, body: "grant_type=client_credentials"}); }
@@ -1416,6 +1421,51 @@ async function spotifyFetchPlaylistTracks(playlistIds, token, onProgress, onWait
   }
   return {rows, warnings};
 }
+async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait){
+  /* álbum é catálogo público (como uma faixa avulsa), não precisa de login — e GET /albums/{id}
+     já devolve o nome/data do álbum junto com a primeira página de faixas numa única chamada */
+  const rows = [], warnings = [];
+  let backoff = 0, attempt = 0;
+  for (let ai = 0; ai < albumIds.length; ai++){
+    const id = albumIds[ai];
+    let url = `https://api.spotify.com/v1/albums/${id}?limit=50`, first = true;
+    let albumName = "", albumDate = "", total = Infinity, got = 0;
+    while (url){
+      let r;
+      for (;;){
+        try { r = await fetch(url, {headers: {Authorization: `Bearer ${token}`}}); }
+        catch (e) { throw new Error("Não foi possível buscar o álbum no Spotify."); }
+        if (r.status === 429){
+          attempt++;
+          if (attempt > 40) throw new Error("O Spotify manteve o limite de requisições por tempo demais seguidas; tente de novo em alguns minutos.");
+          const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
+          backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
+          const wait = Math.max(1, Math.round(backoff));
+          onWait && await onWait(wait, rows.length, total === Infinity ? rows.length : total, attempt);
+          continue;
+        }
+        backoff = Math.max(0, backoff - 3); attempt = 0;
+        if (r.status === 404) throw new Error("Álbum não encontrado (verifique o link).");
+        if (r.status === 403) throw new Error("Spotify recusou o acesso ao álbum (HTTP 403).");
+        if (!r.ok) throw new Error(`Falha ao buscar o álbum no Spotify (HTTP ${r.status}).`);
+        break;
+      }
+      const j = await r.json();
+      const page = first ? j.tracks : j;
+      if (first){ albumName = j.name || ""; albumDate = spotifyDate({release_date: j.release_date}); }
+      total = typeof page.total === "number" ? page.total : got + (page.items || []).length;
+      for (const t of (page.items || [])){
+        if (!t) continue;
+        rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: albumName, sec: Math.round(t.duration_ms / 1000), date: albumDate});
+      }
+      got += (page.items || []).length;
+      url = page.next || null;
+      first = false;
+      onProgress && onProgress(Math.min(got, total), total, ai + 1, albumIds.length);
+    }
+  }
+  return {rows, warnings};
+}
 
 /* ---------- login com Spotify (Authorization Code + PKCE): só assim dá pra ler o conteúdo
    de uma playlist — desde a migração de fev/2026 o Spotify só libera isso pra quem é dono ou
@@ -1430,17 +1480,42 @@ function spotifyRandToken(len = 64){ const a = new Uint8Array(len); crypto.getRa
 async function spotifyPkceChallenge(verifier){ return b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))); }
 function loadSpotifyOAuth(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_OAUTH_KEY) || "null"); } catch (e) { return null; } }
 function saveSpotifyOAuth(j, clientId){
-  const obj = {access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((j.expires_in || 3600) * 1000) - 30000, client_id: clientId};
+  const prev = loadSpotifyOAuth();
+  const obj = {access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((j.expires_in || 3600) * 1000) - 30000, client_id: clientId, profile: (prev && prev.profile) || null};
   try { localStorage.setItem(SPOTIFY_OAUTH_KEY, JSON.stringify(obj)); } catch (e) {}
   return obj;
 }
+function saveSpotifyProfile(profile){
+  const oauth = loadSpotifyOAuth();
+  if (!oauth) return;
+  oauth.profile = {name: profile.display_name || "", avatar: (profile.images && profile.images[0] && profile.images[0].url) || ""};
+  try { localStorage.setItem(SPOTIFY_OAUTH_KEY, JSON.stringify(oauth)); } catch (e) {}
+}
+async function spotifyFetchProfile(token){
+  let r; try { r = await fetch("https://api.spotify.com/v1/me", {headers: {Authorization: `Bearer ${token}`}}); } catch (e) { return null; }
+  return r.ok ? r.json() : null;
+}
 function clearSpotifyOAuth(){ try { localStorage.removeItem(SPOTIFY_OAUTH_KEY); } catch (e) {} }
+const SPOTIFY_GLYPH = `<img src="img/spotify-icon.svg" alt="" width="16" height="16" style="flex:none">`;
+function spotifyChipHtml(profile){
+  const avatar = profile.avatar ? `<img src="${esc(profile.avatar)}" alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none">`
+    : `<span style="width:22px;height:22px;border-radius:50%;background:var(--mint);color:#06140f;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none">${esc((profile.name || "?").slice(0, 1).toUpperCase())}</span>`;
+  return `${SPOTIFY_GLYPH}${avatar}<span class="sp-name">${esc(profile.name || "Conta Spotify")}</span>`;
+}
+function renderSpAccountBar(){
+  const bar = $("#sp-account-bar");
+  if (!bar) return;
+  const oauth = loadSpotifyOAuth();
+  if (!oauth || !oauth.profile){ bar.style.display = "none"; bar.innerHTML = ""; return; }
+  bar.innerHTML = spotifyChipHtml(oauth.profile);
+  bar.style.display = "";
+}
 async function spotifyLogin(clientId, pendingText, pendingMode){
   const verifier = spotifyRandToken(), state = spotifyRandToken(16);
   const challenge = await spotifyPkceChallenge(verifier);
   try { sessionStorage.setItem(SPOTIFY_PKCE_KEY, JSON.stringify({verifier, state, clientId})); } catch (e) {}
   try { sessionStorage.setItem(SPOTIFY_PENDING_KEY, JSON.stringify({text: pendingText || "", mode: pendingMode || "add"})); } catch (e) {}
-  const p = new URLSearchParams({client_id: clientId, response_type: "code", redirect_uri: spotifyRedirectUri(), code_challenge_method: "S256", code_challenge: challenge, scope: "playlist-read-private playlist-read-collaborative", state});
+  const p = new URLSearchParams({client_id: clientId, response_type: "code", redirect_uri: spotifyRedirectUri(), code_challenge_method: "S256", code_challenge: challenge, scope: "playlist-read-private playlist-read-collaborative user-read-private", state});
   location.href = "https://accounts.spotify.com/authorize?" + p.toString();
 }
 async function spotifyExchangeCode(code, verifier, clientId){
@@ -1481,15 +1556,18 @@ async function handleSpotifyRedirectAndResume(){
   try {
     const j = await spotifyExchangeCode(code, pkce.verifier, pkce.clientId);
     saveSpotifyOAuth(j, pkce.clientId);
+    const prof = await spotifyFetchProfile(j.access_token); if (prof) saveSpotifyProfile(prof);
+    renderSpAccountBar();
     toast("Login com o Spotify concluído.");
   } catch (e) { toast(e.message || "Falha ao concluir login com o Spotify."); if (pending) openImport(pending.mode, pending.text); return; }
   openImport(pending ? pending.mode : "add", pending ? pending.text : null, true);
 }
 /* núcleo comum de busca (faixas soltas e/ou playlists) usado tanto pelo fluxo com Client ID/Secret
    quanto pelo login — os dois só diferem no token que entregam aqui */
-async function spotifyRunFetch({token, ids, plIds, status, btn}){
+async function spotifyRunFetch({token, ids, plIds, albumIds, status, btn}){
   status.classList.remove("err");
-  btn.disabled = true; status.textContent = plIds.length ? `Buscando playlist${plIds.length > 1 ? "s" : ""}…` : `Buscando ${faixas(ids.length)}…`;
+  btn.disabled = true;
+  status.textContent = plIds.length ? `Buscando playlist${plIds.length > 1 ? "s" : ""}…` : albumIds.length ? `Buscando álbum${albumIds.length > 1 ? "ns" : ""}…` : `Buscando ${faixas(ids.length)}…`;
   /* cronômetro: sempre recalcula o restante a partir de "quando deve terminar" (timestamp real),
      em vez de só subtrair 1s por tick — assim não trava/atrasa mesmo se o navegador atrasar
      o timer (ex.: aba em segundo plano) */
@@ -1518,6 +1596,14 @@ async function spotifyRunFetch({token, ids, plIds, status, btn}){
         status.textContent = `Buscando faixa ${done} de ${total}${pn > 1 ? ` (playlist ${pi} de ${pn})` : ""}…${etaEndTs != null ? ` cerca de ${fmtEta(etaEndTs - performance.now())} restante` : ""}`;
       }, onWait));
     }
+    if (albumIds.length){
+      const base = results.reduce((s, r) => s + r.rows.length + r.warnings.length, 0);
+      results.push(await spotifyFetchAlbumTracks(albumIds, token, (d, t, ai, an) => {
+        done = base + d; total = base + t;
+        etaEndTs = performance.now() + ((performance.now() - t0) / Math.max(done, 1)) * (total - done);
+        status.textContent = `Buscando faixa ${done} de ${total}${an > 1 ? ` (álbum ${ai} de ${an})` : ""}…${etaEndTs != null ? ` cerca de ${fmtEta(etaEndTs - performance.now())} restante` : ""}`;
+      }, onWait));
+    }
     if (ids.length){
       const base = results.reduce((s, r) => s + r.rows.length + r.warnings.length, 0);
       results.push(await spotifyFetchTracks(ids, token, (d, t) => {
@@ -1544,7 +1630,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
   const body = document.createElement("div");
   body.innerHTML = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add">Adicionar músicas</button><button type="button" data-m="replace">Nova playlist</button></div>
     <p class="mdesc" id="im-desc"></p>
-    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Cole aqui a lista (uma faixa por linha, colunas separadas por TAB), um link de playlist do Spotify, ou links de faixas do Spotify (um por linha):&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26&#10;https://open.spotify.com/track/0G7mYkFpOp7HFRfiuNzoru&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;&#10;Também aceita .txt, .tsv, .csv ou .xlsx: arraste o arquivo para cá."></textarea></label>
+    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Cole aqui a lista (uma faixa por linha, colunas separadas por TAB), um link de playlist/álbum do Spotify, ou links de faixas do Spotify (um por linha):&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26&#10;https://open.spotify.com/track/0G7mYkFpOp7HFRfiuNzoru&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;https://open.spotify.com/album/2H1WUWFEOWwfyIl1aMFsML&#10;&#10;Também aceita .txt, .tsv, .csv ou .xlsx: arraste o arquivo para cá."></textarea></label>
     <div class="imrow"><label class="gbtn file">${ICON.up}<span>Escolher arquivo</span><input type="file" id="im-file" accept=".txt,.tsv,.csv,.xlsx,text/plain,text/csv"></label></div>
     <div id="sp-fields" style="display:none">
       <p class="mdesc" id="sp-detect-msg"></p>
@@ -1554,17 +1640,18 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
             <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
           <div class="imrow"><button class="gbtn" type="submit" id="sp-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-status"></span></div>
         </form>
-        <p class="muted">Client ID e Secret são gratuitos: crie um app em <strong>developer.spotify.com/dashboard</strong> (login com sua conta Spotify) e copie os dois valores daqui.</p>
+        <p class="muted">Client ID e Secret são gratuitos: crie um app em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> (login com sua conta Spotify) e copie os dois valores daqui.</p>
       </div>
       <div id="sp-login" style="display:none">
         <form id="sp-login-form" autocomplete="on">
           <div class="imrow"><input type="text" id="sp-login-id" name="username" placeholder="Client ID" autocomplete="username"></div>
           <div class="imrow"><button class="gbtn" type="submit" id="sp-login-go">Entrar com Spotify</button><span class="sp-status" id="sp-login-status"></span></div>
         </form>
-        <p class="muted">Links de playlist só funcionam com login: o Spotify exige que você entre com a conta dona (ou colaboradora) da playlist, mesmo quando ela é pública. Informe o Client ID do seu app (sem o Secret, não é preciso aqui) e cadastre esta <strong>Redirect URI</strong> nele, em developer.spotify.com/dashboard → seu app → Settings:</p>
+        <p class="muted">Links de playlist só funcionam com login: o Spotify exige que você entre com a conta dona (ou colaboradora) da playlist, mesmo quando ela é pública. Informe o Client ID do seu app (sem o Secret, não é preciso aqui) e cadastre esta <strong>Redirect URI</strong> nele, em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> → seu app → Settings:</p>
         <p class="muted" id="sp-redirect-hint" style="word-break:break-all;font-family:monospace"></p>
       </div>
       <div id="sp-connected" style="display:none">
+        <div class="imrow" id="sp-account" style="align-items:center;gap:10px"></div>
         <div class="imrow"><button class="gbtn" type="button" id="sp-fetch-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-connected-status"></span><button class="lnk" type="button" id="sp-logout">Sair da conta Spotify</button></div>
       </div>
     </div>
@@ -1600,11 +1687,25 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       ${fresh.slice(0, 8).map(rowHtml).join("")}</tbody></table>
       ${fresh.length > 8 ? `<div class="more">+ ${fresh.length - 8} faixas</div>` : ""}</div>`;
   }
-  function setSpotifyMode(on, n, pn){
+  function renderSpAccount(){
+    const el = q("#sp-account");
+    if (!el) return;
+    const oauth = loadSpotifyOAuth();
+    if (!oauth){ el.innerHTML = ""; return; }
+    if (!oauth.profile){
+      el.innerHTML = `<span class="muted">Conectado ao Spotify…</span>`;
+      spotifyUserToken().then(token => token && spotifyFetchProfile(token)).then(prof => { if (prof){ saveSpotifyProfile(prof); renderSpAccount(); renderSpAccountBar(); } }).catch(() => {});
+      return;
+    }
+    const {name, avatar} = oauth.profile;
+    el.innerHTML = `${avatar ? `<img src="${esc(avatar)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex:none">` : `<span style="width:32px;height:32px;border-radius:50%;background:var(--mint,#6EE7B7);color:#06140f;display:inline-flex;align-items:center;justify-content:center;font-weight:700;flex:none">${esc((name || "?").slice(0, 1).toUpperCase())}</span>`}<span>Conectado como <strong>${esc(name || "conta Spotify")}</strong></span>`;
+  }
+  function setSpotifyMode(on, n, pn, an){
     q("#sp-fields").style.display = on ? "" : "none";
     if (!on) return;
     const parts = [];
     if (pn) parts.push(`${pn} playlist${pn > 1 ? "s" : ""}`);
+    if (an) parts.push(`${an} álbu${an > 1 ? "ns" : "m"}`);
     if (n) parts.push(faixas(n));
     const oauth = pn ? loadSpotifyOAuth() : null;
     q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.${pn ? "" : " Informe o Client ID e o Client Secret pra buscar música, artista, álbum, duração e lançamento direto no Spotify:"}`;
@@ -1612,14 +1713,16 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     q("#sp-login").style.display = pn && !oauth ? "" : "none";
     q("#sp-connected").style.display = pn && oauth ? "" : "none";
     if (pn && !oauth) q("#sp-redirect-hint").textContent = spotifyRedirectUri();
+    if (pn && oauth) renderSpAccount();
   }
   const fromText = () => {
     const t = ta.value;
     if (!t.trim()){ parsed = null; setSpotifyMode(false); return update(); }
     const ids = parseSpotifyIds(t);
     const plIds = parseSpotifyPlaylistIds(t);
+    const albIds = parseSpotifyAlbumIds(t);
     const lines = t.split(/\r?\n/).filter(l => l.trim());
-    if ((ids.length || plIds.length) && (ids.length + plIds.length) / lines.length >= 0.5){ parsed = null; setSpotifyMode(true, ids.length, plIds.length); return update(); }
+    if ((ids.length || plIds.length || albIds.length) && (ids.length + plIds.length + albIds.length) / lines.length >= 0.5){ parsed = null; setSpotifyMode(true, ids.length, plIds.length, albIds.length); return update(); }
     setSpotifyMode(false);
     try { parsed = cellsToRows(textToCells(t)); if (!parsed.rows.length) parsed.error = "Nenhuma faixa reconhecida. Confira se as colunas estão separadas por TAB, ponto e vírgula ou vírgula."; } catch (e) { parsed = {rows: [], warnings: [], error: e.message}; } update();
   };
@@ -1643,14 +1746,14 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
   q("#sp-form").addEventListener("submit", async e => {
     e.preventDefault();
     const id = q("#sp-id").value.trim(), secret = q("#sp-secret").value.trim();
-    const ids = parseSpotifyIds(ta.value);
+    const ids = parseSpotifyIds(ta.value), albumIds = parseSpotifyAlbumIds(ta.value);
     const status = q("#sp-status"), btn = q("#sp-go");
     status.classList.remove("err");
     if (!id || !secret){ status.classList.add("err"); status.textContent = "Informe o Client ID e o Client Secret."; return; }
-    if (!ids.length){ status.classList.add("err"); status.textContent = "Nenhum link do Spotify reconhecido."; return; }
+    if (!ids.length && !albumIds.length){ status.classList.add("err"); status.textContent = "Nenhum link do Spotify reconhecido."; return; }
     if (q("#sp-remember").checked) saveSpotifyCreds(id, secret); else clearSpotifyCreds();
     let token; try { token = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
-    parsed = await spotifyRunFetch({token, ids, plIds: [], status, btn});
+    parsed = await spotifyRunFetch({token, ids, plIds: [], albumIds, status, btn});
     update();
   });
   q("#sp-login-form").addEventListener("submit", e => {
@@ -1663,17 +1766,18 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     spotifyLogin(clientId, ta.value, mode);
   });
   q("#sp-fetch-go").addEventListener("click", async () => {
-    const ids = parseSpotifyIds(ta.value), plIds = parseSpotifyPlaylistIds(ta.value);
+    const ids = parseSpotifyIds(ta.value), plIds = parseSpotifyPlaylistIds(ta.value), albumIds = parseSpotifyAlbumIds(ta.value);
     const status = q("#sp-connected-status"), btn = q("#sp-fetch-go");
     status.classList.remove("err");
-    let token; try { token = await spotifyUserToken(); } catch (e){ status.classList.add("err"); status.textContent = e.message; setSpotifyMode(true, ids.length, plIds.length); return; }
-    if (!token){ status.classList.add("err"); status.textContent = "Sessão do Spotify expirou; entre novamente."; setSpotifyMode(true, ids.length, plIds.length); return; }
-    parsed = await spotifyRunFetch({token, ids, plIds, status, btn});
+    let token; try { token = await spotifyUserToken(); } catch (e){ status.classList.add("err"); status.textContent = e.message; setSpotifyMode(true, ids.length, plIds.length, albumIds.length); return; }
+    if (!token){ status.classList.add("err"); status.textContent = "Sessão do Spotify expirou; entre novamente."; setSpotifyMode(true, ids.length, plIds.length, albumIds.length); return; }
+    parsed = await spotifyRunFetch({token, ids, plIds, albumIds, status, btn});
     update();
   });
   q("#sp-logout").addEventListener("click", () => {
     clearSpotifyOAuth();
-    setSpotifyMode(true, parseSpotifyIds(ta.value).length, parseSpotifyPlaylistIds(ta.value).length);
+    renderSpAccountBar();
+    setSpotifyMode(true, parseSpotifyIds(ta.value).length, parseSpotifyPlaylistIds(ta.value).length, parseSpotifyAlbumIds(ta.value).length);
   });
   if (prefillText){
     ta.value = prefillText;
@@ -1844,6 +1948,7 @@ addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { pla
 function boot(){
   placePill();
   render();
+  renderSpAccountBar();
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
   if (location.hash === "#insights") showTab("insights");
 }

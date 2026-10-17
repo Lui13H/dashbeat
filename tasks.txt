@@ -1,9 +1,11 @@
 PAINEL MUSICAL — IDEIAS DE FUTURAS ADIÇÕES
 (lista aberta, sem prioridade definida — vai sendo atualizada conforme surgem ideias)
 
+CONCLUÍDO
+- [x] Aceitar link de álbum do Spotify (igual já funciona com playlist), importando todas as faixas do álbum de uma vez.
+- [x] Mostrar o nome/avatar da conta logada no Spotify (hoje só diz "conectado").
+
 IMPORTAÇÃO / SPOTIFY
-- Aceitar link de álbum do Spotify (igual já funciona com playlist), importando todas as faixas do álbum de uma vez.
-- Mostrar o nome/avatar da conta logada no Spotify (hoje só diz "conectado").
 - Importar direto de outras plataformas: YouTube Music, Apple Music, Deezer.
 - Puxar o gênero musical de cada artista via API do Spotify e usar isso nos gráficos/filtros.
 - Importar a capa do álbum e exibir nas tabelas/tooltips.
