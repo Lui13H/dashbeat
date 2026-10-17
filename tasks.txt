@@ -1,0 +1,32 @@
+PAINEL MUSICAL — IDEIAS DE FUTURAS ADIÇÕES
+(lista aberta, sem prioridade definida — vai sendo atualizada conforme surgem ideias)
+
+IMPORTAÇÃO / SPOTIFY
+- Aceitar link de álbum do Spotify (igual já funciona com playlist), importando todas as faixas do álbum de uma vez.
+- Mostrar o nome/avatar da conta logada no Spotify (hoje só diz "conectado").
+- Importar direto de outras plataformas: YouTube Music, Apple Music, Deezer.
+- Puxar o gênero musical de cada artista via API do Spotify e usar isso nos gráficos/filtros.
+- Importar a capa do álbum e exibir nas tabelas/tooltips.
+- Botão para reautenticar automaticamente quando o refresh token expirar/for revogado, em vez de só dar erro.
+
+EDIÇÃO DA PLAYLIST
+- Editar uma faixa específica direto na tabela (corrigir nome/artista/álbum sem precisar reimportar tudo).
+- Reordenar faixas manualmente (arrastar e soltar) na visão de tabela.
+- Desfazer (undo) a última importação/edição.
+- Mesclar duas playlists exportadas em uma só, sem re-digitar.
+
+DASHBOARD / VISUALIZAÇÕES
+- Modo claro (hoje só existe o tema escuro).
+- Busca por nome de faixa (hoje os filtros são só por banda e álbum).
+- Prévia de 30s da música (quando disponível na API) ao passar o mouse/tocar na faixa.
+- Comparar duas playlists lado a lado (ex.: antes/depois de um período).
+- Gráfico de gêneros musicais, se os dados de gênero forem importados.
+
+PLATAFORMA / INFRAESTRUTURA
+- Deixar o painel instalável como PWA (ícone, abre offline com os dados já salvos).
+- Backup/restauração na nuvem (Google Drive, Dropbox) além do localStorage atual.
+- Suporte a mais de uma playlist salva no navegador, com opção de trocar entre elas.
+- Link somente-leitura para compartilhar o painel sem dar acesso de edição.
+
+EXPORTAÇÃO
+- Exportar em CSV e JSON, além do TXT/Excel que já existem.

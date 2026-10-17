@@ -1,0 +1,1850 @@
+const DEFAULT_RAW = [[1,"One","Metallica","...And Justice for All",447,"1988-08-25"],[2,"For Whom The Bell Tolls - Remastered","Metallica","Ride the Lightning",309,"1984-07-27"],[3,"Master Of Puppets","Metallica","Master of Puppets",515,"1986-03-03"],[4,"Sad But True","Metallica","Metallica",323,"1991-08-12"],[5,"Wherever I May Roam","Metallica","Metallica",403,"1991-08-12"],[6,"Enter Sandman","Metallica","Metallica",331,"1991-08-12"],[7,"The Unforgiven","Metallica","Metallica",386,"1991-08-12"],[8,"Battery","Metallica","Master of Puppets",312,"1986-03-03"],[9,"Welcome Home (Sanitarium)","Metallica","Master of Puppets",387,"1986-03-03"],[10,"Fade To Black - Remastered","Metallica","Ride the Lightning",417,"1984-07-27"],[11,"Blackened","Metallica","...And Justice for All",400,"1988-08-25"],[12,"The Shortest Straw","Metallica","...And Justice for All",395,"1988-08-25"],[13,"All Nightmare Long","Metallica","Death Magnetic",477,"2008-01-01"],[14,"Don't Tread On Me","Metallica","Metallica",240,"1991-08-12"],[15,"The Thing That Should Not Be","Metallica","Master of Puppets",396,"1986-03-03"],[16,"Murder One","Metallica","Hardwired... to Self-Destruct",345,"2016-11-18"],[17,"...And Justice For All","Metallica","...And Justice for All",586,"1988-08-25"],[18,"Eye Of The Beholder","Metallica","...And Justice for All",390,"1988-08-25"],[19,"Sarcastrophe","Slipknot",".5: The Gray Chapter",306,"2014-10-15"],[20,"A.V.I.","Slipknot",".5: The Gray Chapter",332,"2014-10-15"],[21,"The Devil in I","Slipknot",".5: The Gray Chapter",342,"2014-10-15"],[22,"Lech","Slipknot",".5: The Gray Chapter",290,"2014-10-15"],[23,"The Negative One","Slipknot",".5: The Gray Chapter",325,"2014-10-15"],[24,"All Out Life","Slipknot","All Out Life",340,"2018-10-31"],[25,"People = Shit","Slipknot","Iowa",215,"2001-01-01"],[26,"Disasterpiece","Slipknot","Iowa",308,"2001-01-01"],[27,"Everything Ends","Slipknot","Iowa",254,"2001-01-01"],[28,"The Heretic Anthem","Slipknot","Iowa",254,"2001-01-01"],[29,"Left Behind","Slipknot","Iowa",241,"2001-01-01"],[30,"Spit It Out - Hyper Version","Slipknot","Antennas to Hell",144,"2009-09-09"],[31,"The Blister Exists","Slipknot","Vol. 3: (The Subliminal Verses)",319,"2004-01-01"],[32,"Three Nil","Slipknot","Vol. 3: (The Subliminal Verses)",288,"2004-01-01"],[33,"Duality","Slipknot","Vol. 3: (The Subliminal Verses)",252,"2004-01-01"],[34,"Before I Forget","Slipknot","Vol. 3: (The Subliminal Verses)",278,"2004-01-01"],[35,"Scream","Slipknot","Vol. 3: (The Subliminal Verses)",271,"2004-01-01"],[36,"Unsainted","Slipknot","We Are Not Your Kind",260,"2019-08-09"],[37,"Birth Of The Cruel","Slipknot","We Are Not Your Kind",275,"2019-08-09"],[38,"Nero Forte","Slipknot","We Are Not Your Kind",315,"2019-08-09"],[39,"Critical Darling","Slipknot","We Are Not Your Kind",385,"2019-08-09"],[40,"Red Flag","Slipknot","We Are Not Your Kind",251,"2019-08-09"],[41,"Orphan","Slipknot","We Are Not Your Kind",361,"2019-08-09"],[42,"Solway Firth","Slipknot","We Are Not Your Kind",355,"2019-08-09"],[43,"B.Y.O.B.","System Of A Down","Mezmerize",255,"2005-05-17"],[44,"I-E-A-I-A-I-O","System Of A Down","Steal This Album!",188,"2002-11-26"],[45,"Sugar","System Of A Down","System Of A Down",153,"1998-01-01"],[46,"Spiders","System Of A Down","System Of A Down",215,"1998-01-01"],[47,"Toxicity","System Of A Down","Toxicity",218,"2001-09-04"],[48,"Aerials","System Of A Down","Toxicity",235,"2001-09-04"],[49,"Walk","Pantera","Vulgar Display of Power",315,"1992-01-01"],[50,"We’ll Be Back","Megadeth","The Sick, the Dying... and the Dead!",269,"2022-09-02"],[51,"The Trooper - 2015 Remaster","Iron Maiden","Piece of Mind",252,"1983-01-01"],[52,"Nightmare","Avenged Sevenfold","Nightmare",374,"2010-07-25"],[53,"Buried Alive","Avenged Sevenfold","Nightmare",404,"2010-07-25"],[54,"Walk","Avenged Sevenfold","Diamonds in the Rough",321,"2007-07-10"],[55,"This Means War","Avenged Sevenfold","Hail to the King",369,"2013-08-20"],[56,"Hail to the King","Avenged Sevenfold","Hail to the King",305,"2013-08-20"],[57,"Roots Bloody Roots","Sepultura","Roots",212,"1996-02-20"],[58,"Refuse / Resist","Sepultura","Chaos A.D.",199,"1993-09-02"],[59,"Ratamahatta","Sepultura","Roots",270,"1996-02-20"],[60,"The Number of the Beast - 2015 Remaster","Iron Maiden","The Number of the Beast",290,"1982-01-01"],[61,"2 Minutes to Midnight - 2015 Remaster","Iron Maiden","Powerslave",363,"1984-01-01"],[62,"Teutonic Terror","Accept","Blood of the Nations",313,"2010-08-20"],[63,"Delusions of Saviour","Slayer","Repentless",115,"2015-09-11"],[64,"Painkiller","Judas Priest","Painkiller",365,"1990-09-26"],[65,"Territory","Sepultura","Chaos A.D.",287,"1993-09-02"],[66,"The Beautiful People","Marilyn Manson","Antichrist Superstar",218,"1996-01-01"],[67,"Just One Fix","Sepultura","Kairos",211,"2011-06-24"],[68,"Breed Apart","Sepultura","Roots",241,"1996-02-20"],[69,"Skeletons Of Society","Slayer","Seasons in the Abyss",280,"1990-10-09"],[70,"Memento Mori","Lamb of God","Omens",348,"2020-06-19"],[71,"Voice of the Soul","Death","The Sound of Perseverance",223,"1998-01-01"],[72,"Suite-Pee","System Of A Down","System Of A Down",151,"1998-01-01"],[73,"Pulse of the Maggots","Slipknot","Vol. 3: (The Subliminal Verses)",259,"2004-01-01"],[74,"Bounce","System Of A Down","Toxicity",114,"2001-09-04"],[75,"Custer","Slipknot",".5: The Gray Chapter",254,"2014-10-15"],[76,"Purity","Slipknot","Slipknot",265,"2009-09-09"],[77,"All Hope Is Gone","Slipknot","All Hope Is Gone",284,"2008-08-22"],[78,"Interloper - Demo","Slipknot","Slipknot (10th Anniversary Edition)",139,"2009-09-09"],[79,"Vermilion","Slipknot","Vol. 3: (The Subliminal Verses)",316,"2004-01-01"],[80,"Hive Mind","Slipknot","The End, So Far",315,"2022-09-30"],[81,"Falling Away from Me","Korn","Issues",270,"1999-11-09"],[82,"Got the Life","Korn","Follow the Leader",225,"1998-08-18"],[83,"Warranty","Slipknot","The End, So Far",231,"2022-09-30"],[84,"Spectrum","Sepultura","Kairos",241,"2011-06-24"],[85,"Orgasmatron","Sepultura","Arise (Remastered)",254,"1991-03-20"],[86,"Arise","Sepultura","Arise",198,"1991-03-20"],[87,"Kairos","Sepultura","Kairos",215,"2011-06-24"],[88,"Born Strong","Sepultura","Kairos",278,"2011-06-24"],[89,"Structure Violence Azzes","Sepultura","Kairos",337,"2011-06-24"],[90,"Machine Messiah","Sepultura","Machine Messiah",354,"2017-01-13"],[91,"Fear of the Dark - 2015 Remaster","Iron Maiden","Fear of the Dark",438,"1992-01-01"],[92,"Spit","Sepultura","Roots",165,"1996-02-20"],[93,"Dictatorshit","Sepultura","Roots",84,"1996-02-20"],[94,"Carry On","Avenged Sevenfold","Black Ops II (Soundtrack)",255,"2012-09-24"],[95,"Diluted","Slipknot","Slipknot",203,"1999-01-01"],[96,"Liberate","Slipknot","Slipknot",184,"1999-01-01"],[97,"Aces High - 2015 Remaster","Iron Maiden","Powerslave",271,"1984-01-01"],[98,"Alexander the Great (356-323 B.C.) - 2015 Remaster","Iron Maiden","Somewhere in Time",517,"1986-01-01"],[99,"Children of the Damned - 2015 Remaster","Iron Maiden","The Number of the Beast",275,"1982-01-01"],[100,"Rime of the Ancient Mariner - 2015 Remaster","Iron Maiden","Powerslave",818,"1984-01-01"],[101,"The Evil That Men Do - 2015 Remaster","Iron Maiden","Seventh Son of a Seventh Son",274,"1988-01-01"],[102,"Opium of the People","Slipknot","Vol. 3: (The Subliminal Verses)",192,"2004-01-01"],[103,"Dusted","Sepultura","Roots",243,"1996-02-20"],[104,"The Clairvoyant - 2015 Remaster","Iron Maiden","Seventh Son of a Seventh Son",267,"1988-01-01"],[105,"Hallowed Be Thy Name - 2015 Remaster","Iron Maiden","The Number of the Beast",431,"1982-01-01"],[106,"Tornado Of Souls - 2004 Remix","Megadeth","Rust in Peace",319,"1990-10-04"],[107,"Silent Scream","Slayer","South of Heaven",186,"1988-01-01"],[108,"Spit Out The Bone","Metallica","Hardwired... to Self-Destruct",429,"2016-11-18"],[109,"Hangar 18 - 2004 Remix","Megadeth","Rust in Peace",311,"1990-10-04"],[110,"Surfacing","Slipknot","Slipknot",218,"1999-01-01"],[111,"No Life","Slipknot","Slipknot",167,"1999-01-01"],[112,"Inherit the Earth","Burn The Priest","Burn the Priest",209,"2018-05-18"],[113,"Honey Bucket","Burn The Priest","Burn the Priest",163,"2018-05-18"],[114,"Jesus Built My Hotrod","Burn The Priest","Burn the Priest",373,"2018-05-18"],[115,"We Gotta Know","Burn The Priest","Burn the Priest",207,"2018-05-18"],[116,"Laid to Rest","Lamb of God","Ashes of the Wake",230,"2004-08-26"],[117,"Kerosene","Burn The Priest","Burn the Priest",372,"2018-05-18"],[118,"Sphinx","Gojira","Fortitude",240,"2021-04-30"],[119,"Filth Upon Filth","Soulfly","Totem",173,"2022-08-05"],[120,"Flying Whales","Gojira","From Mars to Sirius",464,"2005-09-27"],[121,"If You Want Peace... Prepare For War","Children Of Bodom","Are You Dead Yet?",237,"2005-01-01"],[122,"Bastards Of Bodom","Children Of Bodom","Are You Dead Yet?",207,"2005-01-01"],[123,"Needled 24 / 7","Children Of Bodom","Hate Crew Deathroll",248,"2004-01-01"],[124,"Under Grass and Clover","Children Of Bodom","Hexed",213,"2019-03-08"],[125,"The Nameless","Slipknot","Vol. 3: (The Subliminal Verses)",268,"2004-01-01"],[126,"Gematria (The Killing Name)","Slipknot","All Hope Is Gone",361,"2008-08-22"],[127,"Sulfur","Slipknot","All Hope Is Gone",277,"2008-08-22"],[128,"Vendetta","Slipknot","All Hope Is Gone",315,"2008-08-22"],[129,"This Cold Black","Slipknot","All Hope Is Gone",280,"2008-08-22"],[130,"Psychosocial","Slipknot","All Hope Is Gone",283,"2008-08-22"],[131,"Unstable","Adema","Unstable",192,"2003-06-11"],[132,"Hallowed Be Thy Name","Machine Head","The Blackening",447,"2007-03-27"],[133,"Animal I Have Become","Three Days Grace","One-X",231,"2006-06-25"],[134,"Nomad","Sepultura","Chaos A.D.",299,"1993-09-02"],[135,"Freak On a Leash","Korn","Follow the Leader",255,"1998-08-18"],[136,"512","Lamb of God","VII: Sturm und Drang",284,"2015-07-24"],[137,"Altered State","Sepultura","Arise",394,"1991-03-20"],[138,"Harvester Of Sorrow","Metallica","...And Justice for All",345,"1988-08-25"],[139,"Under the Waste Command","Municipal Waste","Slime and Punishment",110,"2017-06-23"],[140,"Thrasher's Abattoir","Carcass","Surgical Steel",110,"2013-09-13"],[141,"Blind","Korn","Korn",258,"1994-10-11"],[142,"Snuff","Slipknot","All Hope Is Gone",276,"2008-08-22"],[143,"Halo","Machine Head","The Blackening",543,"2007-03-27"],[144,"Amazonia","Gojira","Fortitude",300,"2021-04-30"],[145,"1985","Carcass","Surgical Steel",75,"2013-09-13"],[146,"Let Go","Illdisposed","The Prestige",68,"2008-03-28"],[147,"The Heaviest Matter of the Universe","Gojira","From Mars to Sirius",237,"2005-09-27"],[148,"(sic)","Slipknot","Slipknot",199,"1999-01-01"],[149,"Eyeless","Slipknot","Slipknot",236,"1999-01-01"],[150,"Wait and Bleed","Slipknot","Slipknot",147,"1999-01-01"],[151,"Silvera","Gojira","Magma",212,"2016-06-17"],[152,"L'enfant sauvage","Gojira","L'Enfant Sauvage",257,"2012-06-26"],[153,"Born in Winter","Gojira","L'Enfant Sauvage",231,"2012-06-26"],[154,"Another World","Gojira","Another World",264,"2021-04-30"],[155,"Oroborus","Gojira","The Way of All Flesh",321,"2008-10-06"],[156,"Born For One Thing","Gojira","Fortitude",260,"2021-04-30"],[157,"Holy Wars...The Punishment Due - 2004 Remix","Megadeth","Rust in Peace",392,"1990-10-04"],[158,"Not Ready to Die - From \"Call of the Dead\"","Avenged Sevenfold","Not Ready to Die",425,"2011-05-02"],[159,"Bloodline","Slayer","God Hates Us All",216,"2001-01-01"],[160,"Born Stubborn","Sepultura","Roots",247,"1996-02-20"],[161,"Losfer Words (Big 'Orra) - 2015 Remaster","Iron Maiden","Powerslave",255,"1984-01-01"],[162,"The Shooting Star","Gojira","Magma",342,"2016-06-17"],[163,"Prison Song","System Of A Down","Toxicity",201,"2001-09-04"],[164,"Cowboys from Hell","Pantera","Cowboys from Hell",243,"1990-07-20"],[165,"Nookie","Limp Bizkit","Significant Other",289,"1999-01-01"],[166,"Vandals Nest","Sepultura","Machine Messiah",167,"2017-01-13"],[167,"Redneck","Lamb of God","Sacrament",220,"2006-08-22"],[168,"Zero Tolerance","Death","Symbolic",288,"1995-03-19"],[169,"Biotech Is Godzilla","Sepultura","Chaos A.D.",112,"1993-09-02"],[170,"This Love","Pantera","Vulgar Display of Power",393,"1992-01-01"],[171,"Sympathy","Pissing Razors","Where Death Lives",203,"1999-04-20"],[172,"Domination","Pantera","Cowboys from Hell",305,"1990-07-20"],[173,"Axis Rot","Burn The Priest","Burn the Priest",184,"2018-05-18"],[174,"Mouth for War","Pantera","Vulgar Display of Power",237,"1992-01-01"],[175,"Sun Doesn't Rise","Mushroomhead","XIII",193,"2003-01-01"],[176,"Straighthate","Sepultura","Roots",321,"1996-02-20"],[177,"The Day That Never Comes","Metallica","Death Magnetic",476,"2008-01-01"],[178,"Shepherd of Fire","Avenged Sevenfold","Hail to the King",323,"2013-08-20"],[179,"Creeping Death - Remastered","Metallica","Ride the Lightning",395,"1984-07-27"],[180,"Dystopia","Megadeth","Dystopia",299,"2016-01-22"],[181,"Down for Life","Testament","The Gathering",203,"1999-06-08"],[182,"Repentless","Slayer","Repentless",199,"2015-09-11"],[183,"Dead Embryonic Cells","Sepultura","Arise",292,"1991-03-20"],[184,"Dig","Mudvayne","L.D. 50",162,"2000-08-13"],[185,"Orion","Metallica","Master of Puppets",507,"1986-03-03"],[186,"Disposable Heroes","Metallica","Master of Puppets",496,"1986-03-03"],[187,"Ride The Lightning - Remastered","Metallica","Ride the Lightning",396,"1984-07-27"],[188,"Welcome","Slipknot","Vol. 3: (The Subliminal Verses)",195,"2004-01-01"],[189,"Slaughtered","Pantera","Far Beyond Driven",237,"1994-01-01"],[190,"Blacklist","Exodus","Tempo of the Damned",376,"2004-02-02"],[191,"I'm Broken","Pantera","Far Beyond Driven",264,"1994-01-01"],[192,"Brotherhood of the Snake","Testament","Brotherhood of the Snake",253,"2016-10-28"],[193,"Get This","Slipknot","Slipknot",123,"2009-09-09"],[194,"Ten Ton Hammer","Machine Head","The More Things Change...",254,"1997-01-01"],[195,"A New Level - 2012 Remaster","Pantera","Vulgar Display of Power",237,"1992-01-01"],[196,"Backbone","Gojira","From Mars to Sirius",258,"2005-09-27"],[197,"Descending","Lamb of God","Sacrament",215,"2006-08-22"],[198,"The Pale King","Testament","Brotherhood of the Snake",291,"2016-10-28"],[199,"Hourglass","Lamb of God","Ashes of the Wake",240,"2004-08-26"],[200,"Bat Country","Avenged Sevenfold","City of Evil",311,"2005-06-06"],[201,"Forget to Remember - From Saw II - Original Soundtrack","Mudvayne","Lost and Found",215,"2005-01-01"],[202,"Strife","Trivium","Vengeance Falls",269,"2013-10-08"],[203,"Caught Somewhere in Time - 2015 Remaster","Iron Maiden","Somewhere in Time",447,"1986-01-01"],[204,"Stranger in a Strange Land - 2015 Remaster","Iron Maiden","Somewhere in Time",346,"1986-01-01"],[205,"Given Up","Linkin Park","Minutes to Midnight",189,"2007-05-14"],[206,"Symbolic","Death","Symbolic",392,"1995-03-19"],[207,"Spirit Crusher","Death","The Sound of Perseverance",407,"1998-01-01"],[208,"Flesh and the Power It Holds","Death","The Sound of Perseverance",506,"1998-01-01"],[209,"Lack of Comprehension","Death","Human",223,"2011-06-21"],[210,"Trapped In A Corner","Death","Individual Thought Patterns",254,"2011-10-25"],[211,"Crystal Mountain","Death","Symbolic",307,"1995-03-19"],[212,"Almost Easy","Avenged Sevenfold","Avenged Sevenfold",234,"2007-10-26"],[213,"Fight Fire With Fire - Remastered","Metallica","Ride the Lightning",284,"1984-07-27"],[214,"Walk with Me In Hell","Lamb of God","Sacrament",311,"2006-08-22"],[215,"Dead Memories","Slipknot","All Hope Is Gone",268,"2008-08-22"],[216,"Only One","Slipknot","Slipknot",144,"2009-09-09"],[217,"5 Minutes Alone","Pantera","Far Beyond Driven",347,"1994-01-01"],[218,"Propaganda","Sepultura","Chaos A.D.",213,"1993-09-02"],[219,"Demonic Refusal","Testament","Demonic",321,"1997-06-09"],[220,"Skeptic","Slipknot",".5: The Gray Chapter",286,"2014-10-15"],[221,"Nomadic","Slipknot",".5: The Gray Chapter",258,"2014-10-15"],[222,"Love","Gojira","Terra Incognita",259,"2001-03-19"],[223,"Remembrance","Gojira","The Link",275,"2003-04-18"],[224,"Mouth of Kala","Gojira","L'Enfant Sauvage",351,"2012-06-26"],[225,"The art of dying","Gojira","The Way of All Flesh",594,"2008-10-13"],[226,"My Own Summer (Shove It)","Deftones","Around the Fur",214,"1997-10-27"],[227,"Grace","Lamb of God","Wrath",236,"2009-02-23"],[228,"Be Still and Know","Machine Head","Unto the Locust",343,"2011-09-21"],[229,"Stranded","Gojira","Magma",269,"2016-06-17"],[230,"Davidian","Machine Head","Burn My Eyes",296,"1994-08-08"],[231,"Set To Fail","Lamb of God","Wrath",226,"2009-02-23"],[232,"Amen","Sepultura","Chaos A.D.",267,"1993-09-02"],[233,"Kaiowas","Sepultura","Chaos A.D.",223,"1993-09-02"],[234,"Manifest","Sepultura","Chaos A.D.",289,"1993-09-02"],[235,"Murder","Sepultura","Arise",206,"1991-03-20"],[236,"Under Siege (Regnum Irae)","Sepultura","Arise",294,"1991-03-20"],[237,"Natural Born Killer","Avenged Sevenfold","Nightmare",315,"2010-07-25"],[238,"Contractor","Lamb of God","Wrath",202,"2009-02-23"],[239,"Deathamphetamine","Exodus","Shovel Headed Kill Machine",511,"2005-10-04"],[240,"Empty Words","Death","Symbolic",382,"1995-03-19"],[241,"Funeral Hymn","Exodus","The Atrocity Exhibition... Exhibit A",517,"2007-10-26"],[242,"Salt the Wound","Exodus","Blood In, Blood Out",264,"2014-10-10"],[243,"Riot Act","Exodus","The Atrocity Exhibition... Exhibit A",217,"2007-10-26"],[244,"Persona Non Grata","Exodus","Persona Non Grata",450,"2021-11-19"],[245,"The Beatings Will Continue (Until Morale Improves)","Exodus","Persona Non Grata",181,"2021-11-19"],[246,"Blood in Blood Out","Exodus","Blood In, Blood Out",222,"2014-10-10"],[247,"Save Me","Avenged Sevenfold","Nightmare",656,"2010-07-25"],[248,"Bedlam 1-2-3","Exodus","The Atrocity Exhibition... Exhibit A",479,"2007-10-26"],[249,"Culling the Herd","Exodus","Tempo of the Damned",367,"2004-02-02"],[250,"Impaler","Exodus","Tempo of the Damned",324,"2004-02-02"],[251,"My Last Nerve","Exodus","Blood In, Blood Out",370,"2014-10-10"],[252,"Forward March","Exodus","Tempo of the Damned",458,"2004-02-02"],[253,"War Is My Shepherd","Exodus","Tempo of the Damned",267,"2004-02-02"],[254,"Esoteric Surgery","Gojira","The Way of All Flesh",344,"2008-10-06"],[255,"Scavenger of Human Sorrow","Death","The Sound of Perseverance",416,"1998-01-01"],[256,"Painkiller","Death","The Sound of Perseverance",362,"1998-01-01"],[257,"Food for the Worms","Exodus","Blood In, Blood Out",382,"2014-10-10"],[258,"Psycho Holiday","Pantera","Cowboys from Hell",319,"1990-07-20"],[259,"In Human Form","Death","Individual Thought Patterns",237,"2011-10-25"],[260,"Wrapped in the Arms of Rage","Exodus","Blood In, Blood Out",270,"2014-10-10"],[261,"Honor Killings","Exodus","Blood In, Blood Out",342,"2014-10-10"],[262,"Clone","Gojira","The Link",297,"2009-01-01"],[263,"March of the Sycophants","Exodus","Exhibit B: The Human Condition",405,"2010-05-07"],[264,"The Cell","Gojira","Magma",197,"2016-06-17"],[265,"Children of a Worthless God","Exodus","The Atrocity Exhibition... Exhibit A",504,"2007-10-26"],[266,"Love?","Strapping Young Lad","Alien",293,"2005-01-01"],[267,"Jealousy","Death","Individual Thought Patterns",221,"2011-10-25"],[268,"44 Magnum Opus","Exodus","Shovel Headed Kill Machine",416,"2005-10-04"],[269,"As It Was, as It Soon Shall Be","Exodus","The Atrocity Exhibition... Exhibit A",315,"2007-10-26"],[270,"Low Lands","Gojira","Magma",363,"2016-06-17"],[271,"Explosia","Gojira","L'Enfant Sauvage",399,"2012-06-26"],[272,"Creeping Death","Stone Sour","Straight Outta Burbank...",395,"2015-04-28"],[273,"Tempo of the Damned","Exodus","Tempo of the Damned",261,"2004-02-02"],[274,"I Am Abomination","Exodus","Shovel Headed Kill Machine",204,"2005-10-04"],[275,"Space Time","Gojira","The Link",320,"2009-01-01"],[276,"Shroud of Urine","Exodus","Tempo of the Damned",291,"2004-02-02"],[277,"Afterlife","Avenged Sevenfold","Avenged Sevenfold",352,"2007-10-26"],[278,"Burn, Hollywood, Burn","Exodus","Exhibit B: The Human Condition",245,"2010-05-07"],[279,"Bite the Pain","Death","The Sound of Perseverance",269,"1998-01-01"],[280,"Ruin","Lamb of God","As the Palaces Burn",234,"2003-05-05"],[281,"Downfall","Exodus","Exhibit B: The Human Condition",381,"2010-05-07"],[282,"Unholy Confessions","Avenged Sevenfold","Waking the Fallen",283,"2003-08-26"],[283,"Beast and the Harlot","Avenged Sevenfold","City of Evil",343,"2005-06-06"],[284,"Burn It Down","Avenged Sevenfold","City of Evil",298,"2005-06-06"],[285,"Blinded in Chains","Avenged Sevenfold","City of Evil",394,"2005-06-06"],[286,"Trashed and Scattered","Avenged Sevenfold","City of Evil",351,"2005-06-06"],[287,"I Won't See You Tonight Part 2","Avenged Sevenfold","Waking the Fallen",284,"2003-08-26"],[288,"Toxic Garbage Island","Gojira","The Way of All Flesh",246,"2008-10-13"],[289,"Vacuity","Gojira","The Way of All Flesh",291,"2008-10-13"],[290,"Lizard Skin","Gojira","Terra Incognita",270,"2001-03-19"],[291,"Imperium","Machine Head","Through the Ashes of Empires",401,"2003-12-16"],[292,"Now You've Got Something to Die For","Lamb of God","Ashes of the Wake",219,"2004-08-26"],[293,"Omertá","Lamb of God","Ashes of the Wake",286,"2004-08-26"],[294,"Nothing Remains","Chimaira","Chimaira",336,"2005-08-01"],[295,"Locust","Machine Head","Unto the Locust",456,"2011-09-21"],[296,"Power Trip","Chimaira","The Impossibility of Reason",166,"2003-05-05"],[297,"11th Hour","Lamb of God","As the Palaces Burn",224,"2003-05-06"],[298,"A Devil In God's Country","Lamb of God","As the Palaces Burn",194,"2003-05-06"],[299,"In Defense Of Our Good Name","Lamb of God","As the Palaces Burn",250,"2003-05-06"],[300,"Vigil","Lamb of God","As the Palaces Burn",283,"2003-05-06"],[301,"The Faded Line","Lamb of God","Ashes of the Wake",278,"2004-08-26"],[302,"Blood Of The Scribe","Lamb of God","Ashes of the Wake",263,"2004-08-26"],[303,"One Gun","Lamb of God","Ashes of the Wake",239,"2004-08-26"],[304,"Break You","Lamb of God","Ashes of the Wake",215,"2004-08-26"],[305,"What I've Become","Lamb of God","Ashes of the Wake",208,"2004-08-26"],[306,"Ashes of the Wake","Lamb of God","Ashes of the Wake",345,"2004-08-26"],[307,"Remorse Is for the Dead","Lamb of God","Ashes of the Wake",340,"2004-08-26"],[308,"Pathetic","Lamb of God","Sacrament",271,"2006-08-22"],[309,"Foot to the Throat","Lamb of God","Sacrament",193,"2006-08-22"],[310,"Blacken the Cursed Sun","Lamb of God","Sacrament",328,"2006-08-22"],[311,"Forgotten (Lost Angels)","Lamb of God","Sacrament",185,"2006-08-22"],[312,"Requiem","Lamb of God","Sacrament",251,"2006-08-22"],[313,"More Time to Kill","Lamb of God","Sacrament",217,"2006-08-22"],[314,"Beating On Death's Door","Lamb of God","Sacrament",307,"2006-08-22"],[315,"The Passing","Lamb of God","Wrath",120,"2009-02-23"],[316,"In Your Words","Lamb of God","Wrath",324,"2009-02-23"],[317,"Without Judgement","Death","Symbolic",328,"1995-03-19"],[318,"The Garden of Bleeding","Exodus","The Atrocity Exhibition... Exhibit A",349,"2007-10-26"],[319,"R.E.M.F.","Exodus","Persona Non Grata",262,"2021-11-19"],[320,"Iconoclasm","Exodus","The Atrocity Exhibition... Exhibit A",474,"2007-10-26"],[321,"Collateral Damage","Exodus","Blood In, Blood Out",327,"2014-10-10"],[322,"Condemn The Hive","Lamb of God","Wrath",221,"2009-02-23"],[323,"Shoulder Of Your God - Bonus Track","Lamb of God","Wrath",355,"2009-02-23"],[324,"We Die Alone - Bonus Track","Lamb of God","Wrath",278,"2009-02-23"],[325,"Reclamation","Lamb of God","Wrath",426,"2009-02-23"],[326,"Choke Sermon","Lamb of God","Wrath",200,"2009-02-23"],[327,"Everything To Nothing","Lamb of God","Wrath",230,"2009-02-23"],[328,"Dead Seeds","Lamb of God","Wrath",221,"2009-02-23"],[329,"Broken Hands","Lamb of God","Wrath",233,"2009-02-23"],[330,"Desolation","Lamb of God","Resolution",234,"2012-01-24"],[331,"Scar Spangled Banner","Exodus","Tempo of the Damned",401,"2004-02-02"],[332,"Liquid Fire","Gojira","L'Enfant Sauvage",257,"2012-06-26"],[333,"Pure Hatred","Chimaira","The Impossibility of Reason",256,"2003-05-05"],[334,"Resurrection","Chimaira","Resurrection",277,"2007-03-02"],[335,"Salvation","Chimaira","Chimaira",320,"2005-08-01"],[336,"Cleansation","Chimaira","The Impossibility of Reason",247,"2003-05-05"],[337,"Sacred Serenity","Death","Symbolic",267,"1995-03-19"],[338,"Fucking Hostile","Pantera","Vulgar Display of Power",168,"1992-01-01"],[339,"Rise","Pantera","Vulgar Display of Power",276,"1992-01-01"],[340,"No Good (Attack the Radical)","Pantera","Vulgar Display of Power",289,"1992-01-01"],[341,"Scene Two: I. Overture 1928","Dream Theater","Metropolis Pt. 2: Scenes from a Memory",217,"1999-01-01"],[342,"Slipping Into Madness","Exodus","Persona Non Grata",333,"2021-11-19"],[343,"Heresy","Pantera","Cowboys from Hell",286,"1990-07-20"],[344,"Critical Acclaim","Avenged Sevenfold","Avenged Sevenfold",315,"2007-10-26"],[345,"Misanthrope","Death","Symbolic",303,"1995-03-19"],[346,"The Mirror","Dream Theater","Awake",405,"1994-10-03"],[347,"Resurrection Man","Lamb of God","Omens",299,"2020-06-19"],[348,"More Than Meets the Eye","Testament","The Formation of Damnation",273,"2008-04-25"],[349,"Death Blooms","Mudvayne","L.D. 50",291,"2000-08-13"],[350,"I Will Be Heard","Hatebreed","Perseverance",178,"2002-01-01"],[351,"Still Echoes","Lamb of God","VII: Sturm und Drang",262,"2015-07-24"],[352,"Ghost Walking","Lamb of God","Resolution",270,"2012-01-24"],[353,"The Killing Floor","Lamb of God","Omens",256,"2026-03-13"],[354,"Ditch","Lamb of God","Omens",217,"2022-10-07"],[355,"Poison Dream","Lamb of God, Jamey Jasta","Omens",297,"2020-06-19"],[356,"Hit The Wall","Lamb of God","Resolution",219,"2012-01-24"],[357,"COLD BLOOD","HEALTH, Lamb of God","DISCO4 :: PART II",326,"2022-04-08"],[358,"Blunt Force Blues","Lamb of God","Omens",251,"2026-03-13"]];
+/* ---------------- data layer: the list lives in the browser, so imports/edits survive reloads ---------------- */
+const STORE_KEY = "catalogo-musical:v1";
+function readStore(){
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) {}
+  if (!s){ try { const w = JSON.parse(window.name || "null"); if (w && w.k === STORE_KEY) s = w.v; } catch (e) {} }
+  return s && Array.isArray(s.rows) && s.rows.length ? s : null;
+}
+function writeStore(obj){
+  let ok = false;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(obj)); ok = true; } catch (e) {}
+  try { window.name = JSON.stringify({k: STORE_KEY, v: obj}); ok = true; } catch (e) {}
+  return ok;
+}
+function clearStore(){ try { localStorage.removeItem(STORE_KEY); } catch (e) {} try { window.name = ""; } catch (e) {} }
+function setFlash(msg){ try { sessionStorage.setItem(STORE_KEY + ":flash", msg); } catch (e) {} }
+function takeFlash(){ try { const m = sessionStorage.getItem(STORE_KEY + ":flash"); sessionStorage.removeItem(STORE_KEY + ":flash"); return m; } catch (e) { return null; } }
+const STORE = readStore();
+const RAW = STORE ? STORE.rows : DEFAULT_RAW;
+const NI = "Não identificado";
+const coll = new Intl.Collator("pt-BR", {sensitivity: "base", numeric: true});
+const T = RAW.map(([n, title, artist, album, sec, date]) => ({
+  n, title, artist: (artist || "").trim() || NI, album: (album || "").trim() || NI,
+  sec: sec, date: date || "", year: date ? +date.slice(0, 4) : NI
+}));
+const ALL_BANDS = [...new Set(T.map(t => t.artist))].sort(niLast);
+const ALL_ALBUMS = [...new Set(T.map(t => t.album))].sort(niLast);
+const ALL_YEARS = [...new Set(T.map(t => t.year))].sort((a, b) => a === NI ? 1 : b === NI ? -1 : a - b);
+function niLast(a, b){ return a === NI ? 1 : b === NI ? -1 : coll.compare(a, b); }
+const bandAlbums = new Map(), albumBands = new Map();
+for (const t of T){
+  (bandAlbums.get(t.artist) || bandAlbums.set(t.artist, new Set()).get(t.artist)).add(t.album);
+  (albumBands.get(t.album) || albumBands.set(t.album, new Set()).get(t.album)).add(t.artist);
+}
+const state = {bands: new Set(), albums: new Set()};
+const $ = s => document.querySelector(s);
+const fmtInt = n => n.toLocaleString("pt-BR");
+const pct = (a, b, d = 1) => (b ? (100 * a / b) : 0).toLocaleString("pt-BR", {minimumFractionDigits: d, maximumFractionDigits: d}) + "%";
+function fmtDur(s){
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}`;
+}
+function fmtLong(s){ const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? `${h}h ${String(m).padStart(2, "0")}min` : `${m}min`; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+function groupBy(rows, key){ const m = new Map(); for (const r of rows){ const k = r[key]; (m.get(k) || m.set(k, []).get(k)).push(r); } return m; }
+const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
+
+function rows(useBand = true, useAlbum = true){
+  return T.filter(t => (!useBand || !state.bands.size || state.bands.has(t.artist)) &&
+                       (!useAlbum || !state.albums.size || state.albums.has(t.album)));
+}
+const bandEnabled = b => !state.albums.size || [...bandAlbums.get(b)].some(a => state.albums.has(a));
+const albumEnabled = a => !state.bands.size || [...albumBands.get(a)].some(b => state.bands.has(b));
+
+$("#srcline").textContent = `${fmtInt(T.length)} faixas · ${ALL_BANDS.length} artistas · ${ALL_ALBUMS.length} álbuns`;
+
+/* ---------------- tween numbers ---------------- */
+const tweens = new WeakMap();
+function tween(el, to, fmt, dur = 900){
+  const from = tweens.has(el) ? tweens.get(el) : 0;
+  tweens.set(el, to);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || from === to || document.hidden){ el.textContent = fmt(to); return; }
+  const t0 = performance.now();
+  const step = now => {
+    const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 4);
+    el.textContent = fmt(from + (to - from) * e);
+    if (k < 1 && tweens.get(el) === to) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+  setTimeout(() => { if (tweens.get(el) === to) el.textContent = fmt(to); }, dur + 400);   // guarantees the final value even if frames are throttled
+}
+
+/* ---------------- tooltip ---------------- */
+const tip = $("#tip");
+function showTip(html, ev){ tip.innerHTML = html; tip.classList.add("on"); moveTip(ev); }
+function moveTip(ev){
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = ev.clientX + 16, y = ev.clientY + 16;
+  if (x + w > innerWidth - pad) x = ev.clientX - w - 16;
+  if (x < pad) x = pad;
+  if (y + h > innerHeight - pad) y = ev.clientY - h - 16;
+  if (y < pad) y = pad;
+  tip.style.transform = ""; tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip(){ tip.classList.remove("on"); }
+function bindTip(el, build){
+  el.addEventListener("pointerenter", e => showTip(build(), e));
+  el.addEventListener("pointermove", moveTip);
+  el.addEventListener("pointerleave", hideTip);
+}
+const sbars = items => items.map(([label, right, frac]) =>
+  `<div class="sb"><div class="l"><span>${esc(label)}</span><em>${right}</em></div><div class="bar"><i style="width:${Math.max(3, frac * 100)}%"></i></div></div>`).join("");
+
+/* ---------------- toast ---------------- */
+let toastT;
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3200); }
+
+/* ---------------- multi-select filters ---------------- */
+const chev = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function buildMS(root, label, all, kind){
+  root.innerHTML = `<button class="ms-btn" aria-haspopup="listbox" aria-expanded="false"><span>${label}</span><span class="cnt"></span>${chev}</button>
+    <div class="pop" role="listbox" aria-multiselectable="true" aria-label="${label}">
+      <div class="search"><input type="search" placeholder="Buscar ${label.toLowerCase()}…" aria-label="Buscar"></div>
+      <div class="opts"></div><div class="foot"></div></div>`;
+  const btn = root.querySelector(".ms-btn"), opts = root.querySelector(".opts"), input = root.querySelector("input");
+  const els = new Map();
+  for (const v of all){
+    const b = document.createElement("button");
+    b.className = "opt"; b.type = "button"; b.setAttribute("role", "option");
+    b.innerHTML = `<span class="box"></span><span class="nm">${esc(v)}</span><span class="n"></span>`;
+    b.addEventListener("click", () => toggle(kind, v));
+    opts.appendChild(b); els.set(v, b);
+  }
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const open = !root.classList.contains("open");
+    document.querySelectorAll(".ms.open").forEach(m => { m.classList.remove("open"); m.querySelector(".ms-btn").setAttribute("aria-expanded", "false"); });
+    if (open){ root.classList.add("open"); btn.setAttribute("aria-expanded", "true"); setTimeout(() => input.focus({preventScroll: true}), 60); }
+  });
+  root.querySelector(".pop").addEventListener("click", e => e.stopPropagation());
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    for (const [v, b] of els) b.style.display = !q || v.toLowerCase().includes(q) ? "" : "none";
+  });
+  return {root, btn, els, foot: root.querySelector(".foot")};
+}
+document.addEventListener("click", () => document.querySelectorAll(".ms.open").forEach(m => { m.classList.remove("open"); m.querySelector(".ms-btn").setAttribute("aria-expanded", "false"); }));
+document.addEventListener("keydown", e => { if (e.key === "Escape"){ document.body.click(); hideTip(); } });
+const MS = {band: buildMS($("#ms-band"), "Banda/Artista", ALL_BANDS, "band"), album: buildMS($("#ms-album"), "Álbum", ALL_ALBUMS, "album")};
+
+function toggle(kind, v){
+  const set = kind === "band" ? state.bands : state.albums;
+  const enabled = kind === "band" ? bandEnabled(v) : albumEnabled(v);
+  if (set.has(v)) set.delete(v);
+  else if (enabled) set.add(v);
+  else return;
+  // never land on an empty screen: if a removal leaves no tracks, drop the now-orphaned picks of the other filter
+  if (!rows().length){
+    const other = kind === "band" ? state.albums : state.bands;
+    const gone = [...other]; other.clear();
+    const what = gone.length <= 2 ? gone.join(" e ") : `${gone.length} ${kind === "band" ? "álbuns" : "artistas"}`;
+    toast(`${what} saí${gone.length > 1 ? "ram" : "u"} do filtro: sem faixas no novo recorte`);
+  }
+  render();
+}
+function clearAll(){ state.bands.clear(); state.albums.clear(); render(); }
+$("#clear").addEventListener("click", clearAll);
+$("#empty-clear").addEventListener("click", clearAll);
+
+function renderFilters(){
+  const byAlbumOnly = groupBy(rows(false, true), "artist");
+  const byBandOnly = groupBy(rows(true, false), "album");
+  for (const [kind, ms, set, enabledFn, counts] of [["band", MS.band, state.bands, bandEnabled, byAlbumOnly], ["album", MS.album, state.albums, albumEnabled, byBandOnly]]){
+    let avail = 0;
+    for (const [v, b] of ms.els){
+      const on = set.has(v), en = enabledFn(v);
+      b.setAttribute("aria-checked", on); b.disabled = !on && !en;
+      b.title = !on && !en ? (kind === "band" ? "Sem faixas nos álbuns escolhidos" : "Sem faixas das bandas escolhidas") : "";
+      const c = (counts.get(v) || []).length;
+      b.querySelector(".n").textContent = en || on ? c : "";
+      b.style.order = on ? 0 : en ? 1 : 2;
+      if (en) avail++;
+    }
+    const cnt = ms.btn.querySelector(".cnt"); cnt.textContent = set.size; cnt.classList.toggle("on", set.size > 0);
+    ms.foot.textContent = `${avail} de ${ms.els.size} disponíveis${set.size ? ` · ${set.size} selecionado${set.size > 1 ? "s" : ""}` : ""}`;
+  }
+  const chips = $("#chips"); chips.innerHTML = "";
+  for (const [kind, set, tag] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"]]){
+    for (const v of set){
+      const c = document.createElement("button");
+      c.className = "chip"; c.type = "button"; c.setAttribute("aria-label", `Remover ${v}`);
+      c.innerHTML = `<b>${tag}</b><span>${esc(v)}</span><span class="x">×</span>`;
+      c.addEventListener("click", () => toggle(kind, v));
+      chips.appendChild(c);
+    }
+  }
+  $("#clear").classList.toggle("on", state.bands.size + state.albums.size > 0);
+}
+
+/* ---------------- text fitting (never break inside a word) ---------------- */
+const measurer = document.createElement("div");
+measurer.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden;word-break:normal;overflow-wrap:normal;hyphens:manual;line-height:1.05";
+document.body.appendChild(measurer);
+function fitsAt(text, size, font, weight, width, maxLines, ls = "-.03em"){
+  measurer.style.font = `${weight} ${size}px ${font}`; measurer.style.width = width + "px"; measurer.style.letterSpacing = ls;
+  measurer.textContent = text;
+  return measurer.scrollWidth <= width + .5 && measurer.offsetHeight <= size * 1.05 * maxLines + 1;
+}
+function fitKpiText(el, text){
+  const w = el.clientWidth, cs = getComputedStyle(el);
+  const max = parseFloat(getComputedStyle(document.querySelector("#k-art")).fontSize);
+  let size = max;
+  while (size > 14 && !fitsAt(text, size, cs.fontFamily, cs.fontWeight, w, 2)) size -= 1;
+  el.style.fontSize = size + "px"; el.textContent = text;
+}
+
+/* ---------------- KPIs ---------------- */
+function modeOf(rows, key){
+  const g = groupBy(rows.filter(r => r[key] !== NI), key);
+  let best = null, max = -1, ties = 0;
+  const keys = [...g.keys()].sort((a, b) => typeof a === "number" ? a - b : coll.compare(a, b));
+  for (const k of keys){ const c = g.get(k).length; if (c > max){ max = c; best = k; ties = 0; } else if (c === max) ties++; }
+  return {best, max, ties};
+}
+function renderKPIs(R){
+  const total = R.length, secs = sum(R, r => r.sec);
+  tween($("#k-total"), total, v => fmtInt(Math.round(v)));
+  $("#k-total-sub").innerHTML = `<strong>${fmtLong(secs)}</strong> de música${state.bands.size + state.albums.size ? ` · ${pct(total, T.length)} do catálogo` : " em sequência"}`;
+  const arts = new Set(R.filter(r => r.artist !== NI).map(r => r.artist)).size;
+  tween($("#k-art"), arts, v => fmtInt(Math.round(v)));
+  const albs = new Set(R.map(r => r.album)).size;
+  $("#k-art-sub").textContent = `em ${albs} álbu${albs === 1 ? "m" : "ns"}`;
+  const timed = R.filter(r => r.sec > 0);
+  tween($("#k-avg"), timed.length ? sum(timed, r => r.sec) / timed.length : 0, fmtDur);
+  const y = modeOf(R, "year");
+  tween($("#k-year"), y.best || 0, v => y.best ? String(Math.round(v)) : "—");
+  $("#k-year-sub").textContent = y.best ? `${y.max} faixa${y.max > 1 ? "s" : ""}${y.ties ? ` · empate com +${y.ties}` : ""}` : "";
+  const a = modeOf(R, "artist");
+  fitKpiText($("#k-top"), a.best || "—");
+  $("#k-top-sub").textContent = a.best ? `${a.max} faixa${a.max > 1 ? "s" : ""} · ${pct(a.max, total)} do recorte${a.ties ? ` · empate com +${a.ties}` : ""}` : "";
+}
+
+/* ---------------- wave (surprise: every track as a stroke) ---------------- */
+const BY_RELEASE = [...T].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999") || a.n - b.n);
+const BY_PLAYLIST = [...T].sort((a, b) => a.n - b.n);
+let WAVE = BY_PLAYLIST, waveMode = "playlist";
+const wave = $("#wave");
+(function buildWave(){
+  const W = T.length, maxS = Math.max(...T.map(t => t.sec));
+  wave.setAttribute("viewBox", `0 0 ${W} 100`);
+  const ns = "http://www.w3.org/2000/svg";
+  WAVE.forEach((t, i) => {
+    const r = document.createElementNS(ns, "rect");
+    const h = Math.max(6, 100 * t.sec / maxS);
+    r.setAttribute("x", i + .18); r.setAttribute("width", .64); r.setAttribute("y", 100 - h); r.setAttribute("height", h); r.setAttribute("rx", .3);
+    r.setAttribute("fill", `hsl(${158 - 10 * (t.sec / maxS)}, 70%, ${38 + 34 * (t.sec / maxS)}%)`);
+    r.style.transform = "scaleY(0)"; r.style.transitionDelay = (i * 2.2) + "ms";
+    wave.appendChild(r); t._w = r;
+  });
+  requestAnimationFrame(() => requestAnimationFrame(() => WAVE.forEach(t => t._w.style.transform = "")));
+  setTimeout(() => WAVE.forEach(t => t._w.style.transitionDelay = ""), 2200);
+  const yrs = T.filter(t => t.year !== NI).map(t => t.year);
+  const setCaps = () => {
+    $("#wave-cap").textContent = waveMode === "playlist" ? "A onda da playlist · cada traço é uma faixa, na ordem em que entrou" : "A onda do catálogo · cada traço é uma faixa, por data de lançamento";
+    $("#wave-l").textContent = waveMode === "playlist" ? "#1 · primeira adição" : String(Math.min(...yrs));
+    $("#wave-r").textContent = waveMode === "playlist" ? `#${T.length} · mais recente` : String(Math.max(...yrs));
+  };
+  setCaps();
+  document.querySelectorAll(".wave-mode button").forEach(b => b.addEventListener("click", () => {
+    waveMode = b.dataset.m;
+    document.querySelectorAll(".wave-mode button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    WAVE = waveMode === "playlist" ? BY_PLAYLIST : BY_RELEASE;
+    WAVE.forEach((t, i) => { t._w.style.x = (i + .18) + "px"; t._w.setAttribute("x", i + .18); });
+    setCaps();
+  }));
+  let hot = null;
+  const pick = e => {
+    const b = wave.getBoundingClientRect();
+    const i = Math.min(W - 1, Math.max(0, Math.floor((e.clientX - b.left) / b.width * W)));
+    const t = WAVE[i];
+    if (hot !== t){ hot && hot._w.classList.remove("hot"); t._w.classList.add("hot"); hot = t; }
+    const mine = T.filter(x => x.artist === t.artist);
+    showTip(`<div class="eyebrow">#${t.n} na playlist · lançada em ${t.date || NI}</div><div class="t">${esc(t.title)}</div>
+      <div class="k"><span>${esc(t.artist)}</span></div><div class="k"><span>${esc(t.album)}</span></div><hr>
+      <div class="k"><span>Duração</span><b>${fmtDur(t.sec)}</b></div>
+      <div class="k"><span>Vs. média do catálogo</span><b>${t.sec >= AVG_ALL ? "+" : "−"}${fmtDur(Math.abs(t.sec - AVG_ALL))}</b></div>
+      <div class="k"><span>Faixa do artista na playlist</span><b>${mine.filter(x => x.n <= t.n).length}ª de ${mine.length}</b></div>`, e);
+  };
+  wave.addEventListener("pointermove", pick);
+  wave.addEventListener("pointerleave", () => { hot && hot._w.classList.remove("hot"); hot = null; hideTip(); });
+})();
+const AVG_ALL = sum(T, t => t.sec) / T.length;
+function renderWave(R){
+  const on = new Set(R);
+  const all = state.bands.size + state.albums.size === 0;
+  for (const t of T) t._w.classList.toggle("off", !all && !on.has(t));
+}
+
+/* ---------------- chart 1: years ---------------- */
+const yearsEl = $("#years");
+const YC = new Map();
+for (const y of ALL_YEARS){
+  const c = document.createElement("div");
+  c.className = "yc";
+  c.innerHTML = `<span class="v"></span><span class="b"></span><span class="y"></span>`;
+  c.querySelector(".y").textContent = y === NI ? "n/i" : "’" + String(y).slice(2);
+  bindTip(c, () => yearTip(y));
+  yearsEl.appendChild(c); YC.set(y, c);
+}
+function yearTip(y){
+  const R = rows().filter(r => r.year === y);
+  if (!R.length) return `<div class="eyebrow">${y}</div><div class="t">Sem faixas neste recorte</div>`;
+  const albs = [...groupBy(R, "album")].map(([a, rs]) => [a, rs.length, rs[0].artist]).sort((a, b) => b[1] - a[1] || coll.compare(a[0], b[0]));
+  const top = albs.slice(0, 4);
+  const rest = albs.length - top.length;
+  return `<div class="eyebrow">${y === NI ? "Ano não identificado" : y}</div><div class="t">${R.length} faixa${R.length > 1 ? "s" : ""} · ${fmtLong(sum(R, r => r.sec))}</div>
+    <div class="k"><span>${(na => `${na} artista${na > 1 ? "s" : ""}`)(new Set(R.map(r => r.artist)).size)} · ${albs.length} álbu${albs.length > 1 ? "ns" : "m"}</span></div><hr>
+    <div class="eyebrow">Principais álbuns e peso no ano</div>
+    ${sbars(top.map(([a, c, art]) => [a + " — " + art, `${c} · ${pct(c, R.length, 0)}`, c / R.length]))}
+    ${rest > 0 ? `<div class="k" style="margin-top:8px"><span>+ ${rest} outro${rest > 1 ? "s" : ""} álbu${rest > 1 ? "ns" : "m"}</span></div>` : ""}`;
+}
+function renderYears(R){
+  const g = groupBy(R, "year");
+  const counts = ALL_YEARS.map(y => (g.get(y) || []).length);
+  const max = Math.max(1, ...counts);
+  const peak = Math.max(...counts);
+  const H = Math.max(40, yearsEl.clientHeight - 22 - 46);   // room left for value + year labels
+  ALL_YEARS.forEach((y, i) => {
+    const c = YC.get(y), n = counts[i];
+    c.classList.toggle("zero", !n);
+    c.classList.toggle("peak", n === peak && n > 0);
+    c.querySelector(".v").textContent = n || "";
+    c.querySelector(".b").style.height = n ? `${Math.max(3, (n / max) * H)}px` : "";
+  });
+  layoutYears();
+}
+function layoutYears(){
+  const colW = yearsEl.clientWidth / ALL_YEARS.length;
+  yearsEl.classList.toggle("tight", colW < 12);
+  // greedy: keep a year label only if there is room since the last one shown (labels never overlap)
+  const need = Math.ceil(26 / Math.max(colW, 1));
+  let last = -Infinity;
+  ALL_YEARS.forEach((y, i) => {
+    const lab = YC.get(y).querySelector(".y");
+    const show = i - last >= need && (i + need <= ALL_YEARS.length - 1 || i === ALL_YEARS.length - 1 || need === 1);
+    lab.style.visibility = show ? "visible" : "hidden";
+    if (show) last = i;
+  });
+}
+
+/* ---------------- chart 2: treemap ---------------- */
+const treeEl = $("#tree");
+const TILES = new Map();
+function squarify(items, W, H){
+  const total = sum(items, d => d.value), out = [];
+  if (!total) return out;
+  const scale = W * H / total;
+  const list = items.map(d => ({...d, area: d.value * scale}));
+  let rect = {x: 0, y: 0, w: W, h: H}, row = [], i = 0;
+  const worst = (r, len) => { if (!r.length) return Infinity; const s = sum(r, d => d.area); let mx = 0, mn = Infinity; for (const d of r){ mx = Math.max(mx, d.area); mn = Math.min(mn, d.area); } return Math.max(len * len * mx / (s * s), s * s / (len * len * mn)); };
+  const lay = r => {
+    const s = sum(r, d => d.area);
+    if (rect.w >= rect.h){ const cw = s / rect.h; let y = rect.y; for (const d of r){ const h = d.area / cw; out.push({...d, x: rect.x, y, w: cw, h}); y += h; } rect.x += cw; rect.w -= cw; }
+    else { const rh = s / rect.w; let x = rect.x; for (const d of r){ const w = d.area / rh; out.push({...d, x, y: rect.y, w, h: rh}); x += w; } rect.y += rh; rect.h -= rh; }
+  };
+  while (i < list.length){
+    const len = Math.min(rect.w, rect.h);
+    if (!row.length || worst([...row, list[i]], len) <= worst(row, len)){ row.push(list[i]); i++; }
+    else { lay(row); row = []; }
+  }
+  if (row.length) lay(row);
+  return out;
+}
+function tileTip(b){
+  const R = rows(false, true).filter(r => r.artist === b);
+  const all = rows(false, true);
+  const albs = [...groupBy(R, "album")].map(([a, rs]) => [a, rs.length]).sort((x, y) => y[1] - x[1]);
+  const yrs = R.map(r => r.year).filter(y => y !== NI);
+  return `<div class="eyebrow">Banda/artista</div><div class="t">${esc(b)}</div>
+    <div class="k"><span>Faixas</span><b>${R.length} · ${pct(R.length, all.length)}</b></div>
+    <div class="k"><span>Tempo somado</span><b>${fmtLong(sum(R, r => r.sec))}</b></div>
+    <div class="k"><span>Na playlist</span><b>#${Math.min(...R.map(r => r.n))} → #${Math.max(...R.map(r => r.n))}</b></div>
+    <div class="k"><span>Período</span><b>${yrs.length ? Math.min(...yrs) + (Math.max(...yrs) !== Math.min(...yrs) ? "–" + Math.max(...yrs) : "") : NI}</b></div><hr>
+    <div class="eyebrow">Álbuns que mais contribuem</div>
+    ${sbars(albs.slice(0, 3).map(([a, c]) => [a, `${c} faixa${c > 1 ? "s" : ""}`, c / R.length]))}`;
+}
+function renderTree(){
+  const base = rows(false, true);
+  const g = groupBy(base, "artist");
+  const items = [...g].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
+  const W = treeEl.clientWidth, H = treeEl.clientHeight;
+  const laid = squarify(items, W, H);
+  const max = items.length ? items[0].value : 1;
+  const hasSel = state.bands.size > 0;
+  const seen = new Set();
+  for (const d of laid){
+    seen.add(d.k);
+    let el = TILES.get(d.k);
+    const fresh = !el;
+    if (fresh){
+      el = document.createElement("div"); el.className = "tile";
+      el.innerHTML = `<div class="lbl"><strong></strong><span></span></div>`;
+      el.querySelector("strong").textContent = d.k;
+      el.addEventListener("click", () => toggle("band", d.k));
+      bindTip(el, () => tileTip(d.k));
+      el.style.opacity = "0";
+      el.style.left = (d.x + d.w / 2) + "px"; el.style.top = (d.y + d.h / 2) + "px"; el.style.width = "0px"; el.style.height = "0px";
+      treeEl.appendChild(el); TILES.set(d.k, el);
+    }
+    el.classList.remove("leaving");
+    const g2 = 2, x = d.x + g2, y = d.y + g2, w = Math.max(0, d.w - 2 * g2), h = Math.max(0, d.h - 2 * g2);
+    const k = Math.sqrt(d.value / max);
+    const sel = state.bands.has(d.k);
+    el.classList.toggle("sel", sel);
+    el.classList.toggle("dim", hasSel && !sel);
+    el.style.background = sel ? "linear-gradient(150deg,#D1FAE5,#34D399)" :
+      `linear-gradient(150deg, hsl(156,62%,${16 + 26 * k}%), hsl(162,70%,${10 + 18 * k}%))`;
+    const lbl = el.querySelector(".lbl");
+    lbl.style.color = sel ? "#022C22" : "#ECFDF5";
+    el.querySelector("span").textContent = d.value;
+    // choose the largest font where the name fits without breaking a word; otherwise hide label (tooltip still works)
+    let size = 0;
+    for (const s of [17, 15, 13.5, 12, 11, 10]){
+      const lines = Math.floor((h - 18 - Math.max(10, s - 2) * 1.2 - 4) / (s * 1.05));   // name lines that fit above the count
+      if (w - 20 > 0 && lines >= 1 && fitsAt(d.k, s, "Sora, sans-serif", 600, w - 20, lines, "-.01em")){ size = s; break; }
+    }
+    lbl.style.opacity = size ? 1 : 0;
+    el.style.borderRadius = Math.max(3, Math.min(10, w / 4, h / 4)) + "px";
+    lbl.querySelector("strong").style.fontSize = size + "px";
+    lbl.querySelector("span").style.fontSize = Math.max(10, size - 2) + "px";
+    const apply = () => { el.style.opacity = ""; el.style.left = x + "px"; el.style.top = y + "px"; el.style.width = w + "px"; el.style.height = h + "px"; };
+    fresh ? requestAnimationFrame(() => requestAnimationFrame(apply)) : apply();
+  }
+  for (const [k, el] of TILES) if (!seen.has(k)){ el.classList.add("leaving"); el.style.pointerEvents = "none"; }
+  for (const [k, el] of TILES) if (seen.has(k)) el.style.pointerEvents = "";
+}
+
+/* ---------------- ranked lists (albums & ranking) with FLIP reordering ---------------- */
+function renderList(container, items, opts){
+  const before = new Map();
+  for (const el of container.children) before.set(el.dataset.k, el.getBoundingClientRect().top);
+  const keep = new Map([...container.children].map(el => [el.dataset.k, el]));
+  const frag = document.createDocumentFragment();
+  const max = items.length ? Math.max(...items.map(d => d.value)) : 1;
+  const hasSel = opts.selected.size > 0;
+  items.forEach((d, i) => {
+    let el = keep.get(d.k);
+    if (!el){
+      el = document.createElement("div"); el.className = "row"; el.dataset.k = d.k;
+      el.innerHTML = (opts.rank ? `<span class="rk"></span>` : "") + `<span class="nm"></span><span class="vl"></span><div class="tr"><div class="fl"></div></div>`;
+      el.querySelector(".nm").textContent = d.k;
+      el.addEventListener("click", () => toggle(opts.kind, d.k));
+      bindTip(el, () => opts.tip(d.k));
+      el._new = true;
+    }
+    keep.delete(d.k);
+    if (opts.rank) el.querySelector(".rk").textContent = String(i + 1).padStart(2, "0");
+    el.classList.toggle("top3", i < 3);
+    el.querySelector(".vl").innerHTML = opts.label(d);
+    const sel = opts.selected.has(d.k);
+    el.classList.toggle("sel", sel); el.classList.toggle("dim", hasSel && !sel);
+    el._w = (d.value / max) * 100;
+    frag.appendChild(el);
+  });
+  for (const el of keep.values()) el.remove();
+  container.appendChild(frag);
+  const rm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const el of container.children){
+    const fl = el.querySelector(".fl");
+    if (el._new){
+      el._new = false;
+      if (!rm) el.animate([{opacity: 0, transform: "translateY(8px)"}, {opacity: 1, transform: "none"}], {duration: 450, easing: "cubic-bezier(.2,.75,.15,1)"});
+      requestAnimationFrame(() => requestAnimationFrame(() => fl.style.width = el._w + "%"));
+    } else {
+      fl.style.width = el._w + "%";
+      const old = before.get(el.dataset.k);
+      const dy = old - el.getBoundingClientRect().top;
+      if (dy && !rm) el.animate([{transform: `translateY(${dy}px)`}, {transform: "none"}], {duration: 650, easing: "cubic-bezier(.2,.75,.15,1)"});
+    }
+  }
+  if (hasSel){
+    const first = [...container.children].find(el => el.classList.contains("sel"));
+    if (first && opts.scrollToSel){
+      const top = first.offsetTop - 8;
+      if (top < container.scrollTop || top > container.scrollTop + container.clientHeight - 60) container.scrollTo({top, behavior: rm ? "auto" : "smooth"});
+    }
+  }
+}
+function albumTip(a){
+  const R = rows(true, false).filter(r => r.album === a);
+  const longest = R.reduce((m, r) => r.sec > m.sec ? r : m, R[0]);
+  const arts = [...new Set(R.map(r => r.artist))];
+  const yrs = [...new Set(R.map(r => r.year))].sort();
+  return `<div class="eyebrow">Álbum · ${yrs.join(", ")}</div><div class="t">${esc(a)}</div>
+    <div class="k"><span>${esc(arts.join(" · "))}</span></div><hr>
+    <div class="k"><span>Duração somada</span><b>${fmtDur(sum(R, r => r.sec))}</b></div>
+    <div class="k"><span>Faixas no catálogo</span><b>${R.length}</b></div>
+    <div class="k"><span>Média por faixa</span><b>${fmtDur(sum(R, r => r.sec) / R.length)}</b></div>
+    <div class="k"><span>Entrou na playlist</span><b>${(lo => lo.length > 1 ? `#${lo[0]} a #${lo[lo.length - 1]}` : `#${lo[0]}`)(R.map(r => r.n).sort((x, y) => x - y))}</b></div><hr>
+    <div class="eyebrow">Faixa mais longa</div>
+    <div class="k"><span style="color:var(--ink)">${esc(longest.title)}</span><b>${fmtDur(longest.sec)}</b></div>`;
+}
+function renderAlbums(){
+  const g = groupBy(rows(true, false), "album");
+  const items = [...g].map(([k, rs]) => ({k, value: sum(rs, r => r.sec), n: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
+  renderList($("#albums"), items, {kind: "album", selected: state.albums, tip: albumTip, scrollToSel: true,
+    label: d => `${fmtDur(d.value)}<small>${d.n} faixa${d.n > 1 ? "s" : ""}</small>`});
+  $("#alb-hint").textContent = state.bands.size ? `${items.length} álbu${items.length > 1 ? "ns" : "m"} no recorte · clique para filtrar` : `${items.length} álbuns · clique para filtrar`;
+}
+function rankTip(b){
+  const base = rows(false, true);
+  const g = [...groupBy(base, "artist")].map(([k, rs]) => [k, rs.length]).sort((x, y) => y[1] - x[1] || coll.compare(x[0], y[0]));
+  const i = g.findIndex(([k]) => k === b), n = g[i][1];
+  const cum = sum(g.slice(0, i + 1), x => x[1]);
+  const R = base.filter(r => r.artist === b);
+  const by = modeOf(R, "year");
+  const next = g[i - 1];
+  return `<div class="eyebrow">Posição ${i + 1} de ${g.length}</div><div class="t">${esc(b)}</div>
+    <div class="k"><span>Faixas</span><b>${n}</b></div>
+    <div class="k"><span>Participação</span><b>${pct(n, base.length)}</b></div>
+    <div class="k"><span>Top ${i + 1} somado</span><b>${pct(cum, base.length)}</b></div>
+    <div class="k"><span>Ano mais forte</span><b>${by.best ?? NI} (${by.max})</b></div>
+    <div class="k"><span>Primeira e última adição</span><b>#${Math.min(...R.map(r => r.n))} · #${Math.max(...R.map(r => r.n))}</b></div>
+    ${next ? `<hr><div class="k"><span>Para alcançar ${esc(next[0])}</span><b>+${next[1] - n} faixa${next[1] - n === 1 ? "" : "s"}</b></div>` : `<hr><div class="k"><span>Liderança</span><b>${g[1] ? "+" + (n - g[1][1]) + " sobre o 2º" : "—"}</b></div>`}`;
+}
+function renderRank(){
+  const base = rows(false, true);
+  const items = [...groupBy(base, "artist")].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
+  renderList($("#rank"), items, {kind: "band", rank: true, selected: state.bands, tip: rankTip, scrollToSel: true,
+    label: d => `${d.value}<small>${pct(d.value, base.length)}</small>`});
+}
+
+/* ---------------- render ---------------- */
+function render(){
+  renderFilters();
+  const R = rows();
+  const empty = !R.length;
+  $("#content").style.display = empty ? "none" : "";
+  $("#empty").classList.toggle("on", empty);
+  if (empty){ hideTip(); return; }
+  renderKPIs(R); renderWave(R); renderYears(R); renderTree(); renderAlbums(); renderRank();
+}
+
+/* ---------------- tabs ---------------- */
+const tabs = [...document.querySelectorAll(".tabs button")];
+function placePill(){ const on = tabs.find(t => t.getAttribute("aria-selected") === "true"); const p = $(".tabs .pill"); p.style.left = on.offsetLeft + "px"; p.style.width = on.offsetWidth + "px"; }
+function showTab(id){
+  tabs.forEach(t => t.setAttribute("aria-selected", t.getAttribute("aria-controls") === id));
+  document.querySelectorAll(".tabpanel").forEach(p => p.classList.toggle("on", p.id === id));
+  placePill(); hideTip();
+  try { history.replaceState(null, "", id === "insights" ? "#insights" : "#"); } catch (e) {}
+  if (id === "insights") animateInsights(); else requestAnimationFrame(() => { renderTree(); renderYears(rows()); });
+}
+tabs.forEach(t => t.addEventListener("click", () => showTab(t.getAttribute("aria-controls"))));
+addEventListener("hashchange", () => showTab(location.hash === "#insights" ? "insights" : "painel"));
+
+/* ================= INSIGHTS ENGINE =================
+   Every sentence on the Insights tab is written here from rules over the current list,
+   so a new or edited playlist produces a different reading. Numbers are always computed. */
+const NN = BY_PLAYLIST.length;
+function median(a){ if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function blocks(k){ k = Math.max(1, Math.min(k, NN)); const out = []; for (let i = 0; i < k; i++){ const a = Math.floor(i * NN / k), b = Math.floor((i + 1) * NN / k); out.push(BY_PLAYLIST.slice(a, b)); } return out; }
+const seedOf = s => { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
+const pickV = (key, arr) => arr[seedOf(key + "|" + NN + "|" + (IS_TOP || "")) % arr.length];
+let IS_TOP = "";
+const B = s => `<strong>${esc(s)}</strong>`;
+const nf = n => fmtInt(n);
+const pc0 = (a, b) => pct(a, b, 0), pc1 = (a, b) => pct(a, b, 1);
+const decLabel = d => d >= 2000 ? `anos ${d}` : `anos ${String(d).slice(2)}`;
+const listPt = arr => arr.length <= 1 ? (arr[0] || "") : arr.slice(0, -1).join(", ") + " e " + arr[arr.length - 1];
+const fracWord = f => f >= .45 ? "quase metade" : f >= .3 ? "um terço" : f >= .2 ? "um quarto" : `${Math.round(f * 100)}%`;
+const faixas = n => `${nf(n)} faixa${n === 1 ? "" : "s"}`;
+const yearsSpan = rs => { const ys = rs.map(r => r.year).filter(y => y !== NI); return ys.length ? [Math.min(...ys), Math.max(...ys)] : [null, null]; };
+const splitArtists = s => s.toLowerCase().split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/).map(x => x.trim()).filter(Boolean);
+
+/* ---------- statistics shared by all rules ---------- */
+const NOW_Y = new Date().getFullYear();
+const IS = (() => {
+  const S = {N: NN};
+  S.art = [...groupBy(T, "artist")].map(([k, rs]) => ({k, rs: [...rs].sort((a, b) => a.n - b.n), c: rs.length})).sort((a, b) => b.c - a.c || coll.compare(a.k, b.k));
+  S.artMap = new Map(S.art.map(a => [a.k, a]));
+  S.alb = [...groupBy(T, "album")].map(([k, rs]) => ({k, rs, c: rs.length, sec: sum(rs, r => r.sec), artist: modeOf(rs, "artist").best || rs[0].artist})).sort((a, b) => b.c - a.c || coll.compare(a.k, b.k));
+  S.dated = T.filter(t => t.year !== NI);
+  S.years = [...groupBy(S.dated, "year")].map(([y, rs]) => ({y, rs, c: rs.length})).sort((a, b) => b.c - a.c || a.y - b.y);
+  S.minY = S.dated.length ? Math.min(...S.dated.map(t => t.year)) : null;
+  S.maxY = S.dated.length ? Math.max(...S.dated.map(t => t.year)) : null;
+  const dm = new Map(); for (const t of S.dated){ const d = Math.floor(t.year / 10) * 10; dm.set(d, (dm.get(d) || 0) + 1); }
+  S.dec = [...dm].map(([d, c]) => ({d, c})).sort((a, b) => a.d - b.d);
+  S.runs = []; S.albRuns = [];
+  if (NN){
+    let cur = [BY_PLAYLIST[0]], ca = [BY_PLAYLIST[0]];
+    for (const t of BY_PLAYLIST.slice(1)){
+      if (t.artist === cur[cur.length - 1].artist) cur.push(t); else { S.runs.push(cur); cur = [t]; }
+      const p = ca[ca.length - 1];
+      if (t.album === p.album && t.artist === p.artist && t.album !== NI) ca.push(t); else { S.albRuns.push(ca); ca = [t]; }
+    }
+    S.runs.push(cur); S.albRuns.push(ca);
+  }
+  S.runsSorted = [...S.runs].sort((a, b) => b.length - a.length || a[0].n - b[0].n);
+  S.collabsOf = name => S.art.filter(a => a.k !== name && splitArtists(a.k).includes(name.toLowerCase()));
+  S.journey = NN >= 30;
+  S.chap = S.journey ? blocks(6) : [];
+  return S;
+})();
+IS_TOP = IS.art.length ? IS.art[0].k : "";
+
+/* ---------- chapters with names chosen by what happened in each ---------- */
+const CHI = (() => {
+  const seen = new Set();
+  const ch = IS.chap.map((seg, i) => {
+    const g = [...groupBy(seg, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1] || coll.compare(a[0], b[0]));
+    const fresh = new Set(seg.map(r => r.artist).filter(a => !seen.has(a))); seg.forEach(r => seen.add(r.artist));
+    return {i, seg, g, top: g[0], share: g[0][1] / seg.length, arts: g.length, fresh: fresh.size, yr: median(seg.filter(r => r.year !== NI).map(r => r.year))};
+  });
+  const maxArts = Math.max(0, ...ch.map(c => c.arts)), used = new Set();
+  ch.forEach((c, i) => {
+    let name;
+    if (i === 0) name = "A porta de entrada";
+    else if (i === ch.length - 1 && c.share >= .3) name = `Era ${c.top[0]}`;
+    else if (c.share >= .35) name = `A febre ${c.top[0]}`;
+    else if (i === 1 && c.arts >= ch[0].arts * 1.5) name = "A expansão";
+    else if (c.arts === maxArts) name = "Exploração máxima";
+    else if (c.share < .2) name = "Transição";
+    else if (i === ch.length - 1) name = "O agora";
+    else name = `${c.top[0]} em alta`;
+    if (used.has(name)) name = ["Novos ares", "A virada", "Mistura", "Respiro"][i % 4];
+    used.add(name); c.name = name;
+  });
+  return ch;
+})();
+
+/* ---------- small visual builders (HTML strings) ---------- */
+const V = {
+  decades(){
+    if (!IS.dec.length) return "";
+    const mx = Math.max(...IS.dec.map(d => d.c));
+    return `<div class="viz decades">${IS.dec.map(({d, c}) => `<div><b>${c}</b><i data-h="${(c / mx) * 100}" class="${c === mx ? "pk" : ""}"></i><span>${String(d).slice(2)}s</span></div>`).join("")}</div>`;
+  },
+  topAlb(list){
+    const mx = list[0].c;
+    return list.map(a => `<div class="sb" style="margin:8px 0"><div class="l" style="display:flex;justify-content:space-between;gap:12px;font-size:13px"><span>${esc(a.k)} <span style="color:var(--ink-3)">· ${esc(a.artist)}</span></span><em style="font-style:normal;color:var(--ink-2);white-space:nowrap">${faixas(a.c)}</em></div>
+      <div style="height:6px;border-radius:6px;background:rgba(110,231,183,.08);margin-top:5px;overflow:hidden"><i data-w="${(a.c / mx) * 100}" style="display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#047857,#6EE7B7);transition:width 1.1s cubic-bezier(.2,.75,.15,1)"></i></div></div>`).join("");
+  },
+  stack(seg){
+    return `<div class="stack">${seg.filter(s => s[0] > 0).map(([n, c]) => `<i style="background:${c};flex-grow:0" data-g="${n}"></i>`).join("")}</div>
+      <div class="legend">${seg.filter(s => s[0] > 0).map(([n, c, l]) => `<span><i style="background:${c}"></i>${l} · ${n} (${pc1(n, NN)})</span>`).join("")}</div>`;
+  },
+  decComp(arts){
+    const decs = IS.dec.map(d => d.d).slice(-5), shade = ["#065F46", "#047857", "#10B981", "#6EE7B7", "#D1FAE5"].slice(-decs.length);
+    return arts.map(a => {
+      const rs = a.rs.filter(t => t.year !== NI);
+      const seg = decs.map(d => rs.filter(t => Math.floor(t.year / 10) * 10 === d).length);
+      return `<div class="drow"><span class="dn">${esc(a.k)}</span><div class="dbar">${seg.map((v, i) => v ? `<i style="flex:${v};background:${shade[i]};color:${i >= decs.length - 2 ? "#022C22" : "#ECFDF5"}" title="${decs[i]}s: ${v}">${rs.length && v / rs.length >= .14 ? v : ""}</i>` : "").join("")}</div></div>`;
+    }).join("") + `<div class="lg">${decs.map((d, i) => `<span><i style="background:${shade[i]}"></i>${String(d).slice(2)}s</span>`).join("")}<span class="r">faixas por década de lançamento</span></div>`;
+  },
+  strips(names){
+    const bounds = IS.chap.slice(1).map(seg => seg[0].n - 1);
+    return names.map(nm => {
+      const a = IS.artMap.get(nm); if (!a) return "";
+      const ticks = a.rs.map(t => `<rect x="${t.n - 1}" y="0" width="1" height="14" fill="#6EE7B7"/>`).join("");
+      const seps = bounds.map(x => `<rect x="${x}" y="0" width=".6" height="14" fill="rgba(240,253,247,.18)"/>`).join("");
+      return `<div class="strip"><div class="sl"><span>${esc(nm)}</span><em>#${a.rs[0].n} → #${a.rs[a.rs.length - 1].n} · ${faixas(a.c)}</em></div>
+        <svg viewBox="0 0 ${NN} 14" preserveAspectRatio="none" class="strip-svg" aria-hidden="true"><rect width="${NN}" height="14" rx="3" fill="rgba(110,231,183,.06)"/>${seps}${ticks}</svg></div>`;
+    }).join("") + `<div class="sx"><span>#1</span><span>capítulos 1–${IS.chap.length || 1}</span><span>#${NN}</span></div>`;
+  },
+  cells(win, a1, a2){
+    const col = t => t.artist === a1 ? "#F0FDF7" : t.artist === a2 ? "#10B981" : "rgba(110,231,183,.14)";
+    return `<div class="cells">${win.map(t => `<i style="background:${col(t)}" title="#${t.n} ${esc(t.title)} — ${esc(t.artist)}"></i>`).join("")}</div>
+      <div class="lg"><span><i style="background:#F0FDF7"></i>${esc(a1)}</span>${a2 ? `<span><i style="background:#10B981"></i>${esc(a2)}</span>` : ""}<span><i style="background:rgba(110,231,183,.14)"></i>outros</span><span class="r">primeiras ${win.length} adições</span></div>`;
+  },
+  mbars(vals, labels, cap){
+    const pm = Math.max(1, ...vals);
+    return `<div class="mbars">${vals.map((v, i) => `<div><b>${v}</b><i style="height:${Math.max(3, v / pm * 56)}px"></i><span>${labels[i]}</span></div>`).join("")}</div><div class="cap2">${cap}</div>`;
+  },
+  runs(list, cap){
+    const rm = list[0].length;
+    return list.map(r => `<div class="hrow"><div class="hl"><span>${esc(r[0].artist)} <em>#${r[0].n}–${r[r.length - 1].n}</em></span><b>${r.length}</b></div><div class="ht"><i style="width:${r.length / rm * 100}%"></i></div></div>`).join("") + `<div class="cap2">${cap}</div>`;
+  },
+  dur(rows, max){
+    return rows.map(([label, sub, v]) => `<div class="hrow"><div class="hl"><span>${esc(label)} <em>${esc(sub)}</em></span><b>${fmtDur(v)}</b></div><div class="ht"><i style="width:${Math.max(2, v / max * 100)}%"></i></div></div>`).join("");
+  },
+  pairs(list){
+    return `<div class="pairs">${list.map(p => `<div class="pair"><b>${esc(p.title)}</b><span>${esc(p.a.artist)} <em>#${p.a.n}</em></span><i>→</i><span>${esc(p.b.artist)} <em>#${p.b.n}</em></span></div>`).join("")}</div>`;
+  },
+  disc(){ return `<div id="disc"></div>`; }
+};
+const cleanTitle = s => s.replace(/\s+-\s+(\d{4}\s+)?(remaster(ed)?|remix|live|ao vivo|demo|bonus track|single version|radio edit|mono|stereo).*$/i, "").replace(/\s+\((\d{4}\s+)?(remaster(ed)?|live|ao vivo)[^)]*\)$/i, "").trim();
+
+/* ---------- rules ---------- */
+const RULES = [];
+const rule = fn => RULES.push(fn);
+
+// CATÁLOGO · peak year explained by whole albums
+rule(() => {
+  if (IS.years.length < 3 || IS.years[0].c < 5) return null;
+  const pk = IS.years[0], albs = [...groupBy(pk.rs, "album")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]);
+  const top = albs.slice(0, 3), topSum = sum(top, x => x[1]), conc = topSum / pk.c;
+  const li = [`<li>${B(`${pk.y} é o pico, com ${faixas(pk.c)}`)}: ${conc >= .6 ? `${nf(topSum)} delas vêm de ${top.length === 1 ? "um único álbum" : `só ${top.length} álbuns`} (${top.map(([a, n]) => `${esc(a)} ${n}`).join(", ")}).` : `distribuídas em ${albs.length} álbuns diferentes, sem um dominante.`}</li>`];
+  const p2 = IS.years[1];
+  if (p2){
+    const a2 = [...groupBy(p2.rs, "album")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1])[0];
+    li.push(`<li>${B(`${p2.y} é o segundo pico (${p2.c})`)}${a2[1] / p2.c >= .4 ? `, e ${esc(a2[0])} sozinho responde por ${a2[1]} dessas faixas.` : `, espalhado por vários álbuns.`}</li>`);
+  }
+  const pd = [...IS.dec].sort((a, b) => b.c - a.c)[0], after = IS.dec.filter(d => d.d > pd.d);
+  if (after.length) li.push(after.every(d => d.c < pd.c)
+    ? `<li>Depois dos ${decLabel(pd.d)} o volume cai: ${after.map((d, i) => `${B(`${faixas(d.c)} nos ${decLabel(d.d)}`)}`).join(" e ")}.</li>`
+    : `<li>O volume se mantém depois dos ${decLabel(pd.d)}: ${after.map(d => `${faixas(d.c)} nos ${decLabel(d.d)}`).join(" e ")}.</li>`);
+  return {kind: "cat", theme: 0, score: 90, wide: true,
+    title: conc >= .6 ? pickV("peak", ["Os picos de lançamento vêm de álbuns inteiros, não de volume espalhado", "Um ano-pico construído por poucos álbuns"]) : "O ano-pico é espalhado, sem um álbum dominante",
+    body: `<ul>${li.join("")}</ul>`, viz: V.decades(), kick: [nf(pk.c), `faixas lançadas em ${pk.y}, o ano-pico do catálogo`]};
+});
+
+// CATÁLOGO · who carries the catalogue and who lost strength
+rule(() => {
+  if (IS.art.length < 3 || !IS.dec.length) return null;
+  const [a1, a2] = IS.art, top2 = a1.c + a2.c;
+  const lostCut = IS.maxY - 20;
+  const lost = IS.art.slice(0, 12).filter(a => a.c >= 5 && a !== a1 && a !== a2).map(a => {
+    const [, mx] = yearsSpan(a.rs); const dg = [...groupBy(a.rs.filter(t => t.year !== NI).map(t => ({d: Math.floor(t.year / 10) * 10})), "d")].map(([d, rs]) => [d, rs.length]).sort((x, y) => y[1] - x[1])[0];
+    return {a, mx, dg};
+  }).filter(x => x.mx !== null && x.mx <= lostCut).slice(0, 3);
+  const [lo1, hi1] = yearsSpan(a1.rs), decs1 = new Set(a1.rs.filter(t => t.year !== NI).map(t => Math.floor(t.year / 10)));
+  const newest = IS.dated.reduce((m, t) => (t.date > m.date ? t : m), IS.dated[0]);
+  const col2 = IS.collabsOf(a2.k);
+  const li = [`<li>${B(`${a1.k} lidera com ${faixas(a1.c)} (${pc1(a1.c, NN)})`)}${decs1.size >= 3 ? ` e é o único grande nome com lançamentos em ${decs1.size} décadas (${lo1} a ${hi1}).` : `.`}</li>`,
+    `<li>${B(`${a2.k} tem ${a2.c}`)}${newest && newest.artist === a2.k ? `, as faixas mais recentes do catálogo (${newest.year})` : ""}${col2.length ? ` e mais ${col2.length} parceria${col2.length > 1 ? "s" : ""}` : ""}.</li>`];
+  if (lost.length) li.push(`<li>${B("Perderam força:")} ${lost.map(({a, mx, dg}) => dg && dg[1] / a.c >= .6 ? `${esc(a.k)} tem ${dg[1]} de ${a.c} faixas nos ${decLabel(dg[0])}` : `${esc(a.k)} para em ${mx}`).join("; ")}.</li>`);
+  return {kind: "cat", theme: 1, score: 85, wide: true,
+    title: `${a1.k} e ${a2.k} ${top2 / NN >= .2 ? "carregam" : "lideram"} o catálogo${lost.length ? "; os clássicos ficaram no passado" : ""}`,
+    body: `<ul>${li.join("")}</ul>`, viz: V.decComp(IS.art.filter(a => a.c >= 3).slice(0, 6)), kick: [nf(top2), `faixas somadas de ${a1.k} e ${a2.k}, ${pc1(top2, NN)} do catálogo`]};
+});
+
+// CATÁLOGO · albums that hold the repertoire
+rule(() => {
+  if (IS.alb.length < 6) return null;
+  const k = Math.min(10, IS.alb.length), topK = IS.alb.slice(0, k), s = sum(topK, a => a.c), f = s / NN;
+  const top5 = IS.alb.slice(0, 5), own = [...groupBy(top5, "artist")].sort((a, b) => b[1].length - a[1].length)[0];
+  const longest = [...IS.alb].filter(a => a.k !== NI).sort((a, b) => b.sec - a.sec)[0];
+  const singles = IS.alb.filter(a => a.c === 1).length;
+  const li = [];
+  if (own && own[1].length >= 2) li.push(`<li>${B(`${own[0]} tem ${own[1].length} dos 5 maiores álbuns`)} (${listPt(own[1].map(a => esc(a.k)))}).</li>`);
+  if (longest) li.push(`<li>${B(`${longest.k} é o álbum mais longo`)}: ${faixas(longest.c)} e ${fmtDur(longest.sec)} de duração somada.</li>`);
+  if (singles / IS.alb.length >= .2) li.push(`<li>Na outra ponta, ${B(`${singles} dos ${IS.alb.length} álbuns aparecem com uma única faixa`)}: uma cauda longa de singles avulsos.</li>`);
+  return {kind: "cat", theme: 3, score: 75, wide: true,
+    title: `${k === 10 ? "Dez" : nf(k)} álbuns seguram ${fracWord(f)} do repertório`,
+    body: `<ul>${li.join("")}</ul>`, viz: V.topAlb(top5), kick: [pc1(s, NN), `das faixas estão nos ${k} maiores álbuns (${nf(s)} de ${nf(NN)})`]};
+});
+
+// CATÁLOGO · concentration
+rule(() => {
+  if (IS.art.length < 6) return null;
+  const c = IS.art.map(a => a.c), top = n => sum(c.slice(0, n), x => x);
+  const t5 = top(5), singles = IS.art.filter(a => a.c === 1).length, hhi = sum(c, x => (x / NN) ** 2);
+  const seg = [[c[0], "#F0FDF7", "Líder"], [t5 - c[0], "#34D399", "2º ao 5º"], [top(10) - t5, "#047857", "6º ao 10º"], [NN - top(10), "rgba(110,231,183,.16)", `Demais ${Math.max(0, IS.art.length - 10)}`]];
+  const f5 = t5 / NN;
+  return {kind: "cat", theme: 4, score: 70, wide: true,
+    title: f5 >= .5 ? "Metade do catálogo está em cinco artistas" : f5 >= .35 ? "Cinco artistas respondem por mais de um terço do catálogo" : "Um catálogo pulverizado entre muitos artistas",
+    body: `<ul><li>${B(`Top 1 = ${pc1(top(1), NN)} · Top 3 = ${pc1(top(3), NN)}${IS.art.length >= 10 ? ` · Top 10 = ${pc1(top(10), NN)}` : ""}`)} das faixas.</li>
+      ${singles ? `<li>${B(`${singles} dos ${IS.art.length} artistas têm uma faixa só.`)} Na prática, o peso do catálogo equivale a cerca de ${Math.round(1 / hhi)} artistas de mesmo tamanho (índice de concentração de ${Math.round(hhi * 10000)} pontos).</li>` : ""}</ul>`,
+    viz: V.stack(seg), kick: [pc1(t5, NN), `das faixas estão nos 5 maiores artistas (${nf(t5)} de ${nf(NN)})`]};
+});
+
+// CATÁLOGO · how recent the catalogue is
+rule(() => {
+  if (!IS.dated.length || IS.maxY - IS.minY < 8) return null;
+  const thr = Math.min(IS.maxY, NOW_Y) - 6, rec = IS.dated.filter(t => t.year >= thr), f = rec.length / NN;
+  const who = [...groupBy(rec, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const ys = []; for (let y = thr; y <= Math.min(IS.maxY, NOW_Y); y++) ys.push(y);
+  return {kind: "cat", theme: 0, score: f < .1 || f > .3 ? 62 : 45,
+    title: f < .1 ? "Pouca renovação: o catálogo vive de lançamentos antigos" : f > .3 ? "Um catálogo atualizado, cheio de lançamentos recentes" : "Renovação moderada de lançamentos",
+    body: `<p>${f < .1 ? "Só" : ""} ${B(faixas(rec.length))} (${pc0(rec.length, NN)}) foram lançadas de ${thr} em diante${who.length ? `, puxadas por ${listPt(who.map(([k, n]) => `${esc(k)} (${n})`))}` : ""}.</p>`,
+    viz: V.mbars(ys.map(y => rec.filter(t => t.year === y).length), ys.map(y => "’" + String(y).slice(2)), `faixas por ano de lançamento desde ${thr}`),
+    kick: [pc0(rec.length, NN), `das faixas foram lançadas de ${thr} em diante`]};
+});
+
+// CATÁLOGO + PLAYLIST · duration extremes vs. order
+rule(() => {
+  const withDur = T.filter(t => t.sec > 0); if (withDur.length < 10) return null;
+  const lo = withDur.reduce((m, t) => t.sec < m.sec ? t : m), hi = withDur.reduce((m, t) => t.sec > m.sec ? t : m), avg = sum(withDur, t => t.sec) / withDur.length;
+  const xs = withDur.map(t => t.n), ys = withDur.map(t => t.sec), mx = sum(xs, x => x) / xs.length, my = avg;
+  const r = sum(xs.map((x, i) => (x - mx) * (ys[i] - my)), v => v) / Math.sqrt(sum(xs, x => (x - mx) ** 2) * sum(ys, y => (y - my) ** 2) || 1);
+  const ratio = hi.sec / lo.sec, rs = r.toLocaleString("pt-BR", {maximumFractionDigits: 2, minimumFractionDigits: 2});
+  return {kind: "both", theme: 5, score: 50,
+    title: Math.abs(r) < .1 ? "O gosto mudou de banda, não de formato" : r > 0 ? "As faixas ficaram mais longas com o tempo" : "As faixas ficaram mais curtas com o tempo",
+    body: `<p>${Math.abs(r) < .1 ? `Os extremos são distantes, mas a duração média não acompanha a ordem de entrada (correlação de ${rs}).` : `A duração acompanha a ordem de entrada (correlação de ${rs}): as adições ${r > 0 ? "recentes são mais longas" : "recentes são mais curtas"}.`}</p>`,
+    viz: V.dur([[cleanTitle(hi.title), hi.artist, hi.sec], ["Média do catálogo", faixas(withDur.length), avg], [cleanTitle(lo.title), lo.artist, lo.sec]], hi.sec),
+    kick: [`${Math.round(ratio)}×`, `a faixa mais longa dura ${Math.round(ratio)} vezes a mais curta`]};
+});
+
+// PLAYLIST · who opened the playlist
+rule(() => {
+  if (!IS.journey) return null;
+  const run = IS.runs[0], a0 = run[0].artist, k = run.length, art = IS.artMap.get(a0);
+  const later = art.c - k, last = art.rs[art.rs.length - 1].n;
+  const win = BY_PLAYLIST.slice(0, Math.min(60, NN));
+  const g = [...groupBy(win, "artist")].map(([x, rs]) => [x, rs.length]).sort((a, b) => b[1] - a[1]);
+  const second = (g.find(([x]) => x !== a0) || [])[0];
+  if (k < 4){
+    const w20 = BY_PLAYLIST.slice(0, 20), na = new Set(w20.map(t => t.artist)).size;
+    return {kind: "pl", theme: 1, score: 55, title: "A playlist começou plural", body: `<p>As primeiras ${w20.length} faixas já reuniam ${B(`${na} artistas`)}, sem um dono da abertura.</p>`, viz: V.cells(win, g[0][0], g[1] && g[1][0]), kick: [nf(na), `artistas nas primeiras ${w20.length} adições`]};
+  }
+  const gone = later <= k / 2;
+  return {kind: "pl", theme: 1, score: 80,
+    title: gone ? `${a0} abriu a playlist e saiu de cena` : `${a0} abriu a playlist e nunca saiu`,
+    body: `<p>${gone ? `Depois da abertura, vieram só ${B(faixas(later))} de ${esc(a0)} em ${nf(NN - k)} adições; a última foi a #${last}.` : `Depois da abertura, ${esc(a0)} seguiu presente: ${B(faixas(later))} a mais, até a #${last}.`}</p>`,
+    viz: V.cells(win, a0, second), kick: [`${k}/${k}`, `primeiras faixas da playlist são de ${a0}`]};
+});
+
+// PLAYLIST · the catalogue leader that stopped (or that still rules)
+rule(() => {
+  if (!IS.journey) return null;
+  const a1 = IS.art[0], last = a1.rs[a1.rs.length - 1].n, tail = NN - last;
+  const myRun = IS.runsSorted.find(r => r[0].artist === a1.k), isBiggest = myRun && IS.runsSorted[0] === myRun;
+  if (tail >= Math.max(15, NN * .15)){
+    return {kind: "pl", theme: 1, score: 82,
+      title: pickV("faded", ["O líder do catálogo é passado na playlist", "O maior artista do catálogo parou de crescer"]),
+      body: `<p>${myRun && myRun.length >= 5 ? `${esc(a1.k)} tem ${isBiggest ? "a maior maratona da lista" : `uma maratona de ${myRun.length}`} (${B(`${myRun.length} seguidas, #${myRun[0].n} a #${myRun[myRun.length - 1].n}`)}) e depois some.` : `${esc(a1.k)} lidera o total, mas a última faixa entrou na ${B("#" + last)}.`}</p>`,
+      viz: V.strips([a1.k]), kick: ["0", `faixas de ${a1.k} nas últimas ${nf(tail)} adições`]};
+  }
+  const lastCh = CHI[CHI.length - 1], x = lastCh.seg.filter(t => t.artist === a1.k).length;
+  if (lastCh.top[0] === a1.k) return {kind: "pl", theme: 1, score: 78, title: `${a1.k} lidera o catálogo e também o agora`,
+    body: `<p>O maior artista do catálogo continua dominando as adições recentes: é o artista mais presente no último capítulo.</p>`, viz: V.strips([a1.k]), kick: [nf(x), `das últimas ${lastCh.seg.length} adições são de ${a1.k}`]};
+  return null;
+});
+
+// PLAYLIST · slow burner
+let SLOW = null;
+rule(() => {
+  if (!IS.journey) return null;
+  const cut = Math.round(NN * .78);
+  const cands = IS.art.filter(a => a.c >= 8).map(a => {
+    const early = a.rs.filter(t => t.n <= cut).length, late = a.c - early;
+    return {a, early, late, first: a.rs[0].n};
+  }).filter(x => x.first <= NN * .5 && x.late / x.a.c >= .6).sort((x, y) => (y.late - y.early) - (x.late - x.early));
+  const c = cands[0]; if (!c) return null;
+  SLOW = c.a.k;
+  const turn = c.a.rs[c.early] ? c.a.rs[c.early].n : cut;
+  const wait = turn - c.first, waitTxt = wait >= 50 ? `mais de ${Math.floor(wait / 50) * 50}` : nf(wait);
+  const run = IS.runsSorted.find(r => r[0].artist === c.a.k && r[0].n > cut * .9);
+  const col = IS.collabsOf(c.a.k).flatMap(x => x.rs).filter(t => t.n > cut).map(t => "#" + t.n);
+  return {kind: "pl", theme: 2, score: 76,
+    title: `${c.a.k} levou ${waitTxt} adições para engrenar`,
+    body: `<p>Chegou na #${c.first}, mas teve só ${B(faixas(c.early))} nas primeiras ${nf(cut)} adições${run && run.length >= 5 ? `; depois explodiu, com maratona de ${run.length} (#${run[0].n} a #${run[run.length - 1].n})` : ""}${col.length ? ` e a playlist seguiu a banda até as parcerias (${listPt(col.slice(0, 3))})` : ""}. ${pickV("slow" + c.a.k, ["Foi conversão lenta, não amor à primeira vista.", "Um gosto adquirido, não instantâneo.", ""])}</p>`,
+    viz: V.strips([c.a.k]), kick: [`${c.early} → ${c.late}`, `faixas nas primeiras ${nf(cut)} vs. nas últimas ${nf(NN - cut)} adições`]};
+});
+
+// PLAYLIST · passions in waves
+rule(() => {
+  if (!IS.journey) return null;
+  const skip = new Set([IS.art[0].k, SLOW]);
+  const cands = IS.art.filter(a => a.c >= 8 && !skip.has(a.k)).map(a => {
+    const need = Math.max(2, a.c - 1); let best = null;
+    for (let i = 0; i + need - 1 < a.rs.length; i++){ const w = a.rs[i + need - 1].n - a.rs[i].n + 1; if (!best || w < best.w) best = {w, from: a.rs[i].n, to: a.rs[i + need - 1].n}; }
+    return {a, need, ...best};
+  }).filter(x => x.w <= NN * .35).sort((x, y) => (y.need / y.w) - (x.need / x.w));
+  const c = cands[0]; if (!c) return null;
+  const stopped = IS.art.filter(a => a.c >= 6 && !skip.has(a.k) && a.k !== c.a.k && a.rs[a.rs.length - 1].n <= NN * .7).slice(0, 3);
+  return {kind: "pl", theme: 2, score: 72,
+    title: stopped.length >= 2 ? pickV("waves", ["Cada fase teve um dono, e as ondas não voltam", "Paixões em ondas: intensas e passageiras"]) : `${c.a.k} foi uma febre concentrada`,
+    body: `<p>${esc(c.a.k)} ${pickV("wv" + c.a.k, ["foi uma febre concentrada.", "chegou como uma onda."])}${stopped.length ? ` ${stopped.map((a, i) => `${esc(a.k)} parou na #${a.rs[a.rs.length - 1].n}`).join(", ")}.` : ""}</p>`,
+    viz: V.strips([c.a.k]), kick: [`${c.need}/${c.a.c}`, `faixas de ${c.a.k} entraram entre #${c.from} e #${c.to}`]};
+});
+
+// PLAYLIST · the loyal ones
+rule(() => {
+  if (NN < 36) return null;
+  const bl = blocks(12);
+  const cands = IS.art.filter(a => a.c >= 6).map(a => {
+    const cov = bl.filter(seg => seg.some(t => t.artist === a.k)).length, span = a.rs[a.rs.length - 1].n - a.rs[0].n;
+    let gap = 0, gi = 0; for (let i = 1; i < a.rs.length; i++){ const g = a.rs[i].n - a.rs[i - 1].n; if (g > gap){ gap = g; gi = i; } }
+    return {a, cov, span, gap, back: a.rs.slice(gi).length};
+  }).filter(x => x.span >= NN * .6).sort((x, y) => y.cov - x.cov || y.span - x.span).slice(0, 3);
+  if (cands.length < 2) return null;
+  const arc = [...cands].sort((x, y) => y.span - x.span)[0];
+  const ret = [...cands].sort((x, y) => y.gap - x.gap)[0];
+  const lastW = NN - (ret.a.rs[ret.a.rs.length - ret.back].n) + 1;
+  return {kind: "pl", theme: 2, score: 74,
+    title: `${cands.length === 3 ? "Três" : "Duas"} bandas atravessam a playlist inteira`,
+    body: `<p>${esc(cands[0].a.k)} aparece em ${cands[0].cov} dos 12 trechos${ret.gap >= NN * .2 ? `; ${esc(ret.a.k)} sumiu por ${ret.gap} posições e voltou com ${faixas(ret.back)} nas últimas ${nf(lastW)}` : ""}.</p>`,
+    viz: V.strips(cands.map(x => x.a.k)), kick: [nf(arc.span), `posições de arco de ${arc.a.k}, do #${arc.a.rs[0].n} ao #${arc.a.rs[arc.a.rs.length - 1].n}`]};
+});
+
+// PLAYLIST · does the taste get newer or older?
+rule(() => {
+  if (!IS.journey || IS.dated.length < 30) return null;
+  const decs = IS.dec.map(d => d.d);
+  const pivot = decs.find(d => { const b = IS.dated.filter(t => t.year < d).length / IS.dated.length; return b >= .15 && b <= .85; }) ?? Math.round(median(IS.dated.map(t => t.year)) / 10) * 10;
+  const pre = CHI.map(c => c.seg.filter(t => t.year !== NI && t.year < pivot).length);
+  const w = Math.min(60, Math.floor(NN / 6));
+  const mf = Math.round(median(BY_PLAYLIST.slice(0, w).filter(t => t.year !== NI).map(t => t.year)));
+  const ml = Math.round(median(BY_PLAYLIST.slice(-w).filter(t => t.year !== NI).map(t => t.year)));
+  const back = pre[pre.length - 1] > pre[pre.length - 2];
+  const oldLbl = decLabel(pivot - 10);
+  const title = ml > mf + 1 ? (back ? `Menos ${oldLbl} com o tempo, até o passado voltar` : "O gosto ficou mais novo com o tempo") : ml < mf - 1 ? "A playlist foi ficando mais nostálgica" : "O gosto mudou de artista, não de época";
+  const backers = back ? [...groupBy(CHI[CHI.length - 1].seg.filter(t => t.year !== NI && t.year < pivot), "artist")].sort((a, b) => b[1].length - a[1].length).slice(0, 3).map(x => esc(x[0])) : [];
+  return {kind: "pl", theme: 0, score: 78, title,
+    body: `<p>${ml > mf + 1 ? "A mediana do ano de lançamento sobe ao longo da playlist" : ml < mf - 1 ? "A mediana do ano de lançamento cai ao longo da playlist" : "A mediana do ano de lançamento quase não muda"}${backers.length ? `, mas o último capítulo resgata ${listPt(backers)}` : ""}.</p>`,
+    viz: V.mbars(pre, CHI.map((c, i) => `cap. ${i + 1}`), `faixas lançadas antes de ${pivot}, por capítulo`),
+    kick: [`${mf} → ${ml}`, `ano mediano de lançamento: primeiras ${w} vs. últimas ${w} adições`]};
+});
+
+// PLAYLIST · binge adding
+rule(() => {
+  if (!IS.journey) return null;
+  const big = IS.runs.filter(r => r.length >= 5), inBig = sum(big, r => r.length), f = inBig / NN;
+  const ar = [...IS.albRuns].filter(r => r.length >= 5).sort((a, b) => b.length - a.length).slice(0, 4);
+  const albTxt = ar.length ? (() => { const g = []; for (const r of ar){ const last = g[g.length - 1]; if (last && last.n === r.length) last.names.push(r[0].album); else g.push({n: r.length, names: [r[0].album]}); } return g.map(x => `${listPt(x.names.map(esc))} (${x.n}${x.names.length > 1 ? " cada" : " seguidas"})`).join(", "); })() : "";
+  const top = IS.runsSorted.slice(0, 5); if (!top.length || top[0].length < 3) return null;
+  return {kind: "pl", theme: 3, score: f >= .25 ? 68 : 48,
+    title: f >= .3 ? "Você adiciona em blocos, não em singles" : f >= .15 ? "Maratonas pontuais no meio de faixas soltas" : "Você monta a playlist música a música",
+    body: `<p>${ar.length ? `Álbuns entram quase inteiros de uma vez: ${albTxt}.` : `As maiores sequências seguidas são curtas: ${top[0].length} faixas no máximo.`}</p>`,
+    viz: V.runs(top, "maiores sequências seguidas do mesmo artista"), kick: [pc0(inBig, NN), `das faixas entraram em sequências de 5+ do mesmo artista`]};
+});
+
+// PLAYLIST · discovery pace
+rule(() => {
+  if (!IS.journey) return null;
+  const seen = new Set(), firstAt = []; for (const t of BY_PLAYLIST){ if (!seen.has(t.artist)){ seen.add(t.artist); firstAt.push(t); } }
+  const total = seen.size, half = firstAt[Math.ceil(total / 2) - 1], cut = Math.round(NN * 2 / 3);
+  const fresh = firstAt.filter(t => t.n > cut), col = fresh.filter(t => splitArtists(t.artist).length > 1);
+  const best = [...CHI].sort((a, b) => b.arts - a.arts)[0], slow = fresh.length <= Math.max(2, total * .2);
+  const colOwner = col.length ? (splitArtists(col[0].artist).map(p => IS.art.find(a => a.k.toLowerCase() === p)).find(Boolean) || {}).k : null;
+  return {kind: "pl", theme: 4, score: 66,
+    title: slow ? "A descoberta desacelerou" : "A playlist segue descobrindo artistas",
+    body: `<p>Metade dos ${total} artistas já tinha aparecido até a #${half.n}. O capítulo ${best.i + 1} reuniu ${best.arts} artistas em ${best.seg.length} faixas.</p>`,
+    viz: V.disc(), mvClass: "disc",
+    kick: [nf(fresh.length), `artista${fresh.length === 1 ? "" : "s"} novo${fresh.length === 1 ? "" : "s"} nas últimas ${nf(NN - cut)} adições${col.length ? `, ${col.length} ${col.length > 1 ? "deles parcerias" : "deles parceria"}${colOwner ? ` de ${colOwner}` : ""}` : ""}`]};
+});
+
+// PLAYLIST · same title recorded by different artists
+rule(() => {
+  if (!IS.journey) return null;
+  const g = groupBy(T.map(t => ({...t, key: cleanTitle(t.title).toLowerCase()})).filter(t => t.key.length > 2), "key");
+  const pairs = [...g.values()].filter(rs => new Set(rs.map(r => r.artist)).size > 1).map(rs => {
+    const s = [...rs].sort((a, b) => a.n - b.n), a = s[0], b = s.find(x => x.artist !== a.artist);
+    return {title: cleanTitle(a.title), a, b, older: a.year !== NI && b.year !== NI && a.year <= b.year};
+  });
+  if (!pairs.length) return null;
+  const k = pairs.filter(p => p.older).length, m = pairs.length;
+  return {kind: "pl", theme: 5, score: 58 + Math.min(m, 4) * 3,
+    title: k === m ? "A versão mais antiga sempre chega primeiro" : k === 0 ? "A gravação mais nova sempre chegou primeiro" : "Títulos repetidos, ordens diferentes",
+    body: `<p>${m === 1 ? "Um título aparece" : `${m} títulos aparecem`} gravado${m > 1 ? "s" : ""} por dois artistas, e ${k === m ? "a gravação mais antiga sempre entrou antes" : k === 0 ? "a gravação mais recente entrou antes" : `em ${k} de ${m} casos a gravação mais antiga entrou antes`}.</p>`,
+    viz: V.pairs(pairs.slice(0, 4)), kick: [`${k} de ${m}`, `versões mais antigas entraram primeiro na playlist`]};
+});
+
+/* ---------- selection, ordering and row packing ---------- */
+function buildCards(){
+  let cards = RULES.map(fn => { try { return fn(); } catch (e) { console.warn("regra ignorada", e); return null; } }).filter(Boolean);
+  cards.sort((a, b) => b.score - a.score); cards = cards.slice(0, 14);
+  // interleave: by theme, catalogue first then playlist, so related readings sit side by side
+  cards.sort((a, b) => a.theme - b.theme || (a.kind === "cat" ? 0 : 1) - (b.kind === "cat" ? 0 : 1) || b.score - a.score);
+  const rows = [];
+  for (const c of cards){ const w = c.wide ? 2 : 1; let r = rows.find(r => r.free >= w); if (!r){ r = {items: [], free: 3}; rows.push(r); } r.items.push(c); r.free -= w; }
+  const last = rows[rows.length - 1];
+  if (last && last.free){
+    const normal = last.items.find(c => !c.wide);
+    if (last.free === 1 && normal) normal.wide = true; else last.items[0].full = true;
+  }
+  return rows.flatMap(r => r.items);
+}
+function renderCards(){
+  const cards = buildCards();
+  const tag = k => k === "cat" ? `<span class="tag">Catálogo</span>` : k === "pl" ? `<span class="tag pl">Playlist</span>` : `<span class="tag">Catálogo</span> <span class="tag pl">Playlist</span>`;
+  $("#mix").innerHTML = cards.map((c, i) => {
+    const wide = c.wide || c.full;
+    return `<article class="card ic${wide ? " wide" : ""}${c.full ? " full" : ""} rise" style="--d:${i + 3}">
+      <div class="num">${String(i + 1).padStart(2, "0")} ${tag(c.kind)}</div><h3>${esc(c.title)}</h3>
+      ${wide ? `<div class="split"><div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>${c.body}</div>` : `${c.body}<div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>`}
+      <div class="kick"><b>${esc(c.kick[0])}</b><span>${esc(c.kick[1])}</span></div></article>`;
+  }).join("");
+  return cards;
+}
+
+/* ---------- hero ---------- */
+function renderHero(){
+  const N = NN, a0run = IS.runs[0] || [], a0 = a0run.length ? a0run[0].artist : "";
+  const pd = [...IS.dec].sort((a, b) => b.c - a.c)[0];
+  const c5 = sum(IS.art.slice(0, 5), a => a.c), f5 = c5 / N;
+  const conc = f5 >= .5 ? "concentrado em poucos artistas" : f5 >= .35 ? "puxado por um grupo de artistas" : "espalhado por muitos artistas";
+  const lastCh = CHI[CHI.length - 1], opener = a0run.length >= 3 ? a0 : (CHI[0] ? CHI[0].top[0] : a0), current = lastCh ? lastCh.top[0] : "";
+  let h2 = `Um catálogo ${pd ? `forte nos <em>${decLabel(pd.d)}</em>, ` : ""}${conc}`;
+  if (IS.journey) h2 += opener === current ? `, fiel a <em>${esc(opener)}</em> do começo ao fim.` : `, que começou com <em>${esc(opener)}</em> e hoje respira <em>${esc(current)}</em>.`;
+  else h2 += ".";
+  const tot = sum(T, t => t.sec);
+  const facts = [];
+  const add = (lbl, n, d) => facts.push(`<div class="fact"><div class="eyebrow">${esc(lbl)}</div><div class="n">${esc(n)}</div><div class="d">${esc(d)}</div></div>`);
+  const cat = [], pl = [];
+  if (pd) cat.push([`Faixas dos ${decLabel(pd.d)}`, pc0(pd.c, N), `${nf(pd.c)} de ${nf(N)}`]);
+  if (IS.art.length >= 5) cat.push(["Top 5 artistas", pc0(c5, N), `${nf(c5)} de ${nf(N)} faixas`]);
+  if (IS.dated.length && IS.maxY - IS.minY >= 8){ const thr = Math.min(IS.maxY, NOW_Y) - 6, r = IS.dated.filter(t => t.year >= thr).length; cat.push([`Lançadas desde ${thr}`, pc0(r, N), `${nf(r)} de ${nf(N)}`]); }
+  const sAlb = IS.alb.filter(a => a.c === 1).length; if (IS.alb.length >= 6) cat.push(["Álbuns com 1 faixa", nf(sAlb), `de ${nf(IS.alb.length)} álbuns`]);
+  cat.push(["Artistas únicos", nf(IS.art.length), `em ${nf(IS.alb.length)} álbuns`], ["Tempo de música", fmtLong(tot), `${nf(N)} faixas`]);
+  if (IS.journey){
+    if (a0run.length >= 3) pl.push([`Primeiras ${a0run.length} faixas`, `${a0run.length}/${a0run.length}`, `todas de ${a0}`]);
+    const a1 = IS.art[0], tail = N - a1.rs[a1.rs.length - 1].n;
+    if (tail >= Math.max(15, N * .15)) pl.push([`${a1.k} nas últimas ${nf(tail)}`, "0", `o líder parou em #${a1.rs[a1.rs.length - 1].n}`]);
+    if (SLOW){ const cut = Math.round(N * .78), late = IS.artMap.get(SLOW).rs.filter(t => t.n > cut).length; pl.push([`${SLOW} nas últimas ${nf(N - cut)}`, nf(late), `${pc0(late, N - cut)} das adições recentes`]); }
+    const big = sum(IS.runs.filter(r => r.length >= 5), r => r.length); if (big) pl.push(["Entraram em maratonas", pc0(big, N), `${nf(big)} faixas em sequências de 5+`]);
+    if (lastCh) pl.push([`Dono do último capítulo`, lastCh.top[0], `${lastCh.top[1]} de ${lastCh.seg.length} adições`]);
+  }
+  for (let i = 0; facts.length < 8 && (i < cat.length || i < pl.length); i++){ if (cat[i]) add(...cat[i]); if (pl[i] && facts.length < 8) add(...pl[i]); }
+  $("#ins-hero").innerHTML = `<div class="eyebrow">Leitura executiva · catálogo${IS.journey ? " e playlist" : ""}</div><h2>${h2}</h2>
+    <p>${nf(N)} faixas, ${nf(IS.art.length)} artistas e ${nf(IS.alb.length)} álbuns, somando ${fmtLong(tot)} de música.${IS.journey ? ` A coluna "número" é a ordem de entrada na playlist: a #1 foi a primeira faixa adicionada e a #${nf(N)}, a mais recente.` : ""} Todos os números vêm exclusivamente da lista.</p>
+    <div class="facts">${facts.join("")}</div>`;
+}
+
+/* ---------- recommendations ---------- */
+function renderRecs(){
+  const N = NN, out = [];
+  const a1 = IS.art[0], a2 = IS.art[1];
+  const cat = [], pl = [];
+  if (IS.journey){
+    const w = Math.min(60, Math.floor(N / 6)), lastW = BY_PLAYLIST.slice(-w), g = [...groupBy(lastW, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]);
+    if (g[0] && g[0][0] !== a1.k) pl.push(["Ler o gosto atual pelas últimas adições", `O total ainda favorece ${a1.k}, mas as ${w} adições mais recentes têm ${g[0][1]} de ${g[0][0]}${g[1] ? ` e ${g[1][1]} de ${g[1][0]}` : ""}. Para seleções e recomendações, o recorte recente vale mais que o acumulado.`]);
+    const seen = new Set(), firstAt = []; for (const t of BY_PLAYLIST){ if (!seen.has(t.artist)){ seen.add(t.artist); firstAt.push(t); } }
+    const cut = Math.round(N * 2 / 3), fresh = firstAt.filter(t => t.n > cut).length, best = [...CHI].sort((a, b) => b.arts - a.arts)[0];
+    if (fresh <= Math.max(2, seen.size * .2)) pl.push(["Reabrir o modo descoberta", `${fresh === 0 ? "Nenhum artista novo apareceu" : `Foram só ${fresh} artista${fresh > 1 ? "s" : ""} novo${fresh > 1 ? "s" : ""}`} nas últimas ${nf(N - cut)} adições, contra ${best.arts} artistas no capítulo ${best.i + 1}. Reservar espaço para nomes novos evita que a playlist vire monocultura.`]);
+    if (N >= 36){ const bl = blocks(12); const loyal = IS.art.filter(a => a.c >= 6 && a.rs[a.rs.length - 1].n - a.rs[0].n >= N * .6).sort((x, y) => bl.filter(s => s.some(t => t.artist === y.k)).length - bl.filter(s => s.some(t => t.artist === x.k)).length).slice(0, 3);
+      if (loyal.length >= 2) pl.push(["Usar os fiéis como âncora", `${listPt(loyal.map(a => a.k))} sobreviveram a todas as fases. São a espinha dorsal para seleções e transições entre estilos.`]); }
+    const big = sum(IS.runs.filter(r => r.length >= 5), r => r.length);
+    if (big / N >= .25) pl.push(["Descobrir do jeito que já funciona", `${pc0(big, N)} das faixas entraram em maratonas do mesmo artista. Ao testar um nome novo, comece por um álbum inteiro, não por um single solto.`]);
+  }
+  if (a2 && (a1.c + a2.c) / N >= .25){ const mid = IS.art.slice(2, 5); cat.push(["Reduzir a dependência", `${a1.k} e ${a2.k} somam ${nf(a1.c + a2.c)} faixas (${pc1(a1.c + a2.c, N)}).${mid.length ? ` O meio do ranking (${mid.map(a => `${a.k} ${a.c}`).join(", ")}) é o melhor lugar para diluir o risco.` : ""}`]); }
+  if (IS.dated.length && IS.maxY - IS.minY >= 8){ const thr = Math.min(IS.maxY, NOW_Y) - 6, rec = IS.dated.filter(t => t.year >= thr); if (rec.length / N < .15){ const who = [...groupBy(rec, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]).slice(0, 3); cat.push(["Renovar com lançamentos recentes", `Só ${faixas(rec.length)} (${pc0(rec.length, N)}) foram lançadas de ${thr} em diante${who.length ? `, e ${sum(who, x => x[1])} delas são de ${listPt(who.map(x => x[0]))}` : ""}.`]); } }
+  const singles = IS.art.filter(a => a.c === 1).length;
+  if (singles >= 5) cat.push(["Aprofundar a cauda longa", `Há ${singles} artistas com uma faixa só. Testar 2 ou 3 faixas a mais dos que já têm aderência antes de buscar nomes novos.`]);
+  const jan1 = T.filter(t => /-01-01$/.test(t.date)).length, collabs = IS.art.filter(a => splitArtists(a.k).length > 1).length, missing = T.filter(t => t.artist === NI || t.album === NI || t.year === NI).length;
+  if (jan1 / N >= .05 || collabs || missing){
+    const bits = [];
+    if (jan1 / N >= .05) bits.push(`${faixas(jan1)} estão datadas em 1º de janeiro, o que indica que só o ano é conhecido`);
+    if (collabs) bits.push(`${collabs} parceria${collabs > 1 ? "s aparecem" : " aparece"} como artista separado`);
+    if (missing) bits.push(`${faixas(missing)} têm algum campo "Não identificado"`);
+    cat.push(["Corrigir a base de dados", bits.join("; ").replace(/^./, c => c.toUpperCase()) + ". Padronizar antes de análises mais finas."]);
+  }
+  for (let i = 0; i < Math.max(cat.length, pl.length); i++){ if (pl[i]) out.push(pl[i]); if (cat[i]) out.push(cat[i]); }
+  const list = out.slice(0, 8); if (list.length % 2 && list.length > 1) list.pop();
+  $("#recs").innerHTML = list.map(([t, d]) => `<li><strong>${esc(t)}</strong>${esc(d)}</li>`).join("");
+  $("#recs-card").style.display = list.length ? "" : "none";
+}
+
+/* ---------- journey visuals ---------- */
+function renderJourney(){
+  $("#journey").style.display = IS.journey ? "" : "none";
+  if (!IS.journey) return;
+  $("#chapters").innerHTML = CHI.map(c => `<div class="chap" style="--o:${(.25 + .75 * c.share / Math.max(...CHI.map(x => x.share))).toFixed(2)}" data-i="${c.i}">
+      <div class="cn">CAP. ${c.i + 1}</div><div class="ct">${esc(c.name)}</div><div class="cr">#${c.seg[0].n} → #${c.seg[c.seg.length - 1].n}</div>
+      <div class="cw"><b>${esc(c.top[0])}</b>${c.top[1]} de ${c.seg.length} faixas${c.g[1] ? ` · depois ${esc(c.g[1][0])} (${c.g[1][1]})` : ""}</div>
+      <div class="cs"><span><b>${c.arts}</b> artistas</span><span><b>${c.fresh}</b> novos</span>${isNaN(c.yr) ? "" : `<span>lanç. mediano <b>${Math.round(c.yr)}</b></span>`}</div></div>`).join("");
+  document.querySelectorAll(".chap").forEach(el => bindTip(el, () => {
+    const c = CHI[+el.dataset.i];
+    return `<div class="eyebrow">Capítulo ${c.i + 1} · #${c.seg[0].n} a #${c.seg[c.seg.length - 1].n}</div><div class="t">${esc(c.name)}</div>
+      <div class="k"><span>Tempo adicionado</span><b>${fmtLong(sum(c.seg, r => r.sec))}</b></div><hr>
+      <div class="eyebrow">Quem mais entrou</div>${sbars(c.g.slice(0, 4).map(([a, n]) => [a, `${n} · ${pc0(n, c.seg.length)}`, n / c.seg.length]))}`;
+  }));
+  const BL = blocks(NN >= 36 ? 12 : 6);
+  const top = IS.art.slice(0, 10).map(a => a.k);
+  const grid = top.map(a => BL.map(seg => seg.filter(r => r.artist === a)));
+  const mx = Math.max(1, ...grid.flat().map(x => x.length));
+  let html = "";
+  top.forEach((a, ai) => {
+    html += `<div class="hn">${esc(a)}</div>`;
+    grid[ai].forEach((rs, bi) => { const k = rs.length / mx; const bg = rs.length ? `hsla(156, 70%, ${18 + 50 * k}%, ${.35 + .65 * k})` : "rgba(110,231,183,.04)";
+      html += `<div class="hc" data-a="${ai}" data-b="${bi}" data-bg="${bg}" style="background:rgba(110,231,183,.04);color:${k > .55 ? "#022C22" : "var(--ink)"}">${rs.length || ""}</div>`; });
+  });
+  html += `<div></div>` + BL.map((seg, i) => `<div class="hx">${i % 3 === 0 ? "#" + seg[0].n : ""}</div>`).join("");
+  const heat = $("#heat"); heat.style.gridTemplateColumns = `auto repeat(${BL.length},minmax(0,1fr))`; heat.innerHTML = html;
+  $("#heat-hint").textContent = `cada coluna = ~${Math.round(NN / BL.length)} adições · passe o mouse`;
+  heat.querySelectorAll(".hc").forEach(el => bindTip(el, () => {
+    const a = top[+el.dataset.a], seg = BL[+el.dataset.b], rs = grid[+el.dataset.a][+el.dataset.b];
+    return `<div class="eyebrow">Adições #${seg[0].n} a #${seg[seg.length - 1].n}</div><div class="t">${esc(a)}</div>
+      <div class="k"><span>Faixas neste trecho</span><b>${rs.length} de ${seg.length} · ${pc0(rs.length, seg.length)}</b></div>
+      ${rs.length ? `<hr><div class="eyebrow">Entraram aqui</div>${rs.slice(0, 4).map(r => `<div class="k"><span style="color:var(--ink)">#${r.n} ${esc(r.title)}</span></div>`).join("")}${rs.length > 4 ? `<div class="k"><span>+ ${rs.length - 4} faixas</span></div>` : ""}` : `<hr><div class="k"><span>Nenhuma faixa neste trecho</span></div>`}`;
+  }));
+}
+function drawScatter(){
+  const box = $("#scatter"); if (!box || !IS.journey) return;
+  const W = box.clientWidth, H = box.clientHeight; if (!W) return;
+  const pts = BY_PLAYLIST.filter(t => t.year !== NI);
+  if (pts.length < 10){ box.innerHTML = `<p style="color:var(--ink-3);font-size:13px">Poucas faixas com data de lançamento para este gráfico.</p>`; return; }
+  const y0 = Math.floor(Math.min(...pts.map(t => t.year)) / 10) * 10, y1 = Math.ceil((Math.max(...pts.map(t => t.year)) + 1) / 10) * 10;
+  const L = 36, R = 8, Tp = 20, Bt = 22;
+  const X = n => L + (n - 1) / Math.max(1, NN - 1) * (W - L - R);
+  const Y = y => Tp + (1 - (y - y0) / (y1 - y0)) * (H - Tp - Bt);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ano de lançamento de cada faixa pela ordem de entrada na playlist">`;
+  CHI.forEach((c, i) => { const xa = X(c.seg[0].n), xb = X(c.seg[c.seg.length - 1].n);
+    if (i % 2) svg += `<rect x="${xa}" y="${Tp - 16}" width="${xb - xa}" height="${H - Tp - Bt + 16}" fill="rgba(110,231,183,.04)" rx="6"/>`;
+    svg += `<text x="${(xa + xb) / 2}" y="${Tp - 6}" text-anchor="middle">cap. ${i + 1}</text>`; });
+  const step = (y1 - y0) > 60 ? 20 : 10;
+  for (let y = y0; y <= y1; y += step) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="rgba(110,231,183,.07)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(y) + 3}" text-anchor="end">${y}</text>`;
+  const ticks = [1, Math.round(NN / 4), Math.round(NN / 2), Math.round(NN * 3 / 4), NN];
+  ticks.forEach((n, i, arr) => svg += `<text x="${X(n)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === arr.length - 1 ? "end" : "middle"}">#${n}</text>`);
+  const pivot = IS.dec.length > 1 ? IS.dec[Math.floor(IS.dec.length / 2)].d : 2000;
+  pts.forEach(t => svg += `<circle cx="${X(t.n)}" cy="${Y(t.year)}" r="3" fill="${t.year < pivot ? "#6EE7B7" : "#10B981"}" opacity=".55"/>`);
+  const win = Math.max(5, Math.min(41, Math.floor(pts.length / 8) | 1));
+  const med = pts.map((t, i) => { const w = pts.slice(Math.max(0, i - (win >> 1)), i + (win >> 1) + 1).map(x => x.year); return [X(t.n), Y(median(w))]; });
+  svg += `<path d="M${med.map(p => p.map(v => v.toFixed(1)).join(",")).join("L")}" fill="none" stroke="#F0FDF7" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(167,243,208,.6))"/>`;
+  svg += `<circle id="sc-hot" r="6" fill="none" stroke="#F0FDF7" stroke-width="2" opacity="0"/></svg>`;
+  box.innerHTML = svg;
+  const s = box.querySelector("svg"), hot = s.querySelector("#sc-hot");
+  s.addEventListener("pointermove", e => {
+    const b = s.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+    let best = null, bd = 1e9;
+    for (const t of pts){ const d = Math.hypot(X(t.n) - x, (Y(t.year) - y) * .6); if (d < bd){ bd = d; best = t; } }
+    if (!best || bd > 40){ hot.setAttribute("opacity", 0); hideTip(); return; }
+    hot.setAttribute("cx", X(best.n)); hot.setAttribute("cy", Y(best.year)); hot.setAttribute("opacity", 1);
+    const i = pts.indexOf(best), md = Math.round(median(pts.slice(Math.max(0, i - (win >> 1)), i + (win >> 1) + 1).map(x => x.year)));
+    showTip(`<div class="eyebrow">#${best.n} na playlist</div><div class="t">${esc(best.title)}</div>
+      <div class="k"><span>${esc(best.artist)}</span></div><div class="k"><span>${esc(best.album)}</span></div><hr>
+      <div class="k"><span>Lançada em</span><b>${best.year}</b></div>
+      <div class="k"><span>Mediana do trecho</span><b>${md}</b></div>
+      <div class="k"><span>Vs. o trecho</span><b>${best.year === md ? "na média" : (best.year > md ? "+" : "−") + Math.abs(best.year - md) + " anos"}</b></div>`, e);
+  });
+  s.addEventListener("pointerleave", () => { hot.setAttribute("opacity", 0); hideTip(); });
+}
+function renderDisc(){
+  const el = $("#disc"); if (!el) return;
+  const seen = new Set(); const cum = BY_PLAYLIST.map(t => (seen.add(t.artist), seen.size));
+  const W = 300, H = 120, n = cum.length, mx = cum[n - 1];
+  const P = cum.map((c, i) => `${(i / Math.max(1, n - 1) * W).toFixed(1)},${(H - 4 - (c / mx) * (H - 8)).toFixed(1)}`).join("L");
+  const half = cum.findIndex(c => c >= Math.ceil(mx / 2));
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;flex:1;min-height:${H}px;display:block;overflow:visible" aria-label="Artistas acumulados ao longo da playlist">
+    <defs><linearGradient id="dg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="rgba(16,185,129,.35)"/><stop offset="1" stop-color="rgba(16,185,129,0)"/></linearGradient></defs>
+    <path d="M0,${H}L${P}L${W},${H}Z" fill="url(#dg)"/><path d="M${P}" fill="none" stroke="#6EE7B7" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    <line x1="${half / Math.max(1, n - 1) * W}" x2="${half / Math.max(1, n - 1) * W}" y1="0" y2="${H}" stroke="rgba(240,253,247,.5)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/></svg>
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--ink-3);margin-top:6px"><span>artistas acumulados</span><span>metade em #${BY_PLAYLIST[half].n}</span><span>${mx} no total</span></div>`;
+  el.style.display = "flex"; el.style.flexDirection = "column"; el.style.flex = "1";
+}
+function renderNote(){
+  $("#ins-note").textContent = `${IS.journey ? `Ordem de entrada = coluna "número" da lista (#1 é a mais antiga na playlist). Capítulos = 6 blocos de ~${Math.round(NN / 6)} adições; trechos = ${NN >= 36 ? 12 : 6} blocos de ~${Math.round(NN / (NN >= 36 ? 12 : 6))}. ` : ""}Cada faixa conta uma vez para o artista exatamente como está escrito na lista. Índice de concentração = soma dos quadrados das participações (HHI). Os textos desta aba são gerados por regras a partir dos dados atuais e mudam quando a lista muda.`;
+}
+(function buildInsights(){
+  try { renderHero(); renderJourney(); renderCards(); renderDisc(); renderRecs(); renderNote(); }
+  catch (e){ console.error(e); $("#mix").innerHTML = `<article class="card ic"><h3>Não foi possível gerar os insights</h3><p>${esc(e.message)}</p></article>`; }
+})();
+
+function animateInsights(){
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.querySelectorAll("#insights .decades i").forEach(i => i.style.height = `${Math.max(4, i.dataset.h / 100 * 80)}px`);
+    document.querySelectorAll("#insights .stack i").forEach(i => i.style.flexGrow = i.dataset.g);
+    document.querySelectorAll("#insights i[data-w]").forEach(i => i.style.width = i.dataset.w + "%");
+    document.querySelectorAll("#heat .hc").forEach((el, k) => setTimeout(() => el.style.background = el.dataset.bg, k * 6));
+    drawScatter();
+  }));
+}
+
+
+/* ================= DATA TOOLS: import · table · export ================= */
+const ICON = {
+  list: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12M2 8h12M2 12.5h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
+  up: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2.5M4.5 6 8 2.5 11.5 6M2.5 13.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  down: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5M2.5 13.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  x: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+};
+const pad2 = n => String(n).padStart(2, "0");
+const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const currentRows = () => BY_PLAYLIST.map(t => [t.n, t.title, t.artist === NI ? "" : t.artist, t.album === NI ? "" : t.album, t.sec, t.date]);
+
+/* ---------- modal system ---------- */
+const modalStack = [];
+function openModal({title, sub = "", body, foot, size = "", onClose}){
+  const bg = document.createElement("div");
+  bg.className = "mbg";
+  bg.innerHTML = `<div class="modal${size ? " m-" + size : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <header class="mh"><div><h3>${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ""}</div><button class="mx" type="button" aria-label="Fechar">${ICON.x}</button></header>
+    <div class="mb"></div><footer class="mf"></footer></div>`;
+  const m = bg.querySelector(".modal");
+  if (typeof body === "string") m.querySelector(".mb").innerHTML = body; else m.querySelector(".mb").appendChild(body);
+  if (foot) { if (typeof foot === "string") m.querySelector(".mf").innerHTML = foot; else m.querySelector(".mf").appendChild(foot); } else m.querySelector(".mf").remove();
+  const close = () => { bg.classList.remove("on"); setTimeout(() => bg.remove(), 250); const i = modalStack.indexOf(api); if (i >= 0) modalStack.splice(i, 1); onClose && onClose(); if (!modalStack.length) document.body.style.overflow = ""; };
+  const api = {bg, m, close, q: s => m.querySelector(s)};
+  bg.addEventListener("pointerdown", e => { if (e.target === bg) close(); });
+  m.querySelector(".mx").addEventListener("click", close);
+  document.body.appendChild(bg); document.body.style.overflow = "hidden";
+  requestAnimationFrame(() => bg.classList.add("on"));
+  modalStack.push(api);
+  setTimeout(() => { const f = m.querySelector("[autofocus], textarea, input[type=search]"); f && f.focus({preventScroll: true}); }, 80);
+  return api;
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && modalStack.length){ e.stopPropagation(); modalStack[modalStack.length - 1].close(); } }, true);
+function confirmModal({title, html, ok = "Confirmar", danger = false, extra}){
+  return new Promise(res => {
+    let done = false;
+    const foot = document.createElement("div"); foot.className = "mfrow";
+    foot.innerHTML = `${extra ? `<button class="gbtn" type="button" data-x>${extra.label}</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn ${danger ? "danger" : ""}" type="button" data-o autofocus>${ok}</button>`;
+    const md = openModal({title, body: `<div class="confirm">${html}</div>`, foot, size: "sm", onClose: () => { if (!done) res(false); }});
+    foot.querySelector("[data-c]").onclick = () => md.close();
+    foot.querySelector("[data-o]").onclick = () => { done = true; md.close(); res(true); };
+    if (extra) foot.querySelector("[data-x]").onclick = extra.run;
+  });
+}
+
+/* ---------- commit: save the new list and rebuild the whole dashboard ---------- */
+async function commitRows(rows, flash){
+  const sorted = [...rows].sort((a, b) => a[0] - b[0]).map((r, i) => [i + 1, r[1], r[2], r[3], r[4], r[5]]);
+  if (!sorted.length){ toast("A playlist não pode ficar vazia."); return; }
+  writeStore({rows: sorted, updated: Date.now()});
+  /* confere se o navegador realmente gravou (abrir o arquivo via file:// pode bloquear
+     localStorage em alguns navegadores/modos de privacidade) antes de recarregar */
+  const verify = readStore();
+  const persisted = verify && Array.isArray(verify.rows) && verify.rows.length === sorted.length;
+  if (!persisted){
+    const proceed = await confirmModal({title: "O navegador pode estar bloqueando o salvamento", danger: true, ok: "Continuar mesmo assim",
+      html: `<p>Não foi possível confirmar que os dados foram gravados no navegador. Isso costuma acontecer quando o arquivo é aberto direto (<code>file://</code>) e o navegador restringe o armazenamento local nesse modo.</p><p><strong>Se continuar, as músicas podem sumir ao recarregar ou fechar a página.</strong></p><p class="muted">Exporte um backup agora, ou cancele e tente em outro navegador.</p>`,
+      extra: {label: `${ICON.down} Exportar backup`, run: () => exportTxt()}});
+    if (!proceed) return;
+  }
+  setFlash(flash);
+  document.body.classList.add("leaving");
+  setTimeout(() => location.reload(), 260);
+}
+async function restoreOriginal(){
+  const ok = await confirmModal({title: "Restaurar a playlist original?", danger: true, ok: "Restaurar original",
+    html: `<p>A lista atual (${faixas(NN)}) será descartada e o painel volta para a lista original embutida no arquivo (${faixas(DEFAULT_RAW.length)}).</p><p class="muted">Se quiser guardar a lista atual, exporte antes.</p>`,
+    extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+  if (!ok) return;
+  clearStore(); setFlash(`Playlist original restaurada · ${faixas(DEFAULT_RAW.length)}`);
+  document.body.classList.add("leaving"); setTimeout(() => location.reload(), 260);
+}
+
+/* ---------- parsing: TSV / CSV / XLSX into rows ---------- */
+function splitCSV(line, sep){
+  const out = []; let cur = "", q = false;
+  for (let i = 0; i < line.length; i++){
+    const ch = line[i];
+    if (q){ if (ch === '"' && line[i + 1] === '"'){ cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true; else if (ch === sep){ out.push(cur); cur = ""; } else cur += ch;
+  }
+  out.push(cur); return out;
+}
+function textToCells(text){
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return [];
+  const sample = lines.slice(0, 5).join("\n");
+  const sep = sample.includes("\t") ? "\t" : (sample.split(";").length > sample.split(",").length ? ";" : ",");
+  return lines.map(l => sep === "\t" ? l.split("\t") : splitCSV(l, sep));
+}
+function parseDur(v){
+  if (v == null) return null; const s = String(v).trim(); if (!s) return null;
+  let m;
+  if ((m = s.match(/^(\d{1,2}):(\d{1,2}):(\d{2})$/))) return +m[1] * 3600 + +m[2] * 60 + +m[3];
+  if ((m = s.match(/^(\d{1,3}):(\d{2})$/))) return +m[1] * 60 + +m[2];
+  if (/^0?[.,]\d+$/.test(s)) return Math.round(parseFloat(s.replace(",", ".")) * 86400);   // Excel time fraction
+  if (/^\d+$/.test(s) && +s >= 20 && +s < 36000) return +s;                                  // plain seconds
+  return undefined;
+}
+function parseDate(v){
+  if (v == null) return ""; const s = String(v).trim(); if (!s) return "";
+  let m;
+  if ((m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/))) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+  if ((m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/))) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+  if ((m = s.match(/^(\d{4})[-/.](\d{1,2})$/))) return `${m[1]}-${pad2(m[2])}-01`;
+  if (/^\d{4}$/.test(s) && +s > 1900 && +s < 2100) return s;
+  if (/^\d{5}(\.\d+)?$/.test(s)){ const d = new Date(Date.UTC(1899, 11, 30) + Math.round(parseFloat(s)) * 864e5); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`; }   // Excel serial
+  return undefined;
+}
+const HDR = {n: /^(n[uú]mero|numero|n[ºo°]?|#|pos(i[cç][aã]o)?|ordem|index)$/i, title: /^(m[uú]sicas?|faixas?|t[ií]tulo|title|track|song|nome(_da_m[uú]sica)?)$/i, artist: /^(bandas?|artistas?|banda_artista|banda\/artista|artist|int[eé]rprete)$/i,
+  album: /^([aá]lbum|album)$/i, dur: /^(dura[cç][aã]o|tempo|duration|length|dur)$/i, date: /^(data|lan[cç]amento|data_(de_)?lan[cç]amento|release(_date)?|ano|year|date)$/i};
+function cellsToRows(cells){
+  const warnings = []; let start = 0, map = null;
+  const h = cells[0] ? cells[0].map(c => String(c).trim().toLowerCase().replace(/\s+/g, "_")) : [];
+  // a header row names at least two known columns and has no value that looks like data (a duration)
+  const hasHeader = Object.keys(HDR).filter(k => h.some(c => HDR[k].test(c))).length >= 2 && !h.some(c => /^\d{1,3}:\d{2}$/.test(c));
+  if (hasHeader){
+    map = {}; start = 1;
+    h.forEach((c, i) => { for (const k of Object.keys(HDR)) if (map[k] === undefined && HDR[k].test(c)) { map[k] = i; break; } });
+  }
+  const rows = [];
+  for (let li = start; li < cells.length; li++){
+    const c = cells[li].map(x => String(x == null ? "" : x).trim());
+    if (!c.some(Boolean)) continue;
+    let n, title, artist, album, dur, date;
+    if (map){ n = c[map.n]; title = c[map.title]; artist = c[map.artist]; album = c[map.album]; dur = c[map.dur]; date = c[map.date]; }
+    else if (c.length >= 6 && /^\d+$/.test(c[0])) [n, title, artist, album, dur, date] = c;
+    else if (c.length >= 5) [title, artist, album, dur, date] = c;
+    else if (c.length >= 2){ [title, artist, album, dur, date] = c; }
+    else { warnings.push({line: li + 1, msg: "linha com poucas colunas, ignorada"}); continue; }
+    if (!title){ warnings.push({line: li + 1, msg: "sem nome da música, ignorada"}); continue; }
+    let sec = parseDur(dur);
+    if (sec === undefined){ warnings.push({line: li + 1, msg: `duração "${dur}" não reconhecida (fica 0:00)`}); sec = 0; }
+    if (sec === null){ warnings.push({line: li + 1, msg: "sem duração (fica 0:00 e não entra na média)"}); sec = 0; }
+    let d = parseDate(date);
+    if (d === undefined){ warnings.push({line: li + 1, msg: `data "${date}" não reconhecida (fica "${NI}")`}); d = ""; }
+    if (!artist) warnings.push({line: li + 1, msg: `sem artista (fica "${NI}")`});
+    rows.push({n: /^\d+$/.test(n || "") ? +n : null, title, artist: artist || "", album: album || "", sec, date: d});
+  }
+  return {rows, warnings};
+}
+/* minimal XLSX reader (ZIP + XML), using the browser's own inflater */
+async function xlsxToCells(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  let eocd = -1; for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  if (eocd < 0) throw new Error("arquivo .xlsx inválido");
+  const cnt = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true);
+  const files = {}; const dec = new TextDecoder();
+  for (let i = 0; i < cnt; i++){
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const name = dec.decode(u8.slice(p + 46, p + 46 + nlen));
+    files[name] = {method, csize, off}; p += 46 + nlen + elen + clen;
+  }
+  const read = async name => {
+    const f = files[name]; if (!f) return null;
+    const start = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true), data = u8.slice(start, start + f.csize);
+    if (f.method === 0) return dec.decode(data);
+    if (typeof DecompressionStream === "undefined") throw new Error("este navegador não lê .xlsx compactado; exporte como texto");
+    const ds = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return await new Response(ds).text();
+  };
+  const xml = s => new DOMParser().parseFromString(s, "application/xml");
+  const ssXml = await read("xl/sharedStrings.xml");
+  const ss = ssXml ? [...xml(ssXml).getElementsByTagName("si")].map(si => [...si.getElementsByTagName("t")].map(t => t.textContent).join("")) : [];
+  const sheetName = Object.keys(files).filter(n => /^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort((a, b) => parseInt(a.match(/\d+/)) - parseInt(b.match(/\d+/)))[0];
+  if (!sheetName) throw new Error("planilha sem abas");
+  const doc = xml(await read(sheetName));
+  const colIdx = ref => { let n = 0; for (const ch of ref.replace(/\d+/g, "")) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+  return [...doc.getElementsByTagName("row")].map(r => {
+    const out = [];
+    for (const c of r.getElementsByTagName("c")){
+      const t = c.getAttribute("t"), v = c.getElementsByTagName("v")[0], is = c.getElementsByTagName("is")[0];
+      out[colIdx(c.getAttribute("r") || "A")] = t === "s" ? ss[+v.textContent] : t === "inlineStr" ? (is ? is.textContent : "") : (v ? v.textContent : "");
+    }
+    return Array.from(out, x => x == null ? "" : x);
+  });
+}
+
+/* ---------- import by Spotify link: fetch title/artist/album/duration/release date from the Web API ---------- */
+const SPOTIFY_CREDS_KEY = "catalogo-musical:spotify-creds";
+function loadSpotifyCreds(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_CREDS_KEY) || "null") || {}; } catch (e) { return {}; } }
+function saveSpotifyCreds(id, secret){ try { localStorage.setItem(SPOTIFY_CREDS_KEY, JSON.stringify({id, secret})); } catch (e) {} }
+function clearSpotifyCreds(){ try { localStorage.removeItem(SPOTIFY_CREDS_KEY); } catch (e) {} }
+function parseSpotifyIds(text){
+  const ids = [];
+  for (const tok of text.split(/\s+/)){ const m = tok.match(/track[/:]([A-Za-z0-9]{22})/); if (m) ids.push(m[1]); }
+  return [...new Set(ids)];
+}
+function parseSpotifyPlaylistIds(text){
+  const ids = [];
+  for (const tok of text.split(/\s+/)){ const m = tok.match(/playlist[/:]([A-Za-z0-9]{22})/); if (m) ids.push(m[1]); }
+  return [...new Set(ids)];
+}
+async function spotifyToken(id, secret){
+  let r;
+  try { r = await fetch("https://accounts.spotify.com/api/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded", "Authorization": "Basic " + btoa(`${id}:${secret}`)}, body: "grant_type=client_credentials"}); }
+  catch (e) { throw new Error("Não foi possível conectar ao Spotify (sem internet ou bloqueado pelo navegador)."); }
+  if (!r.ok) throw new Error(r.status === 400 ? "Client ID ou Client Secret inválidos." : `Falha ao autenticar no Spotify (HTTP ${r.status}).`);
+  const j = await r.json();
+  if (!j.access_token) throw new Error("Resposta inesperada do Spotify ao autenticar.");
+  return j.access_token;
+}
+function spotifyDate(album){
+  const d = (album && album.release_date) || ""; if (!d) return "";
+  if (d.length >= 10) return d.slice(0, 10);
+  if (d.length === 7) return d + "-01";
+  if (d.length === 4) return d + "-01-01";
+  return "";
+}
+async function spotifyFetchTracks(ids, token, onProgress, onWait){
+  /* desde fev/2026 o Spotify removeu a busca em lote (GET /tracks?ids=...) para apps em
+     Development Mode; agora só GET /tracks/{id}, uma faixa por vez. Com listas grandes isso
+     esbarra no limite de requisições (HTTP 429). O header Retry-After do Spotify, nesse modo,
+     costuma vir baixo (2-3s) mesmo quando o bloqueio real dura bem mais — respeitar só ele faz
+     martelar o mesmo erro sem avançar. Por isso a espera cresce (backoff) a cada 429 seguido,
+     e só volta a diminuir depois de uma faixa bem-sucedida. */
+  const rows = [], warnings = [];
+  let backoff = 0, attempt = 0;
+  for (let i = 0; i < ids.length; i++){
+    const id = ids[i];
+    for (let tries = 0; ; tries++){
+      let r; try { r = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {headers: {Authorization: `Bearer ${token}`}}); }
+      catch (e) { throw new Error("Não foi possível buscar as faixas no Spotify."); }
+      if (r.status === 429){
+        attempt++;
+        if (attempt > 40) throw new Error("O Spotify manteve o limite de requisições por tempo demais seguidas; tente de novo em alguns minutos.");
+        const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
+        backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
+        const wait = Math.max(1, Math.round(backoff));
+        onWait && await onWait(wait, i, ids.length, attempt);
+        continue;
+      }
+      backoff = Math.max(0, backoff - 3); attempt = 0;
+      if (r.status === 404){ warnings.push({line: i + 1, msg: `faixa ${id} não encontrada no Spotify`}); onProgress && onProgress(i + 1, ids.length); break; }
+      if (r.status === 403) throw new Error("Spotify recusou o acesso (HTTP 403). Confira se a conta dona do app tem Spotify Premium (exigido para apps em modo de desenvolvimento) e se o Client ID/Secret estão corretos.");
+      if (!r.ok) throw new Error(`Falha ao buscar faixas no Spotify (HTTP ${r.status}).`);
+      const t = await r.json();
+      rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album)});
+      onProgress && onProgress(i + 1, ids.length);
+      break;
+    }
+  }
+  return {rows, warnings};
+}
+async function spotifyFetchPlaylistTracks(playlistIds, token, onProgress, onWait){
+  /* a API de playlist devolve várias faixas por requisição (até 100), então uma playlist
+     inteira custa poucas chamadas — bem mais barato que buscar faixa por faixa. */
+  const rows = [], warnings = [];
+  let backoff = 0, attempt = 0;
+  for (let pi = 0; pi < playlistIds.length; pi++){
+    const pid = playlistIds[pi];
+    let offset = 0, total = Infinity;
+    while (offset < total){
+      let r;
+      for (;;){
+        try {
+          /* endpoint renomeado de /tracks pra /items na migração de fev/2026 do Spotify; o campo
+             da faixa dentro de cada item também mudou de "track" pra "item" — pedimos os dois
+             nomes e lemos o que vier, pra não depender de qual versão a API está servindo */
+          r = await fetch(`https://api.spotify.com/v1/playlists/${pid}/items?limit=100&offset=${offset}&fields=total,items(item(name,artists(name),album(name,release_date),duration_ms,is_local),track(name,artists(name),album(name,release_date),duration_ms,is_local))`, {headers: {Authorization: `Bearer ${token}`}});
+        } catch (e) { throw new Error("Não foi possível buscar a playlist no Spotify."); }
+        if (r.status === 429){
+          attempt++;
+          if (attempt > 40) throw new Error("O Spotify manteve o limite de requisições por tempo demais seguidas; tente de novo em alguns minutos.");
+          const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
+          backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
+          const wait = Math.max(1, Math.round(backoff));
+          onWait && await onWait(wait, rows.length, total === Infinity ? rows.length : total, attempt);
+          continue;
+        }
+        backoff = Math.max(0, backoff - 3); attempt = 0;
+        if (r.status === 404) throw new Error("Playlist não encontrada (verifique o link).");
+        if (r.status === 403) throw new Error("Spotify recusou o acesso à playlist (HTTP 403). Confira se você entrou com a conta dona ou colaboradora dessa playlist.");
+        if (!r.ok) throw new Error(`Falha ao buscar a playlist no Spotify (HTTP ${r.status}).`);
+        break;
+      }
+      const j = await r.json();
+      total = typeof j.total === "number" ? j.total : offset + (j.items || []).length;
+      for (const it of (j.items || [])){
+        const t = it.item || it.track;
+        if (!t || t.is_local){ warnings.push({line: rows.length + warnings.length + 1, msg: "faixa local ou indisponível ignorada"}); continue; }
+        rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album)});
+      }
+      offset += 100;
+      onProgress && onProgress(Math.min(offset, total), total, pi + 1, playlistIds.length);
+    }
+  }
+  return {rows, warnings};
+}
+
+/* ---------- login com Spotify (Authorization Code + PKCE): só assim dá pra ler o conteúdo
+   de uma playlist — desde a migração de fev/2026 o Spotify só libera isso pra quem é dono ou
+   colaborador dela, e não existe "dono" num token de app (Client Credentials). PKCE é o método
+   que o próprio Spotify recomenda pra apps sem backend: não precisa do Client Secret. ---------- */
+const SPOTIFY_OAUTH_KEY = "catalogo-musical:spotify-oauth";
+const SPOTIFY_PKCE_KEY = "catalogo-musical:spotify-pkce";
+const SPOTIFY_PENDING_KEY = "catalogo-musical:spotify-pending-import";
+function spotifyRedirectUri(){ return location.origin + location.pathname; }
+function b64url(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function spotifyRandToken(len = 64){ const a = new Uint8Array(len); crypto.getRandomValues(a); return b64url(a); }
+async function spotifyPkceChallenge(verifier){ return b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))); }
+function loadSpotifyOAuth(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_OAUTH_KEY) || "null"); } catch (e) { return null; } }
+function saveSpotifyOAuth(j, clientId){
+  const obj = {access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((j.expires_in || 3600) * 1000) - 30000, client_id: clientId};
+  try { localStorage.setItem(SPOTIFY_OAUTH_KEY, JSON.stringify(obj)); } catch (e) {}
+  return obj;
+}
+function clearSpotifyOAuth(){ try { localStorage.removeItem(SPOTIFY_OAUTH_KEY); } catch (e) {} }
+async function spotifyLogin(clientId, pendingText, pendingMode){
+  const verifier = spotifyRandToken(), state = spotifyRandToken(16);
+  const challenge = await spotifyPkceChallenge(verifier);
+  try { sessionStorage.setItem(SPOTIFY_PKCE_KEY, JSON.stringify({verifier, state, clientId})); } catch (e) {}
+  try { sessionStorage.setItem(SPOTIFY_PENDING_KEY, JSON.stringify({text: pendingText || "", mode: pendingMode || "add"})); } catch (e) {}
+  const p = new URLSearchParams({client_id: clientId, response_type: "code", redirect_uri: spotifyRedirectUri(), code_challenge_method: "S256", code_challenge: challenge, scope: "playlist-read-private playlist-read-collaborative", state});
+  location.href = "https://accounts.spotify.com/authorize?" + p.toString();
+}
+async function spotifyExchangeCode(code, verifier, clientId){
+  const body = new URLSearchParams({grant_type: "authorization_code", code, redirect_uri: spotifyRedirectUri(), client_id: clientId, code_verifier: verifier});
+  let r; try { r = await fetch("https://accounts.spotify.com/api/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body}); }
+  catch (e) { throw new Error("Não foi possível conectar ao Spotify para concluir o login."); }
+  const j = await r.json();
+  if (!r.ok || !j.access_token) throw new Error(j.error_description || "Falha ao concluir o login com o Spotify.");
+  return j;
+}
+async function spotifyRefreshToken(oauth){
+  const body = new URLSearchParams({grant_type: "refresh_token", refresh_token: oauth.refresh_token, client_id: oauth.client_id});
+  let r; try { r = await fetch("https://accounts.spotify.com/api/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body}); }
+  catch (e) { throw new Error("Não foi possível renovar o login do Spotify."); }
+  const j = await r.json();
+  if (!r.ok || !j.access_token){ clearSpotifyOAuth(); throw new Error("Sua sessão do Spotify expirou; entre novamente."); }
+  if (!j.refresh_token) j.refresh_token = oauth.refresh_token;
+  return saveSpotifyOAuth(j, oauth.client_id);
+}
+async function spotifyUserToken(){
+  let oauth = loadSpotifyOAuth();
+  if (!oauth) return null;
+  if (Date.now() >= oauth.expires_at) oauth = await spotifyRefreshToken(oauth);
+  return oauth.access_token;
+}
+async function handleSpotifyRedirectAndResume(){
+  const url = new URL(location.href);
+  const code = url.searchParams.get("code"), state = url.searchParams.get("state"), err = url.searchParams.get("error");
+  if (!code && !err) return;
+  let pkce = null; try { pkce = JSON.parse(sessionStorage.getItem(SPOTIFY_PKCE_KEY) || "null"); } catch (e) {}
+  try { sessionStorage.removeItem(SPOTIFY_PKCE_KEY); } catch (e) {}
+  url.searchParams.delete("code"); url.searchParams.delete("state"); url.searchParams.delete("error");
+  history.replaceState({}, "", url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "") + url.hash);
+  let pending = null; try { pending = JSON.parse(sessionStorage.getItem(SPOTIFY_PENDING_KEY) || "null"); } catch (e) {}
+  try { sessionStorage.removeItem(SPOTIFY_PENDING_KEY); } catch (e) {}
+  if (err){ toast(`Login com o Spotify cancelado ou recusado (${err}).`); if (pending) openImport(pending.mode, pending.text); return; }
+  if (!pkce || pkce.state !== state){ toast("Não foi possível concluir o login do Spotify (sessão expirada); tente novamente."); if (pending) openImport(pending.mode, pending.text); return; }
+  try {
+    const j = await spotifyExchangeCode(code, pkce.verifier, pkce.clientId);
+    saveSpotifyOAuth(j, pkce.clientId);
+    toast("Login com o Spotify concluído.");
+  } catch (e) { toast(e.message || "Falha ao concluir login com o Spotify."); if (pending) openImport(pending.mode, pending.text); return; }
+  openImport(pending ? pending.mode : "add", pending ? pending.text : null, true);
+}
+/* núcleo comum de busca (faixas soltas e/ou playlists) usado tanto pelo fluxo com Client ID/Secret
+   quanto pelo login — os dois só diferem no token que entregam aqui */
+async function spotifyRunFetch({token, ids, plIds, status, btn}){
+  status.classList.remove("err");
+  btn.disabled = true; status.textContent = plIds.length ? `Buscando playlist${plIds.length > 1 ? "s" : ""}…` : `Buscando ${faixas(ids.length)}…`;
+  /* cronômetro: sempre recalcula o restante a partir de "quando deve terminar" (timestamp real),
+     em vez de só subtrair 1s por tick — assim não trava/atrasa mesmo se o navegador atrasar
+     o timer (ex.: aba em segundo plano) */
+  let t0 = performance.now(), done = 0, total = 1, etaEndTs = null, waitEndTs = null, waitTotalSecs = null, waitAttempt = 0, tick = null;
+  const fmtEta = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${pad2(s % 60)}`; };
+  const render = () => {
+    if (waitEndTs != null){
+      status.textContent = `Spotify pediu ${waitTotalSecs}s de espera (limite de requisições${waitAttempt > 1 ? `, tentativa ${waitAttempt}` : ""}) · retomando em ${fmtEta(waitEndTs - performance.now())} (faixa ${done + 1} de ${total})…`;
+      return;
+    }
+    status.textContent = `Buscando faixa ${done} de ${total}…${etaEndTs != null ? ` cerca de ${fmtEta(etaEndTs - performance.now())} restante` : ""}`;
+  };
+  const startTick = () => { clearInterval(tick); tick = setInterval(render, 1000); };
+  const onWait = (secs, i, t, attempt) => {
+    done = i; total = t; waitTotalSecs = secs; waitAttempt = attempt; waitEndTs = performance.now() + secs * 1000;
+    render();
+    return new Promise(res => { const left = waitEndTs - performance.now(); setTimeout(() => { waitEndTs = null; res(); }, Math.max(0, left)); });
+  };
+  try {
+    startTick();
+    const results = [];
+    if (plIds.length){
+      results.push(await spotifyFetchPlaylistTracks(plIds, token, (d, t, pi, pn) => {
+        done = d; total = t;
+        etaEndTs = performance.now() + ((performance.now() - t0) / Math.max(d, 1)) * (t - d);
+        status.textContent = `Buscando faixa ${done} de ${total}${pn > 1 ? ` (playlist ${pi} de ${pn})` : ""}…${etaEndTs != null ? ` cerca de ${fmtEta(etaEndTs - performance.now())} restante` : ""}`;
+      }, onWait));
+    }
+    if (ids.length){
+      const base = results.reduce((s, r) => s + r.rows.length + r.warnings.length, 0);
+      results.push(await spotifyFetchTracks(ids, token, (d, t) => {
+        done = base + d; total = base + t;
+        etaEndTs = performance.now() + ((performance.now() - t0) / Math.max(done, 1)) * (total - done);
+        render();
+      }, onWait));
+    }
+    clearInterval(tick);
+    const rows = results.flatMap(r => r.rows), warnings = results.flatMap(r => r.warnings);
+    if (!rows.length){ status.classList.add("err"); status.textContent = "Nenhuma faixa encontrada."; return null; }
+    status.textContent = `${faixas(rows.length)} encontrada${rows.length > 1 ? "s" : ""}${warnings.length ? ` · ${warnings.length} não encontrada(s)` : ""}.`;
+    return {rows, warnings};
+  } catch (e) {
+    clearInterval(tick);
+    status.classList.add("err"); status.textContent = e.message || "Erro ao buscar no Spotify.";
+    return null;
+  } finally { btn.disabled = false; }
+}
+
+/* ---------- import modal ---------- */
+function openImport(initialMode = "add", prefillText = null, autoFetch = false){
+  let mode = initialMode, parsed = null;
+  const body = document.createElement("div");
+  body.innerHTML = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add">Adicionar músicas</button><button type="button" data-m="replace">Nova playlist</button></div>
+    <p class="mdesc" id="im-desc"></p>
+    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Cole aqui a lista (uma faixa por linha, colunas separadas por TAB), um link de playlist do Spotify, ou links de faixas do Spotify (um por linha):&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26&#10;https://open.spotify.com/track/0G7mYkFpOp7HFRfiuNzoru&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;&#10;Também aceita .txt, .tsv, .csv ou .xlsx: arraste o arquivo para cá."></textarea></label>
+    <div class="imrow"><label class="gbtn file">${ICON.up}<span>Escolher arquivo</span><input type="file" id="im-file" accept=".txt,.tsv,.csv,.xlsx,text/plain,text/csv"></label></div>
+    <div id="sp-fields" style="display:none">
+      <p class="mdesc" id="sp-detect-msg"></p>
+      <div id="sp-cc">
+        <form id="sp-form" autocomplete="on">
+          <div class="imrow"><input type="text" id="sp-id" name="username" placeholder="Client ID" autocomplete="username"><input type="password" id="sp-secret" name="password" placeholder="Client Secret" autocomplete="current-password">
+            <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
+          <div class="imrow"><button class="gbtn" type="submit" id="sp-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-status"></span></div>
+        </form>
+        <p class="muted">Client ID e Secret são gratuitos: crie um app em <strong>developer.spotify.com/dashboard</strong> (login com sua conta Spotify) e copie os dois valores daqui.</p>
+      </div>
+      <div id="sp-login" style="display:none">
+        <form id="sp-login-form" autocomplete="on">
+          <div class="imrow"><input type="text" id="sp-login-id" name="username" placeholder="Client ID" autocomplete="username"></div>
+          <div class="imrow"><button class="gbtn" type="submit" id="sp-login-go">Entrar com Spotify</button><span class="sp-status" id="sp-login-status"></span></div>
+        </form>
+        <p class="muted">Links de playlist só funcionam com login: o Spotify exige que você entre com a conta dona (ou colaboradora) da playlist, mesmo quando ela é pública. Informe o Client ID do seu app (sem o Secret, não é preciso aqui) e cadastre esta <strong>Redirect URI</strong> nele, em developer.spotify.com/dashboard → seu app → Settings:</p>
+        <p class="muted" id="sp-redirect-hint" style="word-break:break-all;font-family:monospace"></p>
+      </div>
+      <div id="sp-connected" style="display:none">
+        <div class="imrow"><button class="gbtn" type="button" id="sp-fetch-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-connected-status"></span><button class="lnk" type="button" id="sp-logout">Sair da conta Spotify</button></div>
+      </div>
+    </div>
+    <div class="imrow"><label class="chk" id="im-dupwrap"><input type="checkbox" id="im-dup" checked><span>Ignorar faixas que já estão na playlist (mesmo título e artista)</span></label></div>
+    <div id="im-prev" class="prev"></div>`;
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
+  const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md"});
+  const q = s => md.m.querySelector(s), ta = q("#im-text");
+  const existing = new Set(BY_PLAYLIST.map(t => (t.title + "|" + t.artist).toLowerCase()));
+  function update(){
+    md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
+    q("#im-desc").innerHTML = mode === "add"
+      ? `As músicas novas entram <strong>no fim da playlist</strong>, como as adições mais recentes (a partir da #${NN + 1}). Nada do que já existe é apagado.`
+      : `A lista colada <strong>substitui toda a playlist atual</strong>. Painel, gráficos e insights são recalculados do zero com as músicas novas.`;
+    q("#im-dupwrap").style.display = mode === "add" ? "" : "none";
+    const go = q("#im-go");
+    if (!parsed || !parsed.rows.length){ go.disabled = true; go.textContent = mode === "add" ? "Adicionar" : "Substituir playlist"; go.classList.toggle("danger", mode === "replace"); q("#im-prev").innerHTML = parsed && parsed.error ? `<div class="pv bad">${esc(parsed.error)}</div>` : ""; return; }
+    const isDup = r => existing.has((r.title + "|" + (r.artist || NI)).toLowerCase());
+    const dedupeOn = mode === "add" && q("#im-dup").checked;
+    const dup = dedupeOn ? parsed.rows.filter(isDup) : [];
+    const fresh = dedupeOn ? parsed.rows.filter(r => !isDup(r)) : parsed.rows;
+    const n = fresh.length;
+    const arts = new Set(parsed.rows.map(r => r.artist || NI)).size;
+    go.disabled = n === 0; go.classList.toggle("danger", mode === "replace");
+    go.textContent = mode === "add" ? `Adicionar ${faixas(n)}` : `Substituir por ${faixas(n)}…`;
+    const rowHtml = r => `<tr><td>${r.n ?? ""}</td><td>${esc(r.title)}</td><td>${esc(r.artist || NI)}</td><td>${esc(r.album || NI)}</td><td>${durTxt(r.sec)}</td><td>${esc(r.date || NI)}</td></tr>`;
+    q("#im-prev").innerHTML = `<div class="pv ok"><b>${faixas(parsed.rows.length)}</b> reconhecidas · ${arts} artistas${dup.length ? ` · <b>${dup.length}</b> já estão na playlist e serão ignoradas` : ""}${parsed.warnings.length ? ` · <span class="warn">${parsed.warnings.length} aviso${parsed.warnings.length > 1 ? "s" : ""}</span>` : ""}</div>
+      ${parsed.warnings.length ? `<details class="warns"><summary>Ver avisos</summary><ul>${parsed.warnings.slice(0, 30).map(w => `<li>Linha ${w.line}: ${esc(w.msg)}</li>`).join("")}${parsed.warnings.length > 30 ? `<li>+ ${parsed.warnings.length - 30} avisos</li>` : ""}</ul></details>` : ""}
+      ${dup.length ? `<details class="warns"><summary>Ver as ${dup.length} já existentes (ignoradas)</summary><ul>${dup.slice(0, 30).map(r => `<li>${esc(r.title)} — ${esc(r.artist || NI)}</li>`).join("")}${dup.length > 30 ? `<li>+ ${dup.length - 30} faixas</li>` : ""}</ul></details>` : ""}
+      <p class="muted" style="margin:10px 0 4px">${dedupeOn && dup.length ? `Serão adicionadas (${faixas(fresh.length)}):` : "Faixas:"}</p>
+      <div class="ptab"><table><thead><tr><th>#</th><th>Música</th><th>Artista</th><th>Álbum</th><th>Duração</th><th>Lançamento</th></tr></thead><tbody>
+      ${fresh.slice(0, 8).map(rowHtml).join("")}</tbody></table>
+      ${fresh.length > 8 ? `<div class="more">+ ${fresh.length - 8} faixas</div>` : ""}</div>`;
+  }
+  function setSpotifyMode(on, n, pn){
+    q("#sp-fields").style.display = on ? "" : "none";
+    if (!on) return;
+    const parts = [];
+    if (pn) parts.push(`${pn} playlist${pn > 1 ? "s" : ""}`);
+    if (n) parts.push(faixas(n));
+    const oauth = pn ? loadSpotifyOAuth() : null;
+    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.${pn ? "" : " Informe o Client ID e o Client Secret pra buscar música, artista, álbum, duração e lançamento direto no Spotify:"}`;
+    q("#sp-cc").style.display = pn ? "none" : "";
+    q("#sp-login").style.display = pn && !oauth ? "" : "none";
+    q("#sp-connected").style.display = pn && oauth ? "" : "none";
+    if (pn && !oauth) q("#sp-redirect-hint").textContent = spotifyRedirectUri();
+  }
+  const fromText = () => {
+    const t = ta.value;
+    if (!t.trim()){ parsed = null; setSpotifyMode(false); return update(); }
+    const ids = parseSpotifyIds(t);
+    const plIds = parseSpotifyPlaylistIds(t);
+    const lines = t.split(/\r?\n/).filter(l => l.trim());
+    if ((ids.length || plIds.length) && (ids.length + plIds.length) / lines.length >= 0.5){ parsed = null; setSpotifyMode(true, ids.length, plIds.length); return update(); }
+    setSpotifyMode(false);
+    try { parsed = cellsToRows(textToCells(t)); if (!parsed.rows.length) parsed.error = "Nenhuma faixa reconhecida. Confira se as colunas estão separadas por TAB, ponto e vírgula ou vírgula."; } catch (e) { parsed = {rows: [], warnings: [], error: e.message}; } update();
+  };
+  let tmr; ta.addEventListener("input", () => { clearTimeout(tmr); tmr = setTimeout(fromText, 200); });
+  async function loadFile(f){
+    try {
+      if (/\.xlsx$/i.test(f.name)){ const cells = await xlsxToCells(await f.arrayBuffer()); parsed = cellsToRows(cells); ta.value = cells.map(r => r.join("\t")).join("\n"); setSpotifyMode(false); }
+      else { ta.value = await f.text(); fromText(); return; }
+      if (!parsed.rows.length) parsed.error = "Nenhuma faixa reconhecida no arquivo.";
+    } catch (e) { parsed = {rows: [], warnings: [], error: `Não foi possível ler o arquivo: ${e.message}`}; }
+    update();
+  }
+  q("#im-file").addEventListener("change", e => e.target.files[0] && loadFile(e.target.files[0]));
+  const drop = q("#im-drop");
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+  md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.addEventListener("click", () => { mode = b.dataset.m; update(); }));
+  const creds = loadSpotifyCreds();
+  q("#sp-id").value = creds.id || ""; q("#sp-secret").value = creds.secret || ""; q("#sp-login-id").value = creds.id || "";
+  q("#sp-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const id = q("#sp-id").value.trim(), secret = q("#sp-secret").value.trim();
+    const ids = parseSpotifyIds(ta.value);
+    const status = q("#sp-status"), btn = q("#sp-go");
+    status.classList.remove("err");
+    if (!id || !secret){ status.classList.add("err"); status.textContent = "Informe o Client ID e o Client Secret."; return; }
+    if (!ids.length){ status.classList.add("err"); status.textContent = "Nenhum link do Spotify reconhecido."; return; }
+    if (q("#sp-remember").checked) saveSpotifyCreds(id, secret); else clearSpotifyCreds();
+    let token; try { token = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
+    parsed = await spotifyRunFetch({token, ids, plIds: [], status, btn});
+    update();
+  });
+  q("#sp-login-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const clientId = q("#sp-login-id").value.trim();
+    const status = q("#sp-login-status");
+    status.classList.remove("err");
+    if (!clientId){ status.classList.add("err"); status.textContent = "Informe o Client ID."; return; }
+    const c = loadSpotifyCreds(); saveSpotifyCreds(clientId, c.secret || "");
+    spotifyLogin(clientId, ta.value, mode);
+  });
+  q("#sp-fetch-go").addEventListener("click", async () => {
+    const ids = parseSpotifyIds(ta.value), plIds = parseSpotifyPlaylistIds(ta.value);
+    const status = q("#sp-connected-status"), btn = q("#sp-fetch-go");
+    status.classList.remove("err");
+    let token; try { token = await spotifyUserToken(); } catch (e){ status.classList.add("err"); status.textContent = e.message; setSpotifyMode(true, ids.length, plIds.length); return; }
+    if (!token){ status.classList.add("err"); status.textContent = "Sessão do Spotify expirou; entre novamente."; setSpotifyMode(true, ids.length, plIds.length); return; }
+    parsed = await spotifyRunFetch({token, ids, plIds, status, btn});
+    update();
+  });
+  q("#sp-logout").addEventListener("click", () => {
+    clearSpotifyOAuth();
+    setSpotifyMode(true, parseSpotifyIds(ta.value).length, parseSpotifyPlaylistIds(ta.value).length);
+  });
+  if (prefillText){
+    ta.value = prefillText;
+    fromText();
+    if (autoFetch && loadSpotifyOAuth()) q("#sp-fetch-go").click();
+  }
+  q("#im-dup").addEventListener("change", update);
+  q("#im-cancel").addEventListener("click", md.close);
+  if (STORE) q("#im-restore").addEventListener("click", restoreOriginal);
+  q("#im-go").addEventListener("click", async () => {
+    if (!parsed) return;
+    const toRow = (r, n) => [n, r.title, r.artist, r.album, r.sec, r.date];
+    if (mode === "add"){
+      const skip = q("#im-dup").checked;
+      const seen = new Set(existing), fresh = [];
+      const ordered = parsed.rows.every(r => r.n != null) ? [...parsed.rows].sort((a, b) => a.n - b.n) : parsed.rows;
+      for (const r of ordered){ const k = (r.title + "|" + (r.artist || NI)).toLowerCase(); if (skip && seen.has(k)) continue; seen.add(k); fresh.push(r); }
+      if (!fresh.length) return toast("Todas as faixas já estão na playlist.");
+      const ok = await confirmModal({title: `Adicionar ${faixas(fresh.length)}?`, ok: "Adicionar",
+        html: `<p>As faixas entram no fim da playlist, da <strong>#${NN + 1}</strong> à <strong>#${NN + fresh.length}</strong>, e o painel será recalculado com ${faixas(NN + fresh.length)}.</p>`});
+      if (!ok) return;
+      commitRows([...currentRows(), ...fresh.map((r, i) => toRow(r, NN + i + 1))], `${faixas(fresh.length)} adicionada${fresh.length > 1 ? "s" : ""} · playlist com ${faixas(NN + fresh.length)}`);
+    } else {
+      const rows = parsed.rows.every(r => r.n != null) && new Set(parsed.rows.map(r => r.n)).size === parsed.rows.length ? parsed.rows.map(r => toRow(r, r.n)) : parsed.rows.map((r, i) => toRow(r, i + 1));
+      const arts = new Set(parsed.rows.map(r => r.artist || NI)).size;
+      const ok = await confirmModal({title: "Substituir a playlist inteira?", danger: true, ok: "Apagar e substituir",
+        html: `<div class="cmp"><div><span>Atual</span><b>${faixas(NN)}</b><em>${IS.art.length} artistas</em></div><i>→</i><div><span>Nova</span><b>${faixas(rows.length)}</b><em>${arts} artistas</em></div></div>
+          <p>Todas as músicas atuais serão <strong>apagadas</strong> e substituídas pela lista nova. Painel, gráficos e insights serão gerados do zero.</p>
+          <p class="muted">Não dá para desfazer. Se quiser guardar a lista atual, exporte antes.</p>`,
+        extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+      if (!ok) return;
+      commitRows(rows, `Nova playlist carregada · ${faixas(rows.length)} de ${arts} artistas`);
+    }
+  });
+  update();
+}
+
+/* ---------- song table with removal ---------- */
+function openTable(){
+  const marked = new Set(); let sortK = "n", sortDir = 1, query = "";
+  const body = document.createElement("div"); body.className = "tbwrap";
+  body.innerHTML = `<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button><span class="tbcount" id="tb-count"></span></div>
+    <div class="tbscroll"><table class="tb"><thead><tr><th class="ck"></th>${[["n", "#"], ["title", "Música"], ["artist", "Artista"], ["album", "Álbum"], ["sec", "Duração"], ["date", "Lançamento"]].map(([k, l]) => `<th data-k="${k}" class="${k === "n" || k === "sec" ? "num" : ""}" tabindex="0">${l}<i></i></th>`).join("")}</tr></thead><tbody></tbody></table></div>`;
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  foot.innerHTML = `<span class="hintf" id="tb-hint">Marque as faixas que quer remover. Nada é apagado até você salvar.</span><span class="sp"></span><button class="gbtn" type="button" id="tb-cancel">Fechar</button><button class="pbtn danger" type="button" id="tb-save" disabled>Remover faixas</button>`;
+  const md = openModal({title: "Músicas da playlist", sub: `${faixas(NN)} · ${IS.art.length} artistas · ${IS.alb.length} álbuns`, body, foot, size: "lg"});
+  const q = s => md.m.querySelector(s), tbody = q("tbody");
+  const rowsHtml = list => list.map(t => `<tr data-n="${t.n}" class="${marked.has(t.n) ? "mk" : ""}"><td class="ck"><button type="button" class="rm" aria-pressed="${marked.has(t.n)}" aria-label="${marked.has(t.n) ? "Manter" : "Remover"} ${esc(t.title)}">${ICON.x}</button></td>
+    <td class="num">${t.n}</td><td class="tt">${esc(t.title)}</td><td>${esc(t.artist)}</td><td>${esc(t.album)}</td><td class="num">${durTxt(t.sec)}</td><td>${esc(t.date || NI)}</td></tr>`).join("");
+  let visible = [];
+  function draw(){
+    const qq = query.trim().toLowerCase();
+    visible = BY_PLAYLIST.filter(t => !qq || (t.title + " " + t.artist + " " + t.album).toLowerCase().includes(qq));
+    visible.sort((a, b) => { const x = a[sortK], y = b[sortK]; return (typeof x === "number" && typeof y === "number" ? x - y : coll.compare(String(x), String(y))) * sortDir || a.n - b.n; });
+    tbody.innerHTML = visible.length ? rowsHtml(visible) : `<tr><td colspan="7" class="none">Nenhuma faixa encontrada.</td></tr>`;
+    md.m.querySelectorAll("th[data-k]").forEach(th => th.setAttribute("aria-sort", th.dataset.k === sortK ? (sortDir > 0 ? "ascending" : "descending") : "none"));
+    counts();
+  }
+  function counts(){
+    q("#tb-count").textContent = query ? `${visible.length} de ${NN}` : `${NN} faixas`;
+    const k = marked.size, save = q("#tb-save");
+    save.disabled = !k || k >= NN; save.textContent = k ? `Remover ${faixas(k)}…` : "Remover faixas";
+    q("#tb-clear").disabled = !k;
+    q("#tb-hint").innerHTML = k >= NN ? `<span class="warn">A playlist não pode ficar vazia.</span>` : k ? `<strong>${faixas(k)}</strong> marcada${k > 1 ? "s" : ""} para remover.` : "Marque as faixas que quer remover. Nada é apagado até você salvar.";
+  }
+  tbody.addEventListener("click", e => {
+    const b = e.target.closest(".rm"); if (!b) return;
+    const tr = b.closest("tr"), n = +tr.dataset.n;
+    marked.has(n) ? marked.delete(n) : marked.add(n);
+    tr.classList.toggle("mk", marked.has(n)); b.setAttribute("aria-pressed", marked.has(n)); counts();
+  });
+  md.m.querySelectorAll("th[data-k]").forEach(th => { const go = () => { if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = 1; } draw(); };
+    th.addEventListener("click", go); th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } }); });
+  let tmr; q("#tb-q").addEventListener("input", e => { clearTimeout(tmr); tmr = setTimeout(() => { query = e.target.value; draw(); }, 120); });
+  q("#tb-markall").addEventListener("click", () => { visible.forEach(t => marked.add(t.n)); draw(); });
+  q("#tb-clear").addEventListener("click", () => { marked.clear(); draw(); });
+  q("#tb-cancel").addEventListener("click", md.close);
+  q("#tb-save").addEventListener("click", async () => {
+    const k = marked.size; if (!k || k >= NN) return;
+    const gone = BY_PLAYLIST.filter(t => marked.has(t.n));
+    const arts = [...groupBy(gone, "artist")].map(([a, rs]) => [a, rs.length]).sort((x, y) => y[1] - x[1]);
+    const ok = await confirmModal({title: `Remover ${faixas(k)}?`, danger: true, ok: "Remover",
+      html: `<p>${k <= 3 ? gone.map(t => `<strong>${esc(t.title)}</strong> (${esc(t.artist)})`).join(", ") : `Faixas de ${listPt(arts.slice(0, 3).map(([a, n]) => `${esc(a)} (${n})`))}${arts.length > 3 ? ` e mais ${arts.length - 3} artistas` : ""}`} sairão da playlist.</p>
+        <p>A playlist fica com <strong>${faixas(NN - k)}</strong>, renumeradas de 1 a ${NN - k} mantendo a ordem de entrada. Painel e insights serão recalculados.</p><p class="muted">Para guardar a lista antes, exporte primeiro.</p>`,
+      extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+    if (!ok) return;
+    commitRows(currentRows().filter(r => !marked.has(r[0])), `${faixas(k)} removida${k > 1 ? "s" : ""} · playlist com ${faixas(NN - k)}`);
+  });
+  draw();
+}
+
+/* ---------- export ---------- */
+function download(name, blob){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function exportTxt(){
+  const txt = currentRows().map(r => [r[0], r[1], r[2], r[3], durTxt(r[4]), r[5]].map(v => String(v ?? "").replace(/[\t\r\n]+/g, " ")).join("\t")).join("\n") + "\n";
+  download(`playlist-${today()}.txt`, new Blob([txt], {type: "text/plain;charset=utf-8"}));
+  toast(`Lista exportada em texto · ${faixas(NN)}`);
+}
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zipStore(files){
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  for (const f of files){
+    const name = enc.encode(f.name), data = typeof f.data === "string" ? enc.encode(f.data) : f.data, crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true); h.setUint16(10, 0, true); h.setUint16(12, 0x21, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), name, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true); c.setUint16(12, 0, true); c.setUint16(14, 0x21, true);
+    c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true);
+    c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), name);
+    off += 30 + name.length + data.length;
+  }
+  const csize = central.reduce((s, p) => s + p.length, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function exportXlsx(){
+  const x = s => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const col = i => String.fromCharCode(65 + i);
+  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento"];
+  const rows = currentRows();
+  const cell = (v, r, i, s) => typeof v === "number" ? `<c r="${col(i)}${r}"${s ? ` s="${s}"` : ""}><v>${v}</v></c>` : `<c r="${col(i)}${r}" t="inlineStr"${s ? ` s="${s}"` : ""}><is><t xml:space="preserve">${x(v)}</t></is></c>`;
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+<cols><col min="1" max="1" width="9" customWidth="1"/><col min="2" max="2" width="48" customWidth="1"/><col min="3" max="3" width="26" customWidth="1"/><col min="4" max="4" width="38" customWidth="1"/><col min="5" max="5" width="10" customWidth="1"/><col min="6" max="6" width="16" customWidth="1"/></cols>
+<sheetData><row r="1">${head.map((h, i) => cell(h, 1, i, 1)).join("")}</row>${rows.map((r, k) => `<row r="${k + 2}">${[r[0], r[1], r[2], r[3], durTxt(r[4]), r[5]].map((v, i) => cell(v, k + 2, i)).join("")}</row>`).join("")}</sheetData>
+<autoFilter ref="A1:F${rows.length + 1}"/></worksheet>`;
+  const files = [
+    {name: "[Content_Types].xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},
+    {name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+    {name: "xl/workbook.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Músicas" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'Músicas'!$A$1:$F$${rows.length + 1}</definedName></definedNames></workbook>`},
+    {name: "xl/_rels/workbook.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+    {name: "xl/styles.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF064E3B"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},
+    {name: "xl/worksheets/sheet1.xml", data: sheet}
+  ];
+  download(`playlist-${today()}.xlsx`, zipStore(files));
+  toast(`Planilha exportada · ${faixas(NN)}`);
+}
+function openExport(){
+  const body = `<div class="xopts">
+    <button type="button" class="xopt" data-f="xlsx"><span class="xi">XLSX</span><b>Planilha do Excel</b><em>Abre no Excel, Google Sheets ou LibreOffice. Uma linha por faixa, com cabeçalho e filtro.</em></button>
+    <button type="button" class="xopt" data-f="txt"><span class="xi">TXT</span><b>Texto para importar</b><em>Mesmo formato que o painel aceita (colunas separadas por TAB). Ideal para guardar ou mandar para uma nova análise.</em></button></div>
+    <p class="muted" style="margin-top:14px">A exportação usa a lista atual: ${faixas(NN)}, já com as músicas adicionadas ou removidas.</p>`;
+  const md = openModal({title: "Exportar lista de músicas", body, size: "sm"});
+  md.m.querySelectorAll(".xopt").forEach(b => b.addEventListener("click", () => { b.dataset.f === "xlsx" ? exportXlsx() : exportTxt(); md.close(); }));
+}
+
+/* ---------- wire the header buttons ---------- */
+$("#dt-table").innerHTML = `${ICON.list}<span>Músicas</span>`;
+$("#dt-import").innerHTML = `${ICON.up}<span>Adicionar músicas</span>`;
+$("#dt-export").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
+$("#dt-table").addEventListener("click", openTable);
+$("#dt-import").addEventListener("click", () => openImport());
+$("#dt-export").addEventListener("click", openExport);
+$("#foot-src").textContent = STORE ? `Lista editada neste navegador · ${faixas(NN)} · ${new Date(STORE.updated || Date.now()).toLocaleDateString("pt-BR")}` : `Fonte: lista de ${faixas(NN)} fornecida · sem dados externos`;
+if (STORE) $("#srcline").textContent += " · lista editada";
+
+/* ---------------- boot ---------------- */
+let rz;
+addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { placePill(); if ($("#insights").classList.contains("on")) drawScatter(); if ($("#painel").classList.contains("on") && rows().length){ renderTree(); renderYears(rows()); renderKPIs(rows()); } }, 120); });
+function boot(){
+  placePill();
+  render();
+  const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
+  if (location.hash === "#insights") showTab("insights");
+}
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(boot).then(handleSpotifyRedirectAndResume);

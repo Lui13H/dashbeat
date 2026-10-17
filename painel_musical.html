@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo Musical — Painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top rise" style="--d:0">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><div class="eq"><i></i><i></i><i></i><i></i></div></div>
+      <div>
+        <h1>Catálogo Musical</h1>
+        <p id="srcline"></p>
+      </div>
+    </div>
+    <div class="topr"><div class="dtools"><button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button><button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button><button class="dbtn" id="dt-export" type="button" title="Baixar a lista em Excel ou texto"></button></div>
+    <nav class="tabs" role="tablist" aria-label="Seções">
+      <span class="pill" aria-hidden="true"></span>
+      <button role="tab" id="tab-painel" aria-selected="true" aria-controls="painel">Painel</button>
+      <button role="tab" id="tab-insights" aria-selected="false" aria-controls="insights">Insights</button>
+    </nav></div>
+  </header>
+
+  <!-- ================= PAINEL ================= -->
+  <section id="painel" class="tabpanel on" role="tabpanel" aria-labelledby="tab-painel">
+    <div class="filters rise" style="--d:1">
+      <div class="ms" id="ms-band"></div>
+      <div class="ms" id="ms-album"></div>
+      <div class="chips" id="chips"></div>
+      <button class="clear" id="clear">Limpar filtros</button>
+    </div>
+
+    <div id="content">
+      <div class="kpis">
+        <article class="card hero rise" style="--d:2">
+          <div>
+            <div class="eyebrow">Total de músicas</div>
+            <div class="big" id="k-total">0</div>
+            <div class="sub" id="k-total-sub"></div>
+          </div>
+          <div class="wave-wrap">
+            <div class="wave-cap"><span class="eyebrow" id="wave-cap"></span>
+              <span class="wave-mode" role="group" aria-label="Ordem da onda"><button type="button" data-m="playlist" aria-pressed="true">Playlist</button><button type="button" data-m="release" aria-pressed="false">Lançamento</button></span></div>
+            <svg class="wave" id="wave" preserveAspectRatio="none" aria-label="Duração de cada faixa"></svg>
+            <div class="wave-cap" style="margin:6px 0 0"><span class="eyebrow" id="wave-l"></span><span class="eyebrow" id="wave-r"></span></div>
+          </div>
+        </article>
+        <div class="minis">
+          <article class="card kpi rise" style="--d:3"><div class="eyebrow">Artistas únicos</div><div class="val" id="k-art">0</div><div class="foot"><span class="dot"></span><span id="k-art-sub"></span></div></article>
+          <article class="card kpi rise" style="--d:4"><div class="eyebrow">Duração média</div><div class="val" id="k-avg">00:00</div><div class="foot"><span class="dot"></span><span id="k-avg-sub">min:seg por faixa</span></div></article>
+          <article class="card kpi rise" style="--d:5"><div class="eyebrow">Ano com mais lançamentos</div><div class="val" id="k-year">—</div><div class="foot"><span class="dot"></span><span id="k-year-sub"></span></div></article>
+          <article class="card kpi rise" style="--d:6"><div class="eyebrow">Banda/artista com mais faixas</div><div class="val txt" id="k-top">—</div><div class="foot"><span class="dot"></span><span id="k-top-sub"></span></div></article>
+        </div>
+      </div>
+
+      <div class="grid">
+        <article class="card chart rise" style="--d:7">
+          <header><div><div class="eyebrow">01 · Linha do tempo</div><h2>Músicas por ano de lançamento</h2></div><div class="hint">Passe o mouse para ver os álbuns de cada ano</div></header>
+          <div class="body"><div class="years" id="years"></div></div>
+        </article>
+        <article class="card chart rise" style="--d:8">
+          <header><div><div class="eyebrow">02 · Participação</div><h2>Músicas por banda/artista</h2></div><div class="hint">Área proporcional às faixas · clique para filtrar</div></header>
+          <div class="body"><div class="tree" id="tree"></div></div>
+        </article>
+        <article class="card chart rise" style="--d:9">
+          <header><div><div class="eyebrow">03 · Repertório</div><h2>Duração por álbum</h2></div><div class="hint" id="alb-hint">Tempo total somado das faixas · clique para filtrar</div></header>
+          <div class="body"><div class="list albums" id="albums"></div></div>
+        </article>
+        <article class="card chart rise" style="--d:10">
+          <header><div><div class="eyebrow">04 · Ranking</div><h2>Bandas/artistas do maior para o menor</h2></div><div class="hint">Com participação e acumulado</div></header>
+          <div class="body"><div class="list rank" id="rank"></div></div>
+        </article>
+      </div>
+    </div>
+
+    <div class="card empty" id="empty">
+      <div class="eyebrow">Recorte sem dados</div>
+      <h3>Nenhuma faixa combina com estes filtros</h3>
+      <p>As bandas e os álbuns escolhidos não têm músicas em comum no catálogo. Limpe os filtros para voltar à visão completa.</p>
+      <button class="btn" id="empty-clear">Limpar filtros</button>
+    </div>
+  </section>
+
+  <!-- ================= INSIGHTS ================= -->
+  <section id="insights" class="tabpanel" role="tabpanel" aria-labelledby="tab-insights">
+    <article class="card ins-hero rise" style="--d:1" id="ins-hero"></article>
+
+    <article class="card journey rise" style="--d:2" id="journey">
+      <div class="eyebrow">A jornada da playlist · seis capítulos pela ordem de entrada</div>
+      <h3 class="jt">A playlist em capítulos</h3>
+      <div class="chapters" id="chapters"></div>
+      <div class="jviz">
+        <div class="jbox">
+          <div class="jhead"><div><div class="eyebrow">Presença por artista</div><h4>Quem dominou cada trecho da playlist</h4></div><span class="hint2" id="heat-hint"></span></div>
+          <div class="heat" id="heat"></div>
+        </div>
+        <div class="jbox">
+          <div class="jhead"><div><div class="eyebrow">Ano de lançamento × ordem de entrada</div><h4>Como a época das músicas mudou ao longo da playlist</h4></div><span class="hint2">cada ponto é uma faixa · linha = mediana móvel</span></div>
+          <div class="scatter" id="scatter"></div>
+        </div>
+      </div>
+    </article>
+
+    <div class="mix" id="mix"></div>
+
+    <article class="card recs rise" style="--d:17" id="recs-card">
+      <div class="eyebrow">Recomendações</div>
+      <ol id="recs"></ol>
+    </article>
+    <p class="note" id="ins-note"></p>
+  </section>
+
+  <footer><span id="foot-src"></span><span>Atalho: tecla <b>Esc</b> fecha filtros</span></footer>
+</div>
+
+<div class="tip" id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/script.js"></script>
+</body>
+</html>
