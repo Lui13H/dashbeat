@@ -1521,7 +1521,7 @@ const SPOTIFY_GLYPH = `<img src="img/spotify-icon.svg" alt="" width="16" height=
 function spotifyChipHtml(profile){
   const avatar = profile.avatar ? `<img src="${esc(profile.avatar)}" alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none">`
     : `<span style="width:22px;height:22px;border-radius:50%;background:var(--mint);color:#06140f;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none">${esc((profile.name || "?").slice(0, 1).toUpperCase())}</span>`;
-  return `${SPOTIFY_GLYPH}${avatar}<span class="sp-name">${esc(profile.name || "Conta Spotify")}</span>`;
+  return `${SPOTIFY_GLYPH}${avatar}<span class="sp-name">${esc(profile.name || "Conta Spotify")}</span><button type="button" class="sp-logout-x" title="Sair da conta Spotify" aria-label="Sair da conta Spotify">${ICON.x}</button>`;
 }
 function renderSpAccountBar(){
   const bar = $("#sp-account-bar");
@@ -1530,6 +1530,8 @@ function renderSpAccountBar(){
   if (!oauth || !oauth.profile){ bar.style.display = "none"; bar.innerHTML = ""; return; }
   bar.innerHTML = spotifyChipHtml(oauth.profile);
   bar.style.display = "";
+  const btn = bar.querySelector(".sp-logout-x");
+  if (btn) btn.addEventListener("click", () => { clearSpotifyOAuth(); renderSpAccountBar(); toast("Você saiu da conta Spotify."); });
 }
 async function spotifyLogin(clientId, pendingText, pendingMode){
   const verifier = spotifyRandToken(), state = spotifyRandToken(16);
