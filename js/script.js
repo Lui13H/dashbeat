@@ -1161,11 +1161,11 @@ const currentRows = () => BY_PLAYLIST.map(t => [t.n, t.title, t.artist === NI ? 
 
 /* ---------- modal system ---------- */
 const modalStack = [];
-function openModal({title, sub = "", body, foot, size = "", onClose}){
+function openModal({title, sub = "", body, foot, size = "", headerExtra = "", onClose}){
   const bg = document.createElement("div");
   bg.className = "mbg";
   bg.innerHTML = `<div class="modal${size ? " m-" + size : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-    <header class="mh"><div><h3>${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ""}</div><button class="mx" type="button" aria-label="Fechar">${ICON.x}</button></header>
+    <header class="mh"><div><h3>${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ""}</div><button class="mx" type="button" aria-label="Fechar">${ICON.x}</button>${headerExtra ? `<div class="mh-extra">${headerExtra}</div>` : ""}</header>
     <div class="mb"></div><footer class="mf"></footer></div>`;
   const m = bg.querySelector(".modal");
   if (typeof body === "string") m.querySelector(".mb").innerHTML = body; else m.querySelector(".mb").appendChild(body);
@@ -1683,8 +1683,7 @@ async function spotifyRunFetch({token, ids, plIds, albumIds, status, btn}){
 function openImport(initialMode = "add", prefillText = null, autoFetch = false){
   let mode = initialMode, parsed = null;
   const body = document.createElement("div");
-  body.innerHTML = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add">Adicionar músicas</button><button type="button" data-m="replace">Nova playlist</button></div>
-    <p class="mdesc" id="im-desc"></p>
+  body.innerHTML = `<p class="mdesc" id="im-desc"></p>
     <div class="imrow"><label class="chk" id="im-dupwrap"><input type="checkbox" id="im-dup" checked><span>Ignorar faixas que já estão na playlist (mesmo título e artista)</span></label></div>
     <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Aceita: link de playlist/faixa/álbum do Spotify, lista colada (1 faixa por linha, colunas separadas por TAB), ou arquivo .txt/.tsv/.csv/.xlsx (arraste para cá).&#10;&#10;Link do Spotify:&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;&#10;Ou lista colada:&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26"></textarea></label>
     <div class="imrow"><label class="gbtn file">${ICON.up}<span>Escolher arquivo</span><input type="file" id="im-file" accept=".txt,.tsv,.csv,.xlsx,text/plain,text/csv"></label></div>
@@ -1716,7 +1715,8 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     <div id="im-prev" class="prev"></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
-  const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md"});
+  const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add">Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
+  const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md", headerExtra});
   const q = s => md.m.querySelector(s), ta = q("#im-text");
   const existing = new Set(BY_PLAYLIST.map(t => (t.title + "|" + t.artist).toLowerCase()));
   function update(){
