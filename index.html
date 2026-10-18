@@ -4,17 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Catálogo Musical — Dashboard de Playlist do Spotify</title>
-    <script>
-        // Quem já está logado no Spotify pula o tutorial e vai direto para a ferramenta
-        (function () {
-            try {
-                // ?tutoriais=1 é usado pelo botão "Tutoriais" do painel para forçar a volta a esta página
-                if (new URLSearchParams(location.search).get('tutoriais') === '1') return;
-                var oauth = JSON.parse(localStorage.getItem('catalogo-musical:spotify-oauth') || 'null');
-                if (oauth && oauth.profile) location.replace('painel_musical.html');
-            } catch (e) {}
-        })();
-    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -81,9 +70,6 @@
 </head>
 <body class="bg-base-100 text-white font-sans antialiased min-h-screen flex flex-col selection:bg-spotify selection:text-white">
 
-    <!-- Conta do Spotify conectada (some se não houver login salvo) -->
-    <div id="sp-account-bar" class="hidden fixed top-4 right-4 sm:right-6 items-center gap-2 bg-base-200 border border-base-300 rounded-full py-1.5 pl-2.5 pr-4 text-sm z-20 shadow-lg shadow-black/40"></div>
-
     <!-- Header / Hero -->
     <header class="pt-16 pb-12 px-6 text-center max-w-4xl mx-auto w-full">
         <div class="inline-block bg-spotify/10 text-spotify px-4 py-1.5 rounded-full text-sm font-semibold mb-6 tracking-wide uppercase">
@@ -116,7 +102,7 @@
 
                 <h3 class="text-xl font-bold mb-3 text-white">Como funciona?</h3>
                 <p class="text-base-400 leading-relaxed text-lg mb-6">
-                    Envie o link da sua playlist e a ferramenta monta o site de estatísticas automaticamente, sem copiar textos ou usar outras IAs. Leva de <strong class="text-white">poucos segundos a alguns minutos</strong> (depende do tamanho da playlist), mas exige <strong class="text-white">Spotify Premium</strong> e um app criado gratuitamente no painel de desenvolvedor do Spotify.
+                    Cole links de faixas ou álbuns do Spotify e a ferramenta busca os dados automaticamente, sem copiar textos ou usar outras IAs. Para uma <strong class="text-white">playlist inteira</strong>, copie o link de cada faixa na ordem certa (é rápido, veja como abaixo) e cole tudo de uma vez — mais lento que mandar só o link da playlist, mas ainda assim bem mais rápido que o método manual. Exige <strong class="text-white">Spotify Premium</strong> e um app criado gratuitamente no painel de desenvolvedor do Spotify.
                 </p>
 
                 <button type="button" onclick="toggleDetails('premium')" id="toggle-premium-btn" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm mb-8 outline-none focus:outline-none">
@@ -138,7 +124,7 @@
                         <div class="bg-black/40 p-6 rounded-xl border border-base-300">
                             <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">⭐</span> Requisitos</h3>
                             <p class="text-base-400">
-                                Precisa de informações exclusivas de contas <strong>Spotify Premium</strong> (pago). A API necessita de permissões ativas para leitura avançada de catálogos e ordem de inserção.
+                                Precisa de informações exclusivas de contas <strong>Spotify Premium</strong> (pago). A API necessita de permissões ativas para leitura avançada de catálogos.
                             </p>
                         </div>
                         <div class="bg-black/40 p-6 rounded-xl border border-base-300">
@@ -153,15 +139,28 @@
                         <div class="bg-black/40 p-6 rounded-xl border border-base-300">
                             <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">🔑</span> Acesso ao Spotify</h3>
                             <p class="text-base-400">
-                                Além do Premium, você precisa criar um app gratuito em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" class="text-spotify underline">developer.spotify.com/dashboard</a> (login com sua conta Spotify) para conseguir o <strong>Client ID</strong>. Para importar por link de playlist, também é preciso cadastrar a <strong>Redirect URI</strong> da ferramenta nas configurações desse app; para importar por arquivo, é usado o <strong>Client ID e Secret</strong> em vez disso. Esses dados são gratuitos e levam só alguns minutos para gerar.
+                                Além do Premium, você precisa criar um app gratuito em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" class="text-spotify underline">developer.spotify.com/dashboard</a> (login com sua conta Spotify) para conseguir o <strong>Client ID</strong> e o <strong>Client Secret</strong>. Esses dados são gratuitos e levam só alguns minutos para gerar.
                             </p>
                         </div>
                         <div class="bg-black/40 p-6 rounded-xl border border-base-300">
                             <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-yellow-500 mr-2">⏳</span> Tempo estimado</h3>
                             <p class="text-base-400">
-                                Playlists pequenas são importadas em poucos segundos. Em playlists grandes (centenas de músicas), o Spotify passa a limitar as requisições e a ferramenta espera automaticamente entre elas, podendo levar alguns minutos até concluir.
+                                Listas pequenas são importadas em poucos segundos. Em listas grandes (centenas de faixas), o Spotify passa a limitar as requisições e a ferramenta espera automaticamente entre elas, podendo levar alguns minutos até concluir.
                             </p>
                         </div>
+                    </div>
+
+                    <div class="bg-black/40 p-6 rounded-xl border border-base-300 mb-10">
+                        <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">📋</span> Importando uma playlist inteira</h3>
+                        <p class="text-base-400 mb-4">
+                            O Spotify só entrega as faixas de uma playlist na ordem atual de exibição (que muda se alguém reordenar manualmente), não na ordem real em que cada música foi adicionada — por isso links de playlist não são aceitos diretamente. Para manter a ordem certa, copie o link de cada faixa:
+                        </p>
+                        <ol class="list-decimal pl-5 space-y-2 text-base-400">
+                            <li>Abra o <strong>app de PC do Spotify</strong>.</li>
+                            <li>Vá na sua playlist e ordene a coluna <strong>"Adicionada em"</strong> até ver a seta para cima (músicas antigas no topo).</li>
+                            <li>Pressione <kbd class="bg-black border border-base-300 px-2 py-0.5 rounded text-white text-xs mx-1">Ctrl+A</kbd> para selecionar tudo e <kbd class="bg-black border border-base-300 px-2 py-0.5 rounded text-white text-xs mx-1">Ctrl+C</kbd> para copiar os links.</li>
+                            <li>Cole tudo de uma vez na ferramenta — um link de faixa por linha é reconhecido automaticamente.</li>
+                        </ol>
                     </div>
 
                     <div class="bg-yellow-900/20 border-l-4 border-yellow-500 p-5 rounded-r-lg mb-10">
@@ -483,31 +482,6 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
         // Initialize on premium tab (since it has the active class by default)
         // Tab styling is already correct in initial HTML, but we can enforce it:
         switchTab('premium');
-
-        // Mostra a conta do Spotify já logada pelo painel (mesma origem, mesmo localStorage)
-        (function () {
-            function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-            var oauth = null;
-            try { oauth = JSON.parse(localStorage.getItem('catalogo-musical:spotify-oauth') || 'null'); } catch (e) {}
-            if (!oauth || !oauth.profile) return;
-            var bar = document.getElementById('sp-account-bar');
-            if (!bar) return;
-            var name = oauth.profile.name || 'Conta Spotify', avatar = oauth.profile.avatar || '';
-            var glyph = '<img src="img/spotify-icon.svg" alt="" width="16" height="16" style="flex:none">';
-            var avatarHtml = avatar
-                ? '<img src="' + esc(avatar) + '" alt="" class="w-6 h-6 rounded-full object-cover flex-none">'
-                : '<span class="w-6 h-6 rounded-full bg-spotify text-black flex items-center justify-center text-xs font-bold flex-none">' + esc(name.slice(0, 1).toUpperCase()) + '</span>';
-            var logoutBtn = '<button type="button" id="sp-logout-x" title="Sair da conta Spotify" aria-label="Sair da conta Spotify" class="ml-1 -mr-1.5 w-5 h-5 rounded-full flex items-center justify-center text-base-400 hover:text-white hover:bg-white/10 transition-colors flex-none"><svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>';
-            bar.innerHTML = glyph + avatarHtml + '<span class="truncate max-w-[150px]">' + esc(name) + '</span>' + logoutBtn;
-            bar.classList.remove('hidden');
-            bar.classList.add('flex');
-            document.getElementById('sp-logout-x').addEventListener('click', function () {
-                try { localStorage.removeItem('catalogo-musical:spotify-oauth'); } catch (e) {}
-                bar.classList.add('hidden');
-                bar.classList.remove('flex');
-                bar.innerHTML = '';
-            });
-        })();
     </script>
 </body>
 </html>
