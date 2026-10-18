@@ -1695,12 +1695,10 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       <p class="mdesc" id="sp-detect-msg"></p>
       <div class="imrow" style="gap:18px"><button class="lnk" type="button" id="sp-why">Por que isso?</button><button class="lnk" type="button" id="sp-id-help">Não sei meu ID</button></div>
       <div id="sp-cc">
-        <form id="sp-form" autocomplete="off">
-          <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — <strong>Não é seu usuário nem senha de login</strong>.</p>
-          <div class="imrow"><input type="text" id="sp-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"><input type="password" id="sp-secret" name="spotify-client-secret" placeholder="Ex: 9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c" autocomplete="new-password">
-            <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
-          <div class="imrow"><button class="pbtn" type="submit" id="sp-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-status"></span></div>
-        </form>
+        <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — <strong>Não é seu usuário nem senha de login</strong>.</p>
+        <div class="imrow"><input type="text" id="sp-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"><input type="password" id="sp-secret" name="spotify-client-secret" placeholder="Ex: 9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c" autocomplete="new-password">
+          <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
+        <div class="imrow"><span class="sp-status" id="sp-status"></span></div>
       </div>
       <div id="sp-login" style="display:none">
         <form id="sp-login-form" autocomplete="off">
@@ -1713,7 +1711,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       </div>
       <div id="sp-connected" style="display:none">
         <div class="imrow" id="sp-account" style="align-items:center;gap:10px"></div>
-        <div class="imrow"><button class="pbtn" type="button" id="sp-fetch-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-connected-status"></span><button class="lnk" type="button" id="sp-logout">Sair da conta Spotify</button></div>
+        <div class="imrow"><span class="sp-status" id="sp-connected-status"></span><button class="lnk" type="button" id="sp-logout">Sair da conta Spotify</button></div>
       </div>
     </div>
     <div id="im-prev" class="prev"></div>`;
@@ -1730,9 +1728,17 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       : `A lista colada <strong>substitui toda a playlist atual</strong>. Painel, gráficos e insights são recalculados do zero com as músicas novas.`;
     q("#im-dupwrap").style.display = mode === "add" ? "" : "none";
     const go = q("#im-go");
-    const spWaiting = q("#sp-fields").style.display !== "none" && (!parsed || !parsed.rows.length);
-    go.style.display = spWaiting ? "none" : "";
-    if (!parsed || !parsed.rows.length){ go.disabled = true; go.textContent = mode === "add" ? "Adicionar" : "Substituir playlist"; go.classList.toggle("danger", mode === "replace"); q("#im-prev").innerHTML = parsed && parsed.error ? `<div class="pv bad">${esc(parsed.error)}</div>` : ""; return; }
+    const spOn = q("#sp-fields").style.display !== "none";
+    const spFetchable = spOn && (q("#sp-cc").style.display !== "none" || q("#sp-connected").style.display !== "none");
+    const spLoginWaiting = spOn && q("#sp-login").style.display !== "none";
+    if (!parsed || !parsed.rows.length){
+      go.style.display = spLoginWaiting ? "none" : "";
+      if (spFetchable){ go.disabled = false; go.textContent = "Buscar dados no Spotify"; go.classList.remove("danger"); }
+      else { go.disabled = true; go.textContent = mode === "add" ? "Adicionar" : "Substituir playlist"; go.classList.toggle("danger", mode === "replace"); }
+      q("#im-prev").innerHTML = parsed && parsed.error ? `<div class="pv bad">${esc(parsed.error)}</div>` : "";
+      return;
+    }
+    go.style.display = "";
     const isDup = r => existing.has((r.title + "|" + (r.artist || NI)).toLowerCase());
     const dedupeOn = mode === "add" && q("#im-dup").checked;
     const dup = dedupeOn ? parsed.rows.filter(isDup) : [];
@@ -1812,11 +1818,10 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
   md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.addEventListener("click", () => { mode = b.dataset.m; update(); }));
   const creds = loadSpotifyCreds();
   q("#sp-id").value = creds.id || ""; q("#sp-secret").value = creds.secret || ""; q("#sp-login-id").value = creds.id || "";
-  q("#sp-form").addEventListener("submit", async e => {
-    e.preventDefault();
+  async function runCcFetch(){
     const id = q("#sp-id").value.trim(), secret = q("#sp-secret").value.trim();
     const ids = parseSpotifyIds(ta.value), albumIds = parseSpotifyAlbumIds(ta.value);
-    const status = q("#sp-status"), btn = q("#sp-go");
+    const status = q("#sp-status"), btn = q("#im-go");
     status.classList.remove("err");
     if (!id && !secret){ status.classList.add("err"); status.textContent = "Informe o Client ID e o Client Secret."; return; }
     if (id && !SPOTIFY_ID_RE.test(id)){ status.classList.add("err"); status.textContent = "Esse Client ID não parece válido: deveria ter 32 letras/números (ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d)."; openSpotifyAppHelp("cc"); return; }
@@ -1828,7 +1833,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     let token; try { token = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
     parsed = await spotifyRunFetch({token, ids, plIds: [], albumIds, status, btn});
     update();
-  });
+  }
   q("#sp-login-form").addEventListener("submit", e => {
     e.preventDefault();
     const clientId = q("#sp-login-id").value.trim();
@@ -1839,15 +1844,15 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     const c = loadSpotifyCreds(); saveSpotifyCreds(clientId, c.secret || "");
     spotifyLogin(clientId, ta.value, mode);
   });
-  q("#sp-fetch-go").addEventListener("click", async () => {
+  async function runConnectedFetch(){
     const ids = parseSpotifyIds(ta.value), plIds = parseSpotifyPlaylistIds(ta.value), albumIds = parseSpotifyAlbumIds(ta.value);
-    const status = q("#sp-connected-status"), btn = q("#sp-fetch-go");
+    const status = q("#sp-connected-status"), btn = q("#im-go");
     status.classList.remove("err");
     let token; try { token = await spotifyUserToken(); } catch (e){ status.classList.add("err"); status.textContent = e.message; setSpotifyMode(true, ids.length, plIds.length, albumIds.length); return; }
     if (!token){ status.classList.add("err"); status.textContent = "Sessão do Spotify expirou; entre novamente."; setSpotifyMode(true, ids.length, plIds.length, albumIds.length); return; }
     parsed = await spotifyRunFetch({token, ids, plIds, albumIds, status, btn});
     update();
-  });
+  }
   q("#sp-logout").addEventListener("click", () => {
     clearSpotifyOAuth();
     renderSpAccountBar();
@@ -1865,13 +1870,17 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
   if (prefillText){
     ta.value = prefillText;
     fromText();
-    if (autoFetch && loadSpotifyOAuth()) q("#sp-fetch-go").click();
+    if (autoFetch && loadSpotifyOAuth()) runConnectedFetch();
   }
   q("#im-dup").addEventListener("change", update);
   q("#im-cancel").addEventListener("click", md.close);
   if (STORE) q("#im-restore").addEventListener("click", restoreOriginal);
   q("#im-go").addEventListener("click", async () => {
-    if (!parsed) return;
+    if (!parsed || !parsed.rows.length){
+      if (q("#sp-cc").style.display !== "none") return runCcFetch();
+      if (q("#sp-connected").style.display !== "none") return runConnectedFetch();
+      return;
+    }
     const toRow = (r, n) => [n, r.title, r.artist, r.album, r.sec, r.date];
     if (mode === "add"){
       const skip = q("#im-dup").checked;
