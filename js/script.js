@@ -1683,7 +1683,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       <button class="lnk" type="button" id="sp-why">Por que isso?</button>
       <div id="sp-cc">
         <form id="sp-form" autocomplete="off">
-          <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — não é seu usuário nem senha de login.</p>
+          <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — <strong>não é seu usuário nem senha de login</strong>.</p>
           <div class="imrow"><input type="text" id="sp-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"><input type="password" id="sp-secret" name="spotify-client-secret" placeholder="Ex: 9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c" autocomplete="new-password">
             <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
           <div class="imrow"><button class="lnk" type="button" id="sp-cc-help">Não sei meu ID</button></div>
@@ -1693,7 +1693,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       </div>
       <div id="sp-login" style="display:none">
         <form id="sp-login-form" autocomplete="off">
-          <p class="mdesc">Informe o <strong>Client ID</strong> do seu app no Spotify — não é seu nome de usuário.</p>
+          <p class="mdesc">Informe o <strong>Client ID</strong> do seu app no Spotify — <strong>não é seu nome de usuário</strong>.</p>
           <div class="imrow"><input type="text" id="sp-login-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"></div>
           <div class="imrow"><button class="lnk" type="button" id="sp-login-help">Não sei meu ID</button></div>
           <div class="imrow"><button class="gbtn" type="submit" id="sp-login-go">Entrar com Spotify</button><span class="sp-status" id="sp-login-status"></span></div>
