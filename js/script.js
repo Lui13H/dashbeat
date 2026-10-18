@@ -400,15 +400,22 @@ function renderTree(){
     const lbl = el.querySelector(".lbl");
     lbl.style.color = sel ? "#022C22" : "#ECFDF5";
     el.querySelector("span").textContent = d.value;
-    // choose the largest font where the name fits without breaking a word; otherwise hide label (tooltip still works)
-    let size = 0;
+    // choose the largest font where the name fits without breaking a word; otherwise fall
+    // back to the smallest size and truncate with "…" — only hide if there's no room at all
+    let size = 0, truncated = false;
     for (const s of [17, 15, 13.5, 12, 11, 10]){
       const lines = Math.floor((h - 18 - Math.max(10, s - 2) * 1.2 - 4) / (s * 1.05));   // name lines that fit above the count
       if (w - 20 > 0 && lines >= 1 && fitsAt(d.k, s, "Sora, sans-serif", 600, w - 20, lines, "-.01em")){ size = s; break; }
     }
+    if (!size){
+      const s = 10, lines = Math.floor((h - 18 - Math.max(10, s - 2) * 1.2 - 4) / (s * 1.05));
+      if (w - 20 >= 22 && lines >= 1){ size = s; truncated = true; }
+    }
     lbl.style.opacity = size ? 1 : 0;
     el.style.borderRadius = Math.max(3, Math.min(10, w / 4, h / 4)) + "px";
-    lbl.querySelector("strong").style.fontSize = size + "px";
+    const strongEl = lbl.querySelector("strong");
+    strongEl.style.fontSize = size + "px";
+    strongEl.classList.toggle("trunc", truncated);
     lbl.querySelector("span").style.fontSize = Math.max(10, size - 2) + "px";
     const apply = () => { el.style.opacity = ""; el.style.left = x + "px"; el.style.top = y + "px"; el.style.width = w + "px"; el.style.height = h + "px"; };
     fresh ? requestAnimationFrame(() => requestAnimationFrame(apply)) : apply();
@@ -1363,10 +1370,20 @@ async function xlsxToCells(buf){
 
 /* ---------- import by Spotify link: fetch title/artist/album/duration/release date from the Web API ---------- */
 const SPOTIFY_CREDS_KEY = "catalogo-musical:spotify-creds";
+const SPOTIFY_APP_OK_KEY = "catalogo-musical:spotify-app-ok"; // marca que esse navegador já autenticou com um app do Spotify, mesmo sem salvar as credenciais
+function hasSpotifyApp(){ try { return !!localStorage.getItem(SPOTIFY_APP_OK_KEY) || !!loadSpotifyCreds().id; } catch (e) { return false; } }
 const SPOTIFY_ID_RE = /^[0-9a-f]{32}$/i; // Client ID e Client Secret do Spotify são sempre 32 caracteres hexadecimais
 function loadSpotifyCreds(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_CREDS_KEY) || "null") || {}; } catch (e) { return {}; } }
 function saveSpotifyCreds(id, secret){ try { localStorage.setItem(SPOTIFY_CREDS_KEY, JSON.stringify({id, secret})); } catch (e) {} }
 function clearSpotifyCreds(){ try { localStorage.removeItem(SPOTIFY_CREDS_KEY); } catch (e) {} }
+/* metadados já buscados, por ID da faixa: links repetidos não gastam requisição (o limite do Spotify é o gargalo) */
+const SPOTIFY_TRACK_CACHE_KEY = "catalogo-musical:spotify-tracks";
+function loadTrackCache(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_TRACK_CACHE_KEY) || "null") || {}; } catch (e) { return {}; } }
+function saveTrackCache(rows){
+  const c = loadTrackCache();
+  for (const r of rows) if (r.id) c[r.id] = {title: r.title, artist: r.artist, album: r.album, sec: r.sec, date: r.date};
+  try { localStorage.setItem(SPOTIFY_TRACK_CACHE_KEY, JSON.stringify(c)); } catch (e) {}
+}
 function parseSpotifyIds(text){
   const ids = [];
   for (const tok of text.split(/\s+/)){ const m = tok.match(/track[/:]([A-Za-z0-9]{22})/); if (m) ids.push(m[1]); }
@@ -1389,6 +1406,7 @@ async function spotifyToken(id, secret){
   if (!r.ok) throw new Error(r.status === 400 ? "Client ID ou Client Secret inválidos." : `Falha ao autenticar no Spotify (HTTP ${r.status}).`);
   const j = await r.json();
   if (!j.access_token) throw new Error("Resposta inesperada do Spotify ao autenticar.");
+  try { localStorage.setItem(SPOTIFY_APP_OK_KEY, "1"); } catch (e) {}
   return j.access_token;
 }
 function spotifyDate(album){
@@ -1427,7 +1445,7 @@ async function spotifyFetchTracks(ids, token, onProgress, onWait){
         if (r.status === 403) throw new Error("Spotify recusou o acesso (HTTP 403). Confira se a conta dona do app tem Spotify Premium (exigido para apps em modo de desenvolvimento) e se o Client ID/Secret estão corretos.");
         if (!r.ok) throw new Error(`Falha ao buscar faixas no Spotify (HTTP ${r.status}).`);
         const t = await r.json();
-        rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album)});
+        rows.push({n: null, id, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album)});
         onProgress && onProgress(i + 1, ids.length);
         break;
       }
@@ -1474,7 +1492,7 @@ async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait){
         total = typeof page.total === "number" ? page.total : got + (page.items || []).length;
         for (const t of (page.items || [])){
           if (!t) continue;
-          rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: albumName, sec: Math.round(t.duration_ms / 1000), date: albumDate});
+          rows.push({n: null, id: t.id, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: albumName, sec: Math.round(t.duration_ms / 1000), date: albumDate});
         }
         got += (page.items || []).length;
         url = page.next || null;
@@ -1489,51 +1507,120 @@ async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait){
   return {rows, warnings};
 }
 
-function openSpotifyAppHelp(){
-  openModal({
-    title: "Como achar seu Client ID",
-    body: `<ol class="mdesc" style="padding-left:18px;display:flex;flex-direction:column;gap:10px;margin:0">
-        <li>Acesse <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> e faça login com sua conta Spotify.</li>
-        <li>Clique em <strong>Create app</strong>.</li>
-        <li>Dê um nome e uma descrição (pode ser qualquer um), marque <strong>Web API</strong> e aceite os termos.</li>
-        <li>Em <strong>Redirect URIs</strong>, coloque qualquer link válido (ex: <code>https://exemplo.com</code>) — não é usado por esta ferramenta. Clique em "Add".</li>
-        <li>Clique em <strong>Save</strong>. Na tela do app, em <strong>Basic Information</strong>, o <strong>Client ID</strong> já aparece, e o botão <strong>"View client secret"</strong> revela o <strong>Client Secret</strong>.</li>
-      </ol>
-      <p class="muted" style="margin-top:14px">É gratuito e leva menos de 2 minutos.</p>`,
-    foot: `<a class="gbtn" href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="text-decoration:none">Abrir o Dashboard do Spotify</a>`,
-    size: "sm"
+function copyText(text){
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast("Copiado!"); } catch (e) { toast("Não deu pra copiar — selecione o texto e copie manualmente."); }
+    ta.remove();
+  };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(() => toast("Copiado!"), fallback);
+  else fallback();
+}
+function openSpotifyAppHelp({id = "", secret = "", onDone, returning = false} = {}){
+  /* o Spotify exige uma Redirect URI no cadastro do app, mas o fluxo Client Credentials nunca a usa */
+  const redirect = location.protocol === "https:" ? location.origin + "/callback" : "http://127.0.0.1:8080/callback";
+  const vals = {name: "Painel Musical", desc: "Busca dados das faixas para o meu painel de playlist", redirect};
+  const copyRow = (label, key) => `<div class="wz-copy"><span>${label}</span><code>${esc(vals[key])}</code><button class="gbtn" type="button" data-copy="${key}">Copiar</button></div>`;
+  const steps = [
+    {t: "Entre no painel do Spotify", h: `<p class="mdesc">Abra o painel de desenvolvedor em outra aba e faça login com a <strong>sua conta Spotify</strong> (a mesma que você usa pra ouvir música). Se for o primeiro acesso, aceite os termos de desenvolvedor.</p>
+      <p style="margin:16px 0"><a class="pbtn" href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="text-decoration:none">Abrir o painel do Spotify ↗</a></p>
+      <p class="muted">Deixe esta janela aberta — você volta aqui no próximo passo. É grátis e leva uns 2 minutos.</p>`},
+    {t: "Crie o app", h: `<p class="mdesc">No painel, clique em <strong>Create app</strong> e preencha copiando os valores abaixo:</p>
+      ${copyRow("App name", "name")}${copyRow("App description", "desc")}${copyRow("Redirect URI", "redirect")}
+      <p class="mdesc">Depois de colar a Redirect URI, clique em <strong>Add</strong>. Em <strong>Which API/SDKs are you planning to use?</strong> marque <strong>Web API</strong>, aceite os termos e clique em <strong>Save</strong>.</p>
+      <p class="muted">A Redirect URI é obrigatória no formulário do Spotify, mas esta ferramenta não usa — por isso qualquer valor válido serve.</p>`},
+    {t: "Cole o Client ID e o Secret", h: `${returning ? `<p class="mdesc">Você já usou um app do Spotify aqui antes, então abrimos o <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">painel do Spotify</a> direto em outra aba. Ainda não tem um app? Clique em <strong>Voltar</strong> para ver como criar.</p>` : ""}<p class="mdesc">Na tela do app, clique em <strong>Settings</strong>. Em <strong>Basic Information</strong> aparece o <strong>Client ID</strong>; clique em <strong>View client secret</strong> para ver o <strong>Client Secret</strong>. Cole os dois aqui:</p>
+      <div class="wz-field"><label for="wz-id">Client ID</label><input type="text" id="wz-id" autocomplete="off" spellcheck="false" placeholder="32 letras/números"><small id="wz-id-st"></small></div>
+      <div class="wz-field"><label for="wz-secret">Client Secret</label><input type="password" id="wz-secret" autocomplete="new-password" spellcheck="false" placeholder="32 letras/números"><small id="wz-secret-st"></small></div>
+      <p class="sp-status" id="wz-status"></p>`}
+  ];
+  let step = returning ? steps.length - 1 : 0;
+  const body = document.createElement("div");
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  foot.innerHTML = `<button class="gbtn" type="button" data-back>Voltar</button><span class="sp"></span><button class="pbtn" type="button" data-next>Próximo</button>`;
+  const md = openModal({title: "Assistente: criar seu app no Spotify", body, foot, size: "sm"});
+  const back = foot.querySelector("[data-back]"), next = foot.querySelector("[data-next]");
+  const clean = v => v.replace(/\s+/g, "");
+  function checkField(inp, st){
+    const v = clean(inp.value);
+    st.className = "";
+    if (!v){ st.textContent = ""; return false; }
+    if (SPOTIFY_ID_RE.test(v)){ st.textContent = "✓ formato certo"; st.className = "ok"; return true; }
+    st.textContent = /[^0-9a-f]/i.test(v) ? "Tem caracteres que não deveriam estar aí — copie de novo pelo botão do Spotify." : `Deveria ter 32 caracteres (tem ${v.length}).`;
+    st.className = "err"; return false;
+  }
+  function render(){
+    body.innerHTML = `<ol class="wz-dots">${steps.map((s, i) => `<li class="${i === step ? "on" : i < step ? "done" : ""}"><b>${i < step ? "✓" : i + 1}</b><span>${s.t}</span></li>`).join("")}</ol>${steps[step].h}`;
+    back.style.visibility = step ? "" : "hidden";
+    next.textContent = step === steps.length - 1 ? "Testar e usar" : "Próximo";
+    next.disabled = false;
+    body.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => copyText(vals[b.dataset.copy])));
+    if (step === steps.length - 1){
+      const fi = body.querySelector("#wz-id"), fs = body.querySelector("#wz-secret");
+      fi.value = id; fs.value = secret;
+      const sync = () => { id = clean(fi.value); secret = clean(fs.value); checkField(fi, body.querySelector("#wz-id-st")); checkField(fs, body.querySelector("#wz-secret-st")); };
+      fi.addEventListener("input", sync); fs.addEventListener("input", sync); sync();
+      setTimeout(() => (id ? fs : fi).focus({preventScroll: true}), 60);
+    }
+  }
+  back.addEventListener("click", () => { if (step){ step--; render(); } });
+  next.addEventListener("click", async () => {
+    if (step < steps.length - 1){ step++; render(); return; }
+    const st = body.querySelector("#wz-status");
+    st.classList.remove("err");
+    if (!SPOTIFY_ID_RE.test(id) || !SPOTIFY_ID_RE.test(secret)){ st.classList.add("err"); st.textContent = "Confira os dois campos: cada um tem 32 letras/números."; return; }
+    if (id.toLowerCase() === secret.toLowerCase()){ st.classList.add("err"); st.textContent = "Você colou o mesmo valor nos dois campos — o Secret aparece em \"View client secret\"."; return; }
+    next.disabled = true; st.textContent = "Testando com o Spotify…";
+    try { await spotifyToken(id, secret); }
+    catch (e){ next.disabled = false; st.classList.add("err"); st.textContent = e.message + (/inválidos/.test(e.message) ? " Confira se copiou do app certo e se clicou em Save." : ""); return; }
+    md.close();
+    if (onDone) onDone(id, secret);
+    toast("Tudo certo! Credenciais conferidas com o Spotify.");
   });
+  render();
 }
 function openPlaylistLinkHelp(){
-  openModal({
+  const md = openModal({
     title: "Como importar uma playlist inteira",
-    body: `<p class="mdesc">O Spotify só entrega as faixas de uma playlist na ordem atual de exibição — que muda se alguém reordenar a playlist manualmente — e não na ordem real em que cada música foi adicionada. Por isso links de playlist não são aceitos aqui: pra manter a ordem certa, copie o link de cada faixa e cole tudo de uma vez, um link por linha.</p>
-      <ol class="mdesc" style="padding-left:18px;display:flex;flex-direction:column;gap:10px;margin:14px 0 0">
-        <li>Abra o <strong>app de PC do Spotify</strong>.</li>
-        <li>Vá na playlist e ordene a coluna <strong>"Adicionada em"</strong> até ver a seta para cima (músicas antigas no topo).</li>
-        <li>Pressione <strong>Ctrl+A</strong> para selecionar todas as faixas.</li>
-        <li>Pressione <strong>Ctrl+C</strong> para copiar os links.</li>
-        <li>Volte aqui e cole no campo de texto — um link de faixa por linha é reconhecido automaticamente.</li>
-      </ol>`,
+    body: `<ol class="mdesc" style="padding-left:18px;display:flex;flex-direction:column;gap:10px;margin:0">
+        <li>Abra a playlist no <strong>Spotify do PC</strong>.</li>
+        <li>No topo da coluna com a data em que cada música foi adicionada, clique em <strong>"Adicionada em"</strong> até as mais antigas ficarem no topo. <button type="button" class="lnk" data-no-added style="padding:0;font:inherit;vertical-align:baseline">Não encontrei "Adicionada em"</button></li>
+        <li>Aperte <strong>Ctrl+A</strong> e depois <strong>Ctrl+C</strong>.</li>
+        <li>Volte aqui e cole (<strong>Ctrl+V</strong>).</li>
+      </ol>
+      <p class="muted" style="margin-top:14px">Link da playlist não funciona: o Spotify não informa a ordem em que você adicionou as músicas.</p>`,
     size: "sm"
   });
+  md.q("[data-no-added]").addEventListener("click", () => openModal({
+    title: "Não encontrei \"Adicionada em\"",
+    body: `<p class="mdesc">Se ela não aparece no topo da lista de músicas da playlist:</p>
+      <ol class="mdesc" style="padding-left:18px;display:flex;flex-direction:column;gap:10px;margin:10px 0 0">
+        <li>Clique nos <strong>3 tracinhos</strong> (☰) ao lado da lupa de pesquisar.</li>
+        <li>Procure <strong>"Adicionada em"</strong> e clique nela até ficar com a <strong>seta pra cima</strong>.</li>
+      </ol>`,
+    size: "sm"
+  }));
 }
-function openRateLimitModal({done, total, attempt}){
+function openRateLimitModal({done, total}){
   /* só aparece depois de algumas tentativas seguidas (não a cada 429 isolado, que é normal
      e resolve em poucos segundos) — e volta a aparecer periodicamente se continuar travado,
      caso a pessoa escolha "continuar esperando" e o bloqueio persista. */
   return new Promise(res => {
     let decided = false;
     const foot = document.createElement("div"); foot.className = "mfrow"; foot.style.flexWrap = "wrap";
-    foot.innerHTML = `<button class="gbtn" type="button" data-cancel>Cancelar e descartar tudo</button><span class="sp"></span><button class="gbtn" type="button" data-keep>Usar só o que já carregou</button><button class="pbtn" type="button" data-wait autofocus>Continuar esperando</button>`;
+    const hasSome = done > 0;
+    foot.innerHTML = `<button class="gbtn" type="button" data-cancel>${hasSome ? "Cancelar tudo" : "Cancelar"}</button><span class="sp"></span>${hasSome ? `<button class="gbtn" type="button" data-keep>Usar as ${done} carregadas</button>` : ""}<button class="pbtn" type="button" data-wait autofocus>Esperar</button>`;
     const md = openModal({
-      title: "O Spotify está limitando os pedidos",
+      title: "O Spotify pediu uma pausa",
       body: `<div class="confirm">
-          <p>Depois de ${attempt} tentativas seguidas, o Spotify continua pedindo espera antes de liberar a próxima faixa (faixa ${done + 1} de ${total}). Isso é comum em listas grandes e pode levar vários minutos para passar — não tem como saber o tempo exato.</p>
-          <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
-            <div><strong>Continuar esperando</strong><br><span class="muted">Não recomendado em listas grandes: a ferramenta mantém tentando sozinha, sem previsão de quanto tempo ainda falta.</span></div>
-            <div><strong>Usar só o que já carregou</strong><br><span class="muted">Para agora e importa só as ${done} faixa${done === 1 ? "" : "s"} já buscadas; as outras ${total - done} ficam de fora (pode tentar importá-las depois, à parte).</span></div>
-            <div><strong>Cancelar e descartar tudo</strong><br><span class="muted">Cancela a importação inteira — nem as faixas que já carregaram são adicionadas.</span></div>
+          <p>O Spotify limita quantas músicas dá pra buscar em pouco tempo. Isso costuma acontecer quando <strong>já foram buscadas muitas músicas hoje</strong> ou agora há pouco.</p>
+          <p>${hasSome ? `Já carregamos <strong>${done} de ${total}</strong>. As outras só vão carregar quando o Spotify liberar` : `Nenhuma das <strong>${total}</strong> músicas carregou. Elas só vão carregar quando o Spotify liberar`} — pode levar minutos ou até horas.</p>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+            <div><strong>Esperar:</strong> <span class="muted">continua sozinho quando o Spotify liberar.</span></div>
+            ${hasSome ? `<div><strong>Usar as ${done} carregadas:</strong> <span class="muted">importa só essas agora.</span></div>` : ""}
+            <div><strong>${hasSome ? "Cancelar tudo" : "Cancelar"}:</strong> <span class="muted">${hasSome ? "não importa nenhuma." : "para tudo. Tente de novo mais tarde."}</span></div>
           </div>
         </div>`,
       foot, size: "sm",
@@ -1541,7 +1628,7 @@ function openRateLimitModal({done, total, attempt}){
     });
     const pick = v => { decided = true; md.close(); res(v); };
     foot.querySelector("[data-wait]").onclick = () => pick("wait");
-    foot.querySelector("[data-keep]").onclick = () => pick("keep");
+    if (hasSome) foot.querySelector("[data-keep]").onclick = () => pick("keep");
     foot.querySelector("[data-cancel]").onclick = () => pick("cancel");
   });
 }
@@ -1598,6 +1685,7 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn}){
     }
     clearInterval(tick);
     const rows = results.flatMap(r => r.rows), warnings = results.flatMap(r => r.warnings);
+    saveTrackCache(rows);
     const partial = results.some(r => r.partial);
     if (!rows.length){ status.classList.add("err"); status.textContent = "Nenhuma faixa encontrada."; return null; }
     status.textContent = partial
@@ -1618,15 +1706,15 @@ function openImport(initialMode = "add", prefillText = null){
   const body = document.createElement("div");
   body.innerHTML = `<p class="mdesc" id="im-desc"></p>
     <div class="imrow"><label class="chk" id="im-dupwrap"><input type="checkbox" id="im-dup" checked><span>Ignorar faixas que já estão na playlist (mesmo título e artista)</span></label></div>
-    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Aceita: link de faixa/álbum do Spotify (um por linha), lista colada (1 faixa por linha, colunas separadas por TAB), ou arquivo .txt/.tsv/.csv/.xlsx (arraste para cá). Links de playlist não são aceitos — veja como importar uma playlist inteira.&#10;&#10;Link do Spotify:&#10;https://open.spotify.com/track/0G7mYkFpOp7HFRfiuNzoru&#10;&#10;Ou lista colada:&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26"></textarea></label>
-    <div class="imrow"><label class="gbtn file">${ICON.up}<span>Escolher arquivo</span><input type="file" id="im-file" accept=".txt,.tsv,.csv,.xlsx,text/plain,text/csv"></label></div>
+    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Aceita: link de faixa/álbum do Spotify (um por linha), lista colada (1 faixa por linha, colunas separadas por TAB), ou arquivo .txt/.tsv/.csv/.xlsx (arraste para cá). Links de playlist não são aceitos — veja como importar uma playlist inteira.&#10;&#10;Link do Spotify:&#10;https://open.spotify.com/track/0G7mYkFpOp7HFRfiuNzoru&#10;https://open.spotify.com/track/0G7mYkFpOp7HFRfiuNew73&#10;&#10;Ou lista colada:&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26"></textarea></label>
+    <div class="imrow"><label class="gbtn file">${ICON.up}<span>Escolher arquivo</span><input type="file" id="im-file" accept=".txt,.tsv,.csv,.xlsx,text/plain,text/csv"></label><button class="lnk" type="button" id="im-copy-help">Não sei copiar minhas músicas</button></div>
     <div id="sp-fields" style="display:none">
       <p class="mdesc" id="sp-detect-msg"></p>
-      <div class="imrow" style="gap:18px"><button class="lnk" type="button" id="sp-why">Por que isso?</button><button class="lnk" type="button" id="sp-id-help">Não sei meu ID</button></div>
       <div id="sp-cc">
         <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — <strong>Não é seu usuário nem senha de login</strong>.</p>
         <div class="imrow"><input type="text" id="sp-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"><input type="password" id="sp-secret" name="spotify-client-secret" placeholder="Ex: 9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c" autocomplete="new-password">
           <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
+        <div class="imrow" style="gap:18px;margin:4px 0 8px"><button class="lnk" type="button" id="sp-why">Pra que pedimos isso?</button><button class="lnk" type="button" id="sp-id-help">Não sei meu ID/Secret</button></div>
         <div class="imrow"><span class="sp-status" id="sp-status"></span></div>
       </div>
     </div>
@@ -1679,7 +1767,9 @@ function openImport(initialMode = "add", prefillText = null){
     const parts = [];
     if (an) parts.push(`${an} álbu${an > 1 ? "ns" : "m"}`);
     if (n) parts.push(faixas(n));
-    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.`;
+    const single = n === 1 && !an;
+    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.${single ? ` <button type="button" class="lnk" id="sp-whole-pl" style="padding:0;font:inherit;vertical-align:baseline">Quer adicionar a playlist inteira?</button>` : ""}`;
+    if (single) q("#sp-whole-pl").addEventListener("click", openPlaylistLinkHelp);
   }
   const fromText = () => {
     const t = ta.value;
@@ -1720,22 +1810,46 @@ function openImport(initialMode = "add", prefillText = null){
   md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.addEventListener("click", () => { mode = b.dataset.m; update(); }));
   const creds = loadSpotifyCreds();
   q("#sp-id").value = creds.id || ""; q("#sp-secret").value = creds.secret || "";
+  const openWizard = (returning = false) => openSpotifyAppHelp({returning, id: q("#sp-id").value.trim(), secret: q("#sp-secret").value.trim(), onDone: (id, secret) => {
+    q("#sp-id").value = id; q("#sp-secret").value = secret;
+    if (q("#sp-remember").checked) saveSpotifyCreds(id, secret);
+    const st = q("#sp-status"); st.classList.remove("err");
+    st.textContent = "Credenciais conferidas com o Spotify ✓ — agora é só clicar em \"Buscar dados no Spotify\".";
+  }});
   async function runCcFetch(){
     const id = q("#sp-id").value.trim(), secret = q("#sp-secret").value.trim();
     const ids = parseSpotifyIds(ta.value), albumIds = parseSpotifyAlbumIds(ta.value);
     const status = q("#sp-status"), btn = q("#im-go");
     status.classList.remove("err");
-    if (!id && !secret){ status.classList.add("err"); status.textContent = "Informe o Client ID e o Client Secret."; return; }
-    if (id && !SPOTIFY_ID_RE.test(id)){ status.classList.add("err"); status.textContent = "Esse Client ID não parece válido: deveria ter 32 letras/números (ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d)."; openSpotifyAppHelp(); return; }
-    if (!id){ status.classList.add("err"); status.textContent = "Informe o Client ID."; return; }
-    if (secret && !SPOTIFY_ID_RE.test(secret)){ status.classList.add("err"); status.textContent = "Esse Client Secret não parece válido: deveria ter 32 letras/números."; openSpotifyAppHelp(); return; }
-    if (!secret){ status.classList.add("err"); status.textContent = "Informe o Client Secret."; return; }
     if (!ids.length && !albumIds.length){ status.classList.add("err"); status.textContent = "Nenhum link do Spotify reconhecido."; return; }
-    if (q("#sp-remember").checked) saveSpotifyCreds(id, secret); else clearSpotifyCreds();
-    let token; try { token = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
-    parsed = await spotifyRunFetch({token, ids, albumIds, status, btn});
+    const cache = loadTrackCache(), toFetch = ids.filter(x => !cache[x]), known = ids.length - toFetch.length;
+    let res = {rows: [], warnings: []};
+    if (toFetch.length || albumIds.length){
+      res = await fetchFromSpotify(id, secret, toFetch, albumIds, status, btn);
+      if (!res){ parsed = null; update(); return; }
+    }
+    const fetchedSet = new Set(toFetch), got = new Map(res.rows.filter(r => fetchedSet.has(r.id)).map(r => [r.id, r]));
+    const albumRows = res.rows.filter(r => !fetchedSet.has(r.id));
+    const trackRows = ids.map(x => cache[x] ? {n: null, id: x, ...cache[x]} : got.get(x)).filter(Boolean);
+    parsed = {rows: [...albumRows, ...trackRows], warnings: res.warnings};
+    if (known){
+      status.classList.remove("err");
+      const msg = `${known === 1 ? "1 música já era conhecida" : `${known} músicas já eram conhecidas`} — não precisou buscar no Spotify.`;
+      status.textContent = toFetch.length || albumIds.length ? `${status.textContent} ${msg}` : msg;
+    }
     update();
   }
+  async function fetchFromSpotify(id, secret, ids, albumIds, status, btn){
+    if (!id && !secret){ status.classList.add("err"); status.textContent = "Informe o Client ID e o Client Secret."; return; }
+    if (id && !SPOTIFY_ID_RE.test(id)){ status.classList.add("err"); status.textContent = "Esse Client ID não parece válido: deveria ter 32 letras/números (ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d)."; openWizard(); return; }
+    if (!id){ status.classList.add("err"); status.textContent = "Informe o Client ID."; return; }
+    if (secret && !SPOTIFY_ID_RE.test(secret)){ status.classList.add("err"); status.textContent = "Esse Client Secret não parece válido: deveria ter 32 letras/números."; openWizard(); return; }
+    if (!secret){ status.classList.add("err"); status.textContent = "Informe o Client Secret."; return; }
+    if (q("#sp-remember").checked) saveSpotifyCreds(id, secret); else clearSpotifyCreds();
+    let token; try { token = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
+    return spotifyRunFetch({token, ids, albumIds, status, btn});
+  }
+  q("#im-copy-help").addEventListener("click", openPlaylistLinkHelp);
   q("#sp-why").addEventListener("click", () => {
     openModal({
       title: "Por que pedimos isso?",
@@ -1744,7 +1858,11 @@ function openImport(initialMode = "add", prefillText = null){
       size: "sm"
     });
   });
-  q("#sp-id-help").addEventListener("click", () => openSpotifyAppHelp());
+  q("#sp-id-help").addEventListener("click", () => {
+    if (!hasSpotifyApp()) return openWizard();
+    window.open("https://developer.spotify.com/dashboard", "_blank", "noopener");
+    openWizard(true);
+  });
   if (prefillText){
     ta.value = prefillText;
     fromText();
@@ -1924,6 +2042,17 @@ function boot(){
     const qs = params.toString();
     history.replaceState({}, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
     openImport("replace");
-  }
+  } else if (!STORE) openExampleNotice();
+}
+function openExampleNotice(){
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  foot.innerHTML = `<button class="gbtn" type="button" data-ex>Ver o exemplo</button><span class="sp"></span><button class="pbtn" type="button" data-mine autofocus>Adicionar minha playlist</button>`;
+  const md = openModal({
+    title: "Esta playlist é só um exemplo",
+    body: `<div class="confirm"><p>As músicas que você está vendo são de demonstração.</p><p>Para ver o painel com a <strong>SUA PLAYLIST</strong>, clique em <strong>Adicionar músicas</strong> no topo da página e depois em <strong>Substituir playlist</strong>.</p><p class="muted">Ou, mais rápido: clique em <strong>Adicionar minha playlist</strong> aqui embaixo.</p></div>`,
+    foot, size: "sm"
+  });
+  foot.querySelector("[data-ex]").onclick = () => md.close();
+  foot.querySelector("[data-mine]").onclick = () => { md.close(); openImport("replace"); };
 }
 (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(boot);
