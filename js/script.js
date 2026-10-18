@@ -1412,11 +1412,16 @@ async function spotifyFetchTracks(ids, token, onProgress, onWait){
 }
 async function spotifyFetchPlaylistTracks(playlistIds, token, onProgress, onWait){
   /* a API de playlist devolve várias faixas por requisição (até 100), então uma playlist
-     inteira custa poucas chamadas — bem mais barato que buscar faixa por faixa. */
+     inteira custa poucas chamadas — bem mais barato que buscar faixa por faixa.
+     Importante: a API devolve as faixas na ordem ATUAL da playlist (a que aparece no Spotify
+     agora), que não é a mesma coisa que a ordem de adição se o dono reordenou manualmente.
+     Por isso pedimos o campo "added_at" de cada item e reordenamos por ele depois de buscar
+     tudo, pra reconstruir a ordem real de quando cada faixa entrou na playlist. */
   const rows = [], warnings = [];
   let backoff = 0, attempt = 0;
   for (let pi = 0; pi < playlistIds.length; pi++){
     const pid = playlistIds[pi];
+    const plRows = [];
     let offset = 0, total = Infinity;
     while (offset < total){
       let r;
@@ -1425,7 +1430,7 @@ async function spotifyFetchPlaylistTracks(playlistIds, token, onProgress, onWait
           /* endpoint renomeado de /tracks pra /items na migração de fev/2026 do Spotify; o campo
              da faixa dentro de cada item também mudou de "track" pra "item" — pedimos os dois
              nomes e lemos o que vier, pra não depender de qual versão a API está servindo */
-          r = await fetch(`https://api.spotify.com/v1/playlists/${pid}/items?limit=100&offset=${offset}&fields=total,items(item(name,artists(name),album(name,release_date),duration_ms,is_local),track(name,artists(name),album(name,release_date),duration_ms,is_local))`, {headers: {Authorization: `Bearer ${token}`}});
+          r = await fetch(`https://api.spotify.com/v1/playlists/${pid}/items?limit=100&offset=${offset}&fields=total,items(added_at,item(name,artists(name),album(name,release_date),duration_ms,is_local),track(name,artists(name),album(name,release_date),duration_ms,is_local))`, {headers: {Authorization: `Bearer ${token}`}});
         } catch (e) { throw new Error("Não foi possível buscar a playlist no Spotify."); }
         if (r.status === 429){
           attempt++;
@@ -1433,7 +1438,7 @@ async function spotifyFetchPlaylistTracks(playlistIds, token, onProgress, onWait
           const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
           backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
           const wait = Math.max(1, Math.round(backoff));
-          onWait && await onWait(wait, rows.length, total === Infinity ? rows.length : total, attempt);
+          onWait && await onWait(wait, rows.length + plRows.length, total === Infinity ? rows.length + plRows.length : total, attempt);
           continue;
         }
         backoff = Math.max(0, backoff - 3); attempt = 0;
@@ -1446,12 +1451,24 @@ async function spotifyFetchPlaylistTracks(playlistIds, token, onProgress, onWait
       total = typeof j.total === "number" ? j.total : offset + (j.items || []).length;
       for (const it of (j.items || [])){
         const t = it.item || it.track;
-        if (!t || t.is_local){ warnings.push({line: rows.length + warnings.length + 1, msg: "faixa local ou indisponível ignorada"}); continue; }
-        rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album)});
+        if (!t || t.is_local){ warnings.push({line: rows.length + plRows.length + warnings.length + 1, msg: "faixa local ou indisponível ignorada"}); continue; }
+        plRows.push({title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album), addedAt: it.added_at || null});
       }
       offset += 100;
       onProgress && onProgress(Math.min(offset, total), total, pi + 1, playlistIds.length);
     }
+    // reordena pela data de adição (added_at); faixas sem essa data (playlists bem antigas) ficam
+    // no fim, na ordem em que vieram, já que não dá pra saber quando entraram de fato
+    plRows.sort((a, b) => {
+      if (a.addedAt && b.addedAt) return a.addedAt < b.addedAt ? -1 : a.addedAt > b.addedAt ? 1 : 0;
+      if (a.addedAt) return -1;
+      if (b.addedAt) return 1;
+      return 0;
+    });
+    const noDate = plRows.filter(r => !r.addedAt).length;
+    if (noDate) warnings.push({line: rows.length + 1, msg: `${noDate} faixa${noDate > 1 ? "s" : ""} dessa playlist sem data de adição registrada pelo Spotify (comum em playlists bem antigas); foram colocadas no fim, sem garantia de que essa é a ordem real`});
+    const base = rows.length;
+    plRows.forEach((r, i) => rows.push({n: base + i + 1, title: r.title, artist: r.artist, album: r.album, sec: r.sec, date: r.date}));
   }
   return {rows, warnings};
 }
