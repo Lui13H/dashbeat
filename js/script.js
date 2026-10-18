@@ -1706,8 +1706,11 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
           <div class="imrow"><input type="text" id="sp-login-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"></div>
           <div class="imrow"><button class="pbtn" type="submit" id="sp-login-go">Entrar com Spotify</button><span class="sp-status" id="sp-login-status"></span></div>
         </form>
-        <p class="muted">Links de playlist só funcionam com login: o Spotify exige que você entre com a conta dona (ou colaboradora) da playlist, mesmo quando ela é pública. Informe o Client ID do seu app (sem o Secret, não é preciso aqui) e cadastre esta <strong>Redirect URI</strong> nele, em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> → seu app → Settings:</p>
-        <p class="muted" id="sp-redirect-hint" style="word-break:break-all;font-family:monospace"></p>
+        <p class="muted">Links de playlist só funcionam com login: o Spotify exige que você entre com a conta dona (ou colaboradora) da playlist, mesmo quando ela é pública. Informe o Client ID do seu app (sem o Secret, não é preciso aqui) e cadastre esta <strong>Redirect URI</strong> nele — <strong>exatamente igual</strong>, sem espaços a mais — em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> → seu app → Settings:</p>
+        <div class="imrow" style="gap:10px;align-items:center;flex-wrap:nowrap">
+          <p class="muted" id="sp-redirect-hint" style="word-break:break-all;font-family:monospace;margin:0;flex:1"></p>
+          <button class="lnk" type="button" id="sp-redirect-copy" style="flex:none;white-space:nowrap">Copiar</button>
+        </div>
       </div>
       <div id="sp-connected" style="display:none">
         <div class="imrow" id="sp-account" style="align-items:center;gap:10px"></div>
@@ -1867,6 +1870,20 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     });
   });
   q("#sp-id-help").addEventListener("click", () => openSpotifyAppHelp(q("#sp-login").style.display !== "none" ? "login" : "cc"));
+  q("#sp-redirect-copy").addEventListener("click", async () => {
+    const text = spotifyRedirectUri();
+    try {
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+      else throw new Error("no clipboard API");
+      toast("Redirect URI copiada.");
+    } catch (e) {
+      const ta2 = document.createElement("textarea");
+      ta2.value = text; ta2.style.position = "fixed"; ta2.style.opacity = "0";
+      document.body.appendChild(ta2); ta2.focus(); ta2.select();
+      try { document.execCommand("copy"); toast("Redirect URI copiada."); } catch (e2) { toast("Não deu pra copiar; selecione o texto manualmente."); }
+      ta2.remove();
+    }
+  });
   if (prefillText){
     ta.value = prefillText;
     fromText();
