@@ -1328,6 +1328,7 @@ async function xlsxToCells(buf){
 
 /* ---------- import by Spotify link: fetch title/artist/album/duration/release date from the Web API ---------- */
 const SPOTIFY_CREDS_KEY = "catalogo-musical:spotify-creds";
+const SPOTIFY_ID_RE = /^[0-9a-f]{32}$/i; // Client ID e Client Secret do Spotify são sempre 32 caracteres hexadecimais
 function loadSpotifyCreds(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_CREDS_KEY) || "null") || {}; } catch (e) { return {}; } }
 function saveSpotifyCreds(id, secret){ try { localStorage.setItem(SPOTIFY_CREDS_KEY, JSON.stringify({id, secret})); } catch (e) {} }
 function clearSpotifyCreds(){ try { localStorage.removeItem(SPOTIFY_CREDS_KEY); } catch (e) {} }
@@ -1676,6 +1677,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
   const body = document.createElement("div");
   body.innerHTML = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add">Adicionar músicas</button><button type="button" data-m="replace">Nova playlist</button></div>
     <p class="mdesc" id="im-desc"></p>
+    <div class="imrow"><label class="chk" id="im-dupwrap"><input type="checkbox" id="im-dup" checked><span>Ignorar faixas repetidas</span></label></div>
     <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Aceita: link de playlist/faixa/álbum do Spotify, lista colada (1 faixa por linha, colunas separadas por TAB), ou arquivo .txt/.tsv/.csv/.xlsx (arraste para cá).&#10;&#10;Link do Spotify:&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;&#10;Ou lista colada:&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26"></textarea></label>
     <div class="imrow"><label class="gbtn file">${ICON.up}<span>Escolher arquivo</span><input type="file" id="im-file" accept=".txt,.tsv,.csv,.xlsx,text/plain,text/csv"></label></div>
     <div id="sp-fields" style="display:none">
@@ -1683,12 +1685,11 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       <div class="imrow" style="gap:18px"><button class="lnk" type="button" id="sp-why">Por que isso?</button><button class="lnk" type="button" id="sp-id-help">Não sei meu ID</button></div>
       <div id="sp-cc">
         <form id="sp-form" autocomplete="off">
-          <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — <strong>não é seu usuário nem senha de login</strong>.</p>
+          <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — <strong>Não é seu usuário nem senha de login</strong>.</p>
           <div class="imrow"><input type="text" id="sp-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"><input type="password" id="sp-secret" name="spotify-client-secret" placeholder="Ex: 9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c" autocomplete="new-password">
             <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
           <div class="imrow"><button class="gbtn" type="submit" id="sp-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-status"></span></div>
         </form>
-        <p class="muted">Client ID e Secret são gratuitos: crie um app em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> (login com sua conta Spotify) e copie os dois valores daqui.</p>
       </div>
       <div id="sp-login" style="display:none">
         <form id="sp-login-form" autocomplete="off">
@@ -1704,7 +1705,6 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
         <div class="imrow"><button class="gbtn" type="button" id="sp-fetch-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-connected-status"></span><button class="lnk" type="button" id="sp-logout">Sair da conta Spotify</button></div>
       </div>
     </div>
-    <div class="imrow"><label class="chk" id="im-dupwrap"><input type="checkbox" id="im-dup" checked><span>Ignorar faixas que já estão na playlist (mesmo título e artista)</span></label></div>
     <div id="im-prev" class="prev"></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
@@ -1798,7 +1798,11 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     const ids = parseSpotifyIds(ta.value), albumIds = parseSpotifyAlbumIds(ta.value);
     const status = q("#sp-status"), btn = q("#sp-go");
     status.classList.remove("err");
-    if (!id || !secret){ status.classList.add("err"); status.textContent = "Informe o Client ID e o Client Secret."; return; }
+    if (!id && !secret){ status.classList.add("err"); status.textContent = "Informe o Client ID e o Client Secret."; return; }
+    if (!id){ status.classList.add("err"); status.textContent = "Informe o Client ID."; return; }
+    if (!secret){ status.classList.add("err"); status.textContent = "Informe o Client Secret."; return; }
+    if (!SPOTIFY_ID_RE.test(id)){ status.classList.add("err"); status.textContent = "Esse Client ID não parece válido: deveria ter 32 letras/números (ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d)."; return; }
+    if (!SPOTIFY_ID_RE.test(secret)){ status.classList.add("err"); status.textContent = "Esse Client Secret não parece válido: deveria ter 32 letras/números."; return; }
     if (!ids.length && !albumIds.length){ status.classList.add("err"); status.textContent = "Nenhum link do Spotify reconhecido."; return; }
     if (q("#sp-remember").checked) saveSpotifyCreds(id, secret); else clearSpotifyCreds();
     let token; try { token = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
@@ -1811,6 +1815,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     const status = q("#sp-login-status");
     status.classList.remove("err");
     if (!clientId){ status.classList.add("err"); status.textContent = "Informe o Client ID."; return; }
+    if (!SPOTIFY_ID_RE.test(clientId)){ status.classList.add("err"); status.textContent = "Esse Client ID não parece válido: deveria ter 32 letras/números (ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d)."; return; }
     const c = loadSpotifyCreds(); saveSpotifyCreds(clientId, c.secret || "");
     spotifyLogin(clientId, ta.value, mode);
   });
