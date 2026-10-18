@@ -1214,7 +1214,7 @@ async function commitRows(rows, flash){
 }
 async function restoreOriginal(){
   const ok = await confirmModal({title: "Restaurar a playlist original?", danger: true, ok: "Restaurar original",
-    html: `<p>A lista atual (${faixas(NN)}) será descartada e o painel volta para a lista original embutida no arquivo (${faixas(DEFAULT_RAW.length)}).</p><p class="muted">Se quiser guardar a lista atual, exporte antes.</p>`,
+    html: `<p>A lista atual (${faixas(NN)}) será descartada e o painel volta para a lista padrão de exemplo do site (${faixas(DEFAULT_RAW.length)}).</p><p class="muted">Se quiser guardar a lista atual, exporte antes.</p>`,
     extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
   if (!ok) return;
   clearStore(); setFlash(`Playlist original restaurada · ${faixas(DEFAULT_RAW.length)}`);
@@ -1289,13 +1289,17 @@ function cellsToRows(cells){
   }
   return {rows, warnings};
 }
-// texto solto colado sem querer vira poucas "faixas" sem artista/duração/data e com título comprido
-// (pedaço de frase) — nesse caso é melhor avisar do que fingir que importou música de verdade
+// texto solto colado sem querer vira poucas "faixas" sem duração nem data reconhecidas, com
+// título/artista com cara de frase cortada no meio — nesse caso é melhor avisar do que fingir
+// que importou música de verdade (uma vírgula no meio da frase pode virar um "artista" falso)
 function looksLikeGarbage(parsed){
   if (!parsed || !parsed.rows.length || parsed.rows.length > 3) return false;
-  if (!parsed.rows.every(r => !r.artist && !r.date && !r.sec)) return false;
-  const avgLen = parsed.rows.reduce((s, r) => s + (r.title || "").length, 0) / parsed.rows.length;
-  return avgLen > 40;
+  return parsed.rows.every(r => {
+    if (r.sec || r.date) return false; // duração ou data reconhecidas: provavelmente é dado de verdade
+    const text = `${r.title || ""} ${r.artist || ""}`.trim();
+    const words = text.split(/\s+/).filter(Boolean).length;
+    return text.length > 60 || words > 9 || /[.!?]\s|\.\)|\)\./.test(text);
+  });
 }
 /* minimal XLSX reader (ZIP + XML), using the browser's own inflater */
 async function xlsxToCells(buf){
