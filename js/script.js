@@ -1496,6 +1496,29 @@ const SPOTIFY_OAUTH_KEY = "catalogo-musical:spotify-oauth";
 const SPOTIFY_PKCE_KEY = "catalogo-musical:spotify-pkce";
 const SPOTIFY_PENDING_KEY = "catalogo-musical:spotify-pending-import";
 function spotifyRedirectUri(){ return location.origin + location.pathname; }
+function openSpotifyAppHelp(kind){
+  const redirect = spotifyRedirectUri();
+  const steps = kind === "login"
+    ? `<li>Clique em <strong>Create app</strong>.</li>
+       <li>Dê um nome e uma descrição (pode ser qualquer um) e aceite os termos.</li>
+       <li>Em <strong>Redirect URIs</strong>, cole exatamente este endereço e clique em "Add":<br><span style="display:block;margin-top:4px;word-break:break-all;font-family:monospace;font-size:12px;background:rgba(0,0,0,.3);padding:6px 8px;border-radius:6px">${esc(redirect)}</span></li>
+       <li>Em "Which API/SDKs are you planning to use?", marque <strong>Web API</strong>.</li>
+       <li>Clique em <strong>Save</strong>. Na tela do app, em <strong>Basic Information</strong>, o <strong>Client ID</strong> já aparece pronto pra copiar.</li>`
+    : `<li>Clique em <strong>Create app</strong>.</li>
+       <li>Dê um nome e uma descrição (pode ser qualquer um), marque <strong>Web API</strong> e aceite os termos.</li>
+       <li>Em <strong>Redirect URIs</strong>, coloque qualquer link válido (ex: <code>https://exemplo.com</code>) — não é usado neste modo. Clique em "Add".</li>
+       <li>Clique em <strong>Save</strong>. Na tela do app, em <strong>Basic Information</strong>, o <strong>Client ID</strong> já aparece, e o botão <strong>"View client secret"</strong> revela o Secret.</li>`;
+  openModal({
+    title: "Como achar seu Client ID",
+    body: `<ol class="mdesc" style="padding-left:18px;display:flex;flex-direction:column;gap:10px;margin:0">
+        <li>Acesse <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> e faça login com sua conta Spotify.</li>
+        ${steps}
+      </ol>
+      <p class="muted" style="margin-top:14px">É gratuito e leva menos de 2 minutos.</p>`,
+    foot: `<a class="gbtn" href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="text-decoration:none">Abrir o Dashboard do Spotify</a>`,
+    size: "sm"
+  });
+}
 function b64url(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 function spotifyRandToken(len = 64){ const a = new Uint8Array(len); crypto.getRandomValues(a); return b64url(a); }
 async function spotifyPkceChallenge(verifier){ return b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))); }
@@ -1663,7 +1686,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
           <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — não é seu usuário nem senha de login.</p>
           <div class="imrow"><input type="text" id="sp-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"><input type="password" id="sp-secret" name="spotify-client-secret" placeholder="Ex: 9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c" autocomplete="new-password">
             <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
-          <div class="imrow"><a class="lnk" href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Não sei meu ID</a></div>
+          <div class="imrow"><button class="lnk" type="button" id="sp-cc-help">Não sei meu ID</button></div>
           <div class="imrow"><button class="gbtn" type="submit" id="sp-go">Buscar dados no Spotify</button><span class="sp-status" id="sp-status"></span></div>
         </form>
         <p class="muted">Client ID e Secret são gratuitos: crie um app em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> (login com sua conta Spotify) e copie os dois valores daqui.</p>
@@ -1672,7 +1695,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
         <form id="sp-login-form" autocomplete="off">
           <p class="mdesc">Informe o <strong>Client ID</strong> do seu app no Spotify — não é seu nome de usuário.</p>
           <div class="imrow"><input type="text" id="sp-login-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"></div>
-          <div class="imrow"><a class="lnk" href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Não sei meu ID</a></div>
+          <div class="imrow"><button class="lnk" type="button" id="sp-login-help">Não sei meu ID</button></div>
           <div class="imrow"><button class="gbtn" type="submit" id="sp-login-go">Entrar com Spotify</button><span class="sp-status" id="sp-login-status"></span></div>
         </form>
         <p class="muted">Links de playlist só funcionam com login: o Spotify exige que você entre com a conta dona (ou colaboradora) da playlist, mesmo quando ela é pública. Informe o Client ID do seu app (sem o Secret, não é preciso aqui) e cadastre esta <strong>Redirect URI</strong> nele, em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="color:var(--mint)">developer.spotify.com/dashboard</a> → seu app → Settings:</p>
@@ -1815,6 +1838,8 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       size: "sm"
     });
   });
+  q("#sp-cc-help").addEventListener("click", () => openSpotifyAppHelp("cc"));
+  q("#sp-login-help").addEventListener("click", () => openSpotifyAppHelp("login"));
   if (prefillText){
     ta.value = prefillText;
     fromText();
