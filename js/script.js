@@ -1289,6 +1289,14 @@ function cellsToRows(cells){
   }
   return {rows, warnings};
 }
+// texto solto colado sem querer vira poucas "faixas" sem artista/duração/data e com título comprido
+// (pedaço de frase) — nesse caso é melhor avisar do que fingir que importou música de verdade
+function looksLikeGarbage(parsed){
+  if (!parsed || !parsed.rows.length || parsed.rows.length > 3) return false;
+  if (!parsed.rows.every(r => !r.artist && !r.date && !r.sec)) return false;
+  const avgLen = parsed.rows.reduce((s, r) => s + (r.title || "").length, 0) / parsed.rows.length;
+  return avgLen > 40;
+}
 /* minimal XLSX reader (ZIP + XML), using the browser's own inflater */
 async function xlsxToCells(buf){
   const dv = new DataView(buf), u8 = new Uint8Array(buf);
@@ -1773,7 +1781,12 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     const lines = t.split(/\r?\n/).filter(l => l.trim());
     if ((ids.length || plIds.length || albIds.length) && (ids.length + plIds.length + albIds.length) / lines.length >= 0.5){ parsed = null; setSpotifyMode(true, ids.length, plIds.length, albIds.length); return update(); }
     setSpotifyMode(false);
-    try { parsed = cellsToRows(textToCells(t)); if (!parsed.rows.length) parsed.error = "Nenhuma faixa reconhecida. Confira se as colunas estão separadas por TAB, ponto e vírgula ou vírgula."; } catch (e) { parsed = {rows: [], warnings: [], error: e.message}; } update();
+    try {
+      parsed = cellsToRows(textToCells(t));
+      if (!parsed.rows.length) parsed.error = "Nenhuma faixa reconhecida. Confira se as colunas estão separadas por TAB, ponto e vírgula ou vírgula.";
+      else if (looksLikeGarbage(parsed)) parsed = {rows: [], warnings: [], error: "Isso não parece ser uma lista de músicas, um link do Spotify ou um arquivo reconhecido. Confira o que foi colado e tente de novo."};
+    } catch (e) { parsed = {rows: [], warnings: [], error: e.message}; }
+    update();
   };
   let tmr; ta.addEventListener("input", () => { clearTimeout(tmr); tmr = setTimeout(fromText, 200); });
   async function loadFile(f){
@@ -1781,6 +1794,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
       if (/\.xlsx$/i.test(f.name)){ const cells = await xlsxToCells(await f.arrayBuffer()); parsed = cellsToRows(cells); ta.value = cells.map(r => r.join("\t")).join("\n"); setSpotifyMode(false); }
       else { ta.value = await f.text(); fromText(); return; }
       if (!parsed.rows.length) parsed.error = "Nenhuma faixa reconhecida no arquivo.";
+      else if (looksLikeGarbage(parsed)) parsed = {rows: [], warnings: [], error: "Isso não parece ser uma lista de músicas reconhecível. Confira o conteúdo do arquivo e tente de novo."};
     } catch (e) { parsed = {rows: [], warnings: [], error: `Não foi possível ler o arquivo: ${e.message}`}; }
     update();
   }
