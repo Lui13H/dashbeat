@@ -448,7 +448,7 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .mdesc strong{color:var(--ink)}
 .drop{display:block;border-radius:14px;border:1.5px dashed rgba(110,231,183,.25);background:rgba(0,0,0,.25);transition:border-color .2s, background .2s}
 .drop.over{border-color:var(--mint);background:rgba(16,185,129,.08)}
-.drop textarea{display:block;width:100%;min-height:150px;resize:vertical;border:0;background:none;color:var(--ink);font:12.5px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;padding:14px;outline:none;tab-size:4;white-space:pre-wrap;word-break:break-word;overflow-x:hidden;overflow-y:auto}
+.drop textarea{display:block;width:100%;min-height:190px;resize:vertical;border:0;background:none;color:var(--ink);font:12.5px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;padding:14px;outline:none;tab-size:4;white-space:pre-wrap;word-break:break-word;overflow-x:hidden;overflow-y:auto}
 .imrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0}
 .file{position:relative;overflow:hidden}
 .file input{position:absolute;inset:0;opacity:0;cursor:pointer}
