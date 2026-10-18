@@ -1757,7 +1757,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
     if (an) parts.push(`${an} álbu${an > 1 ? "ns" : "m"}`);
     if (n) parts.push(faixas(n));
     const oauth = pn ? loadSpotifyOAuth() : null;
-    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.${pn ? "" : " Informe o Client ID e o Client Secret pra buscar música, artista, álbum, duração e lançamento direto no Spotify:"}`;
+    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.`;
     q("#sp-cc").style.display = pn ? "none" : "";
     q("#sp-login").style.display = pn && !oauth ? "" : "none";
     q("#sp-connected").style.display = pn && oauth ? "" : "none";
