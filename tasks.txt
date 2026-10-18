@@ -32,3 +32,28 @@ PLATAFORMA / INFRAESTRUTURA
 
 EXPORTAÇÃO
 - Exportar em CSV e JSON, além do TXT/Excel que já existem.
+
+❗ enquanto o site está aberto vai tocando as musicas em ordem aleatoria e o usuario pode pausar passar ou escolher qual tocar (se possivel)
+
+❗ ao adicionar uma nota musica vai ter um botão de tocar nova musica
+
+
+colocar a foto dos albuns com mais musicas no grafico de areas
+os nomes estão bugados nesse grafico, as vezes nao aparece
+
+em musicas no filtro atual, quero que apareça nessa ordem padrão ai que está só que apareça do em vez da # colocação apareça a quantidade de musicas que estão nesse filtro, tipo em vez de ir pulando por conta do numero da posição ele vai somando continuamente de 1 em 1 ate acabar a lista (lembrando, só nessa tabela)
+
+botão pra mostrar musicas com titulo parecido da mesma banda (sinal que está provavelmente duplicada)
+talvez o nome seria filtrar musicas duplicadas
+
+no modal de confirmação de remover musicas mostra a lista de quais são as musicas que serão removidas   
+
+✅ quando uma musica tiver varios artistas eu quero que não considere como um artista só com dois nomes, eu quero que a musica seja considerada como dos dois artistas presentes na composição
+
+tambem quero o botão de mostrar lista de covers que vai aparecer a lista de musicas que tem nomes parecidos e artistas diferentes
+
+ao adicionar musicas quero que o site analise se quais cards de painel e insights mudaram significaticamentes e apareçam com cores que se destaquem um pouco mais que os outros
+
+✅ se o carregamento de musicas travar por conta do limite de requisitadas, quero que o site avise e apareça um modal com 3 opções de botão: aguardar carregamento(não recomendado por não temos como calcular previsão de volta), ir com as que conseguiram carregar, cancelar adição (perder todo o pré save concluído das novas musicas) algo assim, veja uma maneira melhor de explicar cada botão e colocar nomes intuitivos neles
+
+✅ la na tela de tutoriais avise claramente que um é pra quem tem o spotify pago (não testado no pirada) e o outro é pra quem nao tem

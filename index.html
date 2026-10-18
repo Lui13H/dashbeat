@@ -88,12 +88,18 @@
 
         <!-- Tabs Navigation -->
         <div class="flex border-b border-base-300 mb-8 overflow-x-auto no-scrollbar">
-            <button onclick="switchTab('premium')" id="btn-premium" class="flex-1 py-4 px-6 text-center font-medium text-spotify border-b-2 border-spotify bg-spotify/5 transition-colors whitespace-nowrap outline-none focus:outline-none">
-                <span class="mr-2">⚡</span> Método Profissional (Premium) <span class="text-spotify">(Recomendado)</span>
-            </button>
-            <button onclick="switchTab('manual')" id="btn-manual" class="flex-1 py-4 px-6 text-center font-medium text-base-400 hover:text-white border-b-2 border-transparent hover:border-base-300 transition-colors whitespace-nowrap outline-none focus:outline-none">
-                <span class="mr-2">🤖</span> Método Manual (Gratuito/IA)
-            </button>
+            <div class="flex-1 flex flex-col">
+                <p class="text-xs sm:text-sm text-base-400 text-center px-2 pb-2"><strong class="text-white">Tem Spotify Premium (pago)?</strong> Use este método.</p>
+                <button onclick="switchTab('premium')" id="btn-premium" class="w-full py-4 px-6 text-center font-medium text-spotify border-b-2 border-spotify bg-spotify/5 transition-colors whitespace-nowrap outline-none focus:outline-none">
+                    <span class="mr-2">⚡</span> Método Profissional <span class="text-spotify">(Recomendado)</span>
+                </button>
+            </div>
+            <div class="flex-1 flex flex-col">
+                <p class="text-xs sm:text-sm text-base-400 text-center px-2 pb-2"><strong class="text-white">Não tem Spotify Premium?</strong> Use este método.</p>
+                <button onclick="switchTab('manual')" id="btn-manual" class="w-full py-4 px-6 text-center font-medium text-base-400 hover:text-white border-b-2 border-transparent hover:border-base-300 transition-colors whitespace-nowrap outline-none focus:outline-none">
+                    <span class="mr-2">🤖</span> Método Manual (Gratuito/IA)
+                </button>
+            </div>
         </div>
 
         <!-- Tab 1: Premium -->
@@ -102,7 +108,7 @@
 
                 <h3 class="text-xl font-bold mb-3 text-white">Como funciona?</h3>
                 <p class="text-base-400 leading-relaxed text-lg mb-6">
-                    Cole links de faixas ou álbuns do Spotify e a ferramenta busca os dados automaticamente, sem copiar textos ou usar outras IAs. Para uma <strong class="text-white">playlist inteira</strong>, copie o link de cada faixa na ordem certa (é rápido, veja como abaixo) e cole tudo de uma vez — mais lento que mandar só o link da playlist, mas ainda assim bem mais rápido que o método manual. Exige <strong class="text-white">Spotify Premium</strong> e um app criado gratuitamente no painel de desenvolvedor do Spotify.
+                    Cole links de faixas ou álbuns do Spotify e a ferramenta busca os dados automaticamente, sem copiar textos ou usar outras IAs. Para uma <strong class="text-white">playlist inteira</strong>, copie o link de cada faixa na ordem certa (é rápido, veja como abaixo) e cole tudo de uma vez. Exige <strong class="text-white">Spotify Premium</strong> e um app criado gratuitamente no painel de desenvolvedor do Spotify.
                 </p>
 
                 <button type="button" onclick="toggleDetails('premium')" id="toggle-premium-btn" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm mb-8 outline-none focus:outline-none">
@@ -124,7 +130,7 @@
                         <div class="bg-black/40 p-6 rounded-xl border border-base-300">
                             <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">⭐</span> Requisitos</h3>
                             <p class="text-base-400">
-                                Precisa de informações exclusivas de contas <strong>Spotify Premium</strong> (pago). A API necessita de permissões ativas para leitura avançada de catálogos.
+                                Precisa de informações exclusivas de contas <strong>Spotify Premium</strong> (pago). A API necessita de permissões ativas para leitura avançada de catálogos. Testado só com conta Premium oficial — <strong>não testamos com contas piratas/modificadas</strong>, então não garantimos que funcionem.
                             </p>
                         </div>
                         <div class="bg-black/40 p-6 rounded-xl border border-base-300">

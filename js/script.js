@@ -575,12 +575,30 @@ const fracWord = f => f >= .45 ? "quase metade" : f >= .3 ? "um terço" : f >= .
 const faixas = n => `${nf(n)} faixa${n === 1 ? "" : "s"}`;
 const yearsSpan = rs => { const ys = rs.map(r => r.year).filter(y => y !== NI); return ys.length ? [Math.min(...ys), Math.max(...ys)] : [null, null]; };
 const splitArtists = s => s.toLowerCase().split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/).map(x => x.trim()).filter(Boolean);
+const splitArtistsRaw = s => s.split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/i).map(x => x.trim()).filter(Boolean);
 
 /* ---------- statistics shared by all rules ---------- */
 const NOW_Y = new Date().getFullYear();
 const IS = (() => {
   const S = {N: NN};
-  S.art = [...groupBy(T, "artist")].map(([k, rs]) => ({k, rs: [...rs].sort((a, b) => a.n - b.n), c: rs.length})).sort((a, b) => b.c - a.c || coll.compare(a.k, b.k));
+  S.art = (() => {
+    /* uma faixa com vários artistas (ex.: "A, B") conta para A e para B, não para a dupla
+       como um artista só — por isso agrupamos pelos nomes já separados (splitArtists),
+       guardando a grafia mais comum de cada nome para exibição */
+    const m = new Map();
+    for (const t of T){
+      const parts = splitArtists(t.artist), raw = splitArtistsRaw(t.artist);
+      parts.forEach((p, i) => {
+        if (!m.has(p)) m.set(p, {rs: [], names: new Map()});
+        const e = m.get(p);
+        e.rs.push(t);
+        const disp = raw[i] || t.artist;
+        e.names.set(disp, (e.names.get(disp) || 0) + 1);
+      });
+    }
+    return [...m.values()].map(e => ({k: [...e.names].sort((a, b) => b[1] - a[1])[0][0], rs: [...e.rs].sort((a, b) => a.n - b.n), c: e.rs.length}))
+      .sort((a, b) => b.c - a.c || coll.compare(a.k, b.k));
+  })();
   S.artMap = new Map(S.art.map(a => [a.k, a]));
   S.alb = [...groupBy(T, "album")].map(([k, rs]) => ({k, rs, c: rs.length, sec: sum(rs, r => r.sec), artist: modeOf(rs, "artist").best || rs[0].artist})).sort((a, b) => b.c - a.c || coll.compare(a.k, b.k));
   S.dated = T.filter(t => t.year !== NI);
@@ -600,7 +618,13 @@ const IS = (() => {
     S.runs.push(cur); S.albRuns.push(ca);
   }
   S.runsSorted = [...S.runs].sort((a, b) => b.length - a.length || a[0].n - b[0].n);
-  S.collabsOf = name => S.art.filter(a => a.k !== name && splitArtists(a.k).includes(name.toLowerCase()));
+  S.collabsOf = name => {
+    /* como cada faixa já é atribuída a todos os artistas que a compõem (ver S.art acima),
+       "colaborador" agora é quem aparece junto em pelo menos uma faixa com vários artistas */
+    const nameLC = name.toLowerCase(), others = new Set();
+    for (const t of T){ const parts = splitArtists(t.artist); if (parts.length > 1 && parts.includes(nameLC)) parts.forEach(p => { if (p !== nameLC) others.add(p); }); }
+    return S.art.filter(a => others.has(a.k.toLowerCase()));
+  };
   S.journey = NN >= 30;
   S.chap = S.journey ? blocks(6) : [];
   return S;
@@ -1027,11 +1051,10 @@ function renderRecs(){
   if (IS.dated.length && IS.maxY - IS.minY >= 8){ const thr = Math.min(IS.maxY, NOW_Y) - 6, rec = IS.dated.filter(t => t.year >= thr); if (rec.length / N < .15){ const who = [...groupBy(rec, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]).slice(0, 3); cat.push(["Renovar com lançamentos recentes", `Só ${faixas(rec.length)} (${pc0(rec.length, N)}) foram lançadas de ${thr} em diante${who.length ? `, e ${sum(who, x => x[1])} delas são de ${listPt(who.map(x => x[0]))}` : ""}.`]); } }
   const singles = IS.art.filter(a => a.c === 1).length;
   if (singles >= 5) cat.push(["Aprofundar a cauda longa", `Há ${singles} artistas com uma faixa só. Testar 2 ou 3 faixas a mais dos que já têm aderência antes de buscar nomes novos.`]);
-  const jan1 = T.filter(t => /-01-01$/.test(t.date)).length, collabs = IS.art.filter(a => splitArtists(a.k).length > 1).length, missing = T.filter(t => t.artist === NI || t.album === NI || t.year === NI).length;
-  if (jan1 / N >= .05 || collabs || missing){
+  const jan1 = T.filter(t => /-01-01$/.test(t.date)).length, missing = T.filter(t => t.artist === NI || t.album === NI || t.year === NI).length;
+  if (jan1 / N >= .05 || missing){
     const bits = [];
     if (jan1 / N >= .05) bits.push(`${faixas(jan1)} estão datadas em 1º de janeiro, o que indica que só o ano é conhecido`);
-    if (collabs) bits.push(`${collabs} parceria${collabs > 1 ? "s aparecem" : " aparece"} como artista separado`);
     if (missing) bits.push(`${faixas(missing)} têm algum campo "Não identificado"`);
     cat.push(["Corrigir a base de dados", bits.join("; ").replace(/^./, c => c.toUpperCase()) + ". Padronizar antes de análises mais finas."]);
   }
@@ -1384,29 +1407,34 @@ async function spotifyFetchTracks(ids, token, onProgress, onWait){
      e só volta a diminuir depois de uma faixa bem-sucedida. */
   const rows = [], warnings = [];
   let backoff = 0, attempt = 0;
-  for (let i = 0; i < ids.length; i++){
-    const id = ids[i];
-    for (let tries = 0; ; tries++){
-      let r; try { r = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {headers: {Authorization: `Bearer ${token}`}}); }
-      catch (e) { throw new Error("Não foi possível buscar as faixas no Spotify."); }
-      if (r.status === 429){
-        attempt++;
-        if (attempt > 40) throw new Error("O Spotify manteve o limite de requisições por tempo demais seguidas; tente de novo em alguns minutos.");
-        const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
-        backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
-        const wait = Math.max(1, Math.round(backoff));
-        onWait && await onWait(wait, i, ids.length, attempt);
-        continue;
+  try {
+    for (let i = 0; i < ids.length; i++){
+      const id = ids[i];
+      for (let tries = 0; ; tries++){
+        let r; try { r = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {headers: {Authorization: `Bearer ${token}`}}); }
+        catch (e) { throw new Error("Não foi possível buscar as faixas no Spotify."); }
+        if (r.status === 429){
+          attempt++;
+          if (attempt > 40) throw new Error("O Spotify manteve o limite de requisições por tempo demais seguidas; tente de novo em alguns minutos.");
+          const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
+          backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
+          const wait = Math.max(1, Math.round(backoff));
+          onWait && await onWait(wait, i, ids.length, attempt);
+          continue;
+        }
+        backoff = Math.max(0, backoff - 3); attempt = 0;
+        if (r.status === 404){ warnings.push({line: i + 1, msg: `faixa ${id} não encontrada no Spotify`}); onProgress && onProgress(i + 1, ids.length); break; }
+        if (r.status === 403) throw new Error("Spotify recusou o acesso (HTTP 403). Confira se a conta dona do app tem Spotify Premium (exigido para apps em modo de desenvolvimento) e se o Client ID/Secret estão corretos.");
+        if (!r.ok) throw new Error(`Falha ao buscar faixas no Spotify (HTTP ${r.status}).`);
+        const t = await r.json();
+        rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album)});
+        onProgress && onProgress(i + 1, ids.length);
+        break;
       }
-      backoff = Math.max(0, backoff - 3); attempt = 0;
-      if (r.status === 404){ warnings.push({line: i + 1, msg: `faixa ${id} não encontrada no Spotify`}); onProgress && onProgress(i + 1, ids.length); break; }
-      if (r.status === 403) throw new Error("Spotify recusou o acesso (HTTP 403). Confira se a conta dona do app tem Spotify Premium (exigido para apps em modo de desenvolvimento) e se o Client ID/Secret estão corretos.");
-      if (!r.ok) throw new Error(`Falha ao buscar faixas no Spotify (HTTP ${r.status}).`);
-      const t = await r.json();
-      rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album)});
-      onProgress && onProgress(i + 1, ids.length);
-      break;
     }
+  } catch (e) {
+    if (e && e.keepPartial) return {rows, warnings, partial: true};
+    throw e;
   }
   return {rows, warnings};
 }
@@ -1415,43 +1443,48 @@ async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait){
      já devolve o nome/data do álbum junto com a primeira página de faixas numa única chamada */
   const rows = [], warnings = [];
   let backoff = 0, attempt = 0;
-  for (let ai = 0; ai < albumIds.length; ai++){
-    const id = albumIds[ai];
-    let url = `https://api.spotify.com/v1/albums/${id}?limit=50`, first = true;
-    let albumName = "", albumDate = "", total = Infinity, got = 0;
-    while (url){
-      let r;
-      for (;;){
-        try { r = await fetch(url, {headers: {Authorization: `Bearer ${token}`}}); }
-        catch (e) { throw new Error("Não foi possível buscar o álbum no Spotify."); }
-        if (r.status === 429){
-          attempt++;
-          if (attempt > 40) throw new Error("O Spotify manteve o limite de requisições por tempo demais seguidas; tente de novo em alguns minutos.");
-          const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
-          backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
-          const wait = Math.max(1, Math.round(backoff));
-          onWait && await onWait(wait, rows.length, total === Infinity ? rows.length : total, attempt);
-          continue;
+  try {
+    for (let ai = 0; ai < albumIds.length; ai++){
+      const id = albumIds[ai];
+      let url = `https://api.spotify.com/v1/albums/${id}?limit=50`, first = true;
+      let albumName = "", albumDate = "", total = Infinity, got = 0;
+      while (url){
+        let r;
+        for (;;){
+          try { r = await fetch(url, {headers: {Authorization: `Bearer ${token}`}}); }
+          catch (e) { throw new Error("Não foi possível buscar o álbum no Spotify."); }
+          if (r.status === 429){
+            attempt++;
+            if (attempt > 40) throw new Error("O Spotify manteve o limite de requisições por tempo demais seguidas; tente de novo em alguns minutos.");
+            const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
+            backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
+            const wait = Math.max(1, Math.round(backoff));
+            onWait && await onWait(wait, rows.length, total === Infinity ? rows.length : total, attempt);
+            continue;
+          }
+          backoff = Math.max(0, backoff - 3); attempt = 0;
+          if (r.status === 404) throw new Error("Álbum não encontrado (verifique o link).");
+          if (r.status === 403) throw new Error("Spotify recusou o acesso ao álbum (HTTP 403).");
+          if (!r.ok) throw new Error(`Falha ao buscar o álbum no Spotify (HTTP ${r.status}).`);
+          break;
         }
-        backoff = Math.max(0, backoff - 3); attempt = 0;
-        if (r.status === 404) throw new Error("Álbum não encontrado (verifique o link).");
-        if (r.status === 403) throw new Error("Spotify recusou o acesso ao álbum (HTTP 403).");
-        if (!r.ok) throw new Error(`Falha ao buscar o álbum no Spotify (HTTP ${r.status}).`);
-        break;
+        const j = await r.json();
+        const page = first ? j.tracks : j;
+        if (first){ albumName = j.name || ""; albumDate = spotifyDate({release_date: j.release_date}); }
+        total = typeof page.total === "number" ? page.total : got + (page.items || []).length;
+        for (const t of (page.items || [])){
+          if (!t) continue;
+          rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: albumName, sec: Math.round(t.duration_ms / 1000), date: albumDate});
+        }
+        got += (page.items || []).length;
+        url = page.next || null;
+        first = false;
+        onProgress && onProgress(Math.min(got, total), total, ai + 1, albumIds.length);
       }
-      const j = await r.json();
-      const page = first ? j.tracks : j;
-      if (first){ albumName = j.name || ""; albumDate = spotifyDate({release_date: j.release_date}); }
-      total = typeof page.total === "number" ? page.total : got + (page.items || []).length;
-      for (const t of (page.items || [])){
-        if (!t) continue;
-        rows.push({n: null, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: albumName, sec: Math.round(t.duration_ms / 1000), date: albumDate});
-      }
-      got += (page.items || []).length;
-      url = page.next || null;
-      first = false;
-      onProgress && onProgress(Math.min(got, total), total, ai + 1, albumIds.length);
     }
+  } catch (e) {
+    if (e && e.keepPartial) return {rows, warnings, partial: true};
+    throw e;
   }
   return {rows, warnings};
 }
@@ -1485,6 +1518,33 @@ function openPlaylistLinkHelp(){
     size: "sm"
   });
 }
+function openRateLimitModal({done, total, attempt}){
+  /* só aparece depois de algumas tentativas seguidas (não a cada 429 isolado, que é normal
+     e resolve em poucos segundos) — e volta a aparecer periodicamente se continuar travado,
+     caso a pessoa escolha "continuar esperando" e o bloqueio persista. */
+  return new Promise(res => {
+    let decided = false;
+    const foot = document.createElement("div"); foot.className = "mfrow"; foot.style.flexWrap = "wrap";
+    foot.innerHTML = `<button class="gbtn" type="button" data-cancel>Cancelar e descartar tudo</button><span class="sp"></span><button class="gbtn" type="button" data-keep>Usar só o que já carregou</button><button class="pbtn" type="button" data-wait autofocus>Continuar esperando</button>`;
+    const md = openModal({
+      title: "O Spotify está limitando os pedidos",
+      body: `<div class="confirm">
+          <p>Depois de ${attempt} tentativas seguidas, o Spotify continua pedindo espera antes de liberar a próxima faixa (faixa ${done + 1} de ${total}). Isso é comum em listas grandes e pode levar vários minutos para passar — não tem como saber o tempo exato.</p>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
+            <div><strong>Continuar esperando</strong><br><span class="muted">Não recomendado em listas grandes: a ferramenta mantém tentando sozinha, sem previsão de quanto tempo ainda falta.</span></div>
+            <div><strong>Usar só o que já carregou</strong><br><span class="muted">Para agora e importa só as ${done} faixa${done === 1 ? "" : "s"} já buscadas; as outras ${total - done} ficam de fora (pode tentar importá-las depois, à parte).</span></div>
+            <div><strong>Cancelar e descartar tudo</strong><br><span class="muted">Cancela a importação inteira — nem as faixas que já carregaram são adicionadas.</span></div>
+          </div>
+        </div>`,
+      foot, size: "sm",
+      onClose: () => { if (!decided) res("wait"); }
+    });
+    const pick = v => { decided = true; md.close(); res(v); };
+    foot.querySelector("[data-wait]").onclick = () => pick("wait");
+    foot.querySelector("[data-keep]").onclick = () => pick("keep");
+    foot.querySelector("[data-cancel]").onclick = () => pick("cancel");
+  });
+}
 async function spotifyRunFetch({token, ids, albumIds, status, btn}){
   status.classList.remove("err");
   btn.disabled = true;
@@ -1492,18 +1552,27 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn}){
   /* cronômetro: sempre recalcula o restante a partir de "quando deve terminar" (timestamp real),
      em vez de só subtrair 1s por tick — assim não trava/atrasa mesmo se o navegador atrasar
      o timer (ex.: aba em segundo plano) */
-  let t0 = performance.now(), done = 0, total = 1, etaEndTs = null, waitEndTs = null, waitTotalSecs = null, waitAttempt = 0, tick = null;
+  let t0 = performance.now(), done = 0, total = 1, etaEndTs = null, waitEndTs = null, waitAttempt = 0, tick = null;
   const fmtEta = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${pad2(s % 60)}`; };
   const render = () => {
     if (waitEndTs != null){
-      status.textContent = `Spotify pediu ${waitTotalSecs}s de espera (limite de requisições${waitAttempt > 1 ? `, tentativa ${waitAttempt}` : ""}) · retomando em ${fmtEta(waitEndTs - performance.now())} (faixa ${done + 1} de ${total})…`;
+      status.textContent = `Spotify pediu espera por limite de requisições${waitAttempt > 1 ? ` (tentativa ${waitAttempt})` : ""} — aguardando para tentar de novo (faixa ${done + 1} de ${total})…`;
       return;
     }
     status.textContent = `Buscando faixa ${done} de ${total}…${etaEndTs != null ? ` cerca de ${fmtEta(etaEndTs - performance.now())} restante` : ""}`;
   };
   const startTick = () => { clearInterval(tick); tick = setInterval(render, 1000); };
-  const onWait = (secs, i, t, attempt) => {
-    done = i; total = t; waitTotalSecs = secs; waitAttempt = attempt; waitEndTs = performance.now() + secs * 1000;
+  const onWait = async (secs, i, t, attempt) => {
+    done = i; total = t;
+    const shouldPrompt = attempt === 3 || (attempt > 3 && (attempt - 3) % 5 === 0);
+    if (shouldPrompt){
+      clearInterval(tick);
+      const decision = await openRateLimitModal({done: i, total: t, attempt});
+      startTick();
+      if (decision === "keep"){ const e = new Error("keep"); e.keepPartial = true; throw e; }
+      if (decision === "cancel"){ const e = new Error("Importação cancelada: nenhuma música foi adicionada."); e.cancelled = true; throw e; }
+    }
+    waitAttempt = attempt; waitEndTs = performance.now() + secs * 1000;
     render();
     return new Promise(res => { const left = waitEndTs - performance.now(); setTimeout(() => { waitEndTs = null; res(); }, Math.max(0, left)); });
   };
@@ -1518,7 +1587,8 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn}){
         status.textContent = `Buscando faixa ${done} de ${total}${an > 1 ? ` (álbum ${ai} de ${an})` : ""}…${etaEndTs != null ? ` cerca de ${fmtEta(etaEndTs - performance.now())} restante` : ""}`;
       }, onWait));
     }
-    if (ids.length){
+    const stoppedEarly = results.length && results[results.length - 1].partial;
+    if (ids.length && !stoppedEarly){
       const base = results.reduce((s, r) => s + r.rows.length + r.warnings.length, 0);
       results.push(await spotifyFetchTracks(ids, token, (d, t) => {
         done = base + d; total = base + t;
@@ -1528,11 +1598,15 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn}){
     }
     clearInterval(tick);
     const rows = results.flatMap(r => r.rows), warnings = results.flatMap(r => r.warnings);
+    const partial = results.some(r => r.partial);
     if (!rows.length){ status.classList.add("err"); status.textContent = "Nenhuma faixa encontrada."; return null; }
-    status.textContent = `${faixas(rows.length)} encontrada${rows.length > 1 ? "s" : ""}${warnings.length ? ` · ${warnings.length} não encontrada(s)` : ""}.`;
+    status.textContent = partial
+      ? `${faixas(rows.length)} encontrada${rows.length > 1 ? "s" : ""} até você parar o carregamento${warnings.length ? ` · ${warnings.length} não encontrada(s)` : ""}.`
+      : `${faixas(rows.length)} encontrada${rows.length > 1 ? "s" : ""}${warnings.length ? ` · ${warnings.length} não encontrada(s)` : ""}.`;
     return {rows, warnings};
   } catch (e) {
     clearInterval(tick);
+    if (e.cancelled){ status.textContent = e.message; return null; }
     status.classList.add("err"); status.textContent = e.message || "Erro ao buscar no Spotify.";
     return null;
   } finally { btn.disabled = false; }
