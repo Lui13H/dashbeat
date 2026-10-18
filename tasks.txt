@@ -7,13 +7,21 @@ CONCLUÍDO
 ✅ Quando uma música tem vários artistas, cada um conta separadamente nas estatísticas e insights (não mais como um "artista" combinado com dois nomes).
 ✅ Modal com 3 opções (continuar esperando / usar só o que já carregou / cancelar e descartar tudo) quando o Spotify travar a importação por limite de requisições.
 ✅ Tela de tutoriais avisa claramente qual método exige Spotify Premium (pago) e qual não exige.
-✅ Corrige nomes que não apareciam no gráfico de áreas (banda/artista) quando o espaço era pequeno — agora trunca com "…" em vez de esconder.
+✅ Gráfico de áreas: nome da banda só aparece se couber inteiro numa linha; senão o bloco mostra só a capa.
 ✅ Posicionar "Não sei meu ID" e "Por que isso?" embaixo dos inputs de credenciais do Spotify.
+✅ Capa do álbum com mais músicas de cada artista como fundo do bloco no gráfico de áreas (via busca pública da Apple, sem login; se não achar o álbum, usa o mais popular do artista).
+✅ Botão "Ver todas as músicas que serão apagadas" no modal de confirmação de remover músicas.
 ✅ Assistente em 3 passos pra criar o app no Spotify e pegar Client ID/Secret (com botões de copiar, checagem do formato e teste com o Spotify, já preenchendo os campos). Criar o app só com o login não dá: o Spotify não tem API pra isso.
+✅ Importação por link guarda todos os dados que vêm de graça na resposta do Spotify (explícita, álbum/single/coletânea, popularidade se vier, capa) — sem nenhum pedido a mais.
+✅ Gênero musical: interruptor na importação "Buscar gênero musical" (1 busca a mais por artista novo, não por música; começa ligado). Gráfico "Músicas por gênero" com filtro por gênero (clique).
+✅ Botão "Atualizar dados" no topo do painel: completa as músicas antigas sem dados (1 busca por música, procurando pelo nome) e os artistas sem gênero (1 busca por artista); confirmação mostra as contas e a lista das músicas incompletas, e dá pra parar no meio sem perder o que veio.
+✅ Card "Como são as faixas" (explícitas, de onde vêm, popularidade) e 5 insights novos: palavrão, álbum x single, hits x lado B, gênero dominante e gênero que cresceu na playlist. Exportação em Excel ganhou essas colunas; o TXT guarda tudo pra reimportar.
+✅ Gênero de reserva pela Apple (sem login, não gasta o Spotify): aparece em gráficos, tabelas, filtro e insights enquanto o artista não tem gênero do Spotify — mas a música continua contando como "sem gênero" pro botão Atualizar dados, e o do Spotify (mais detalhado) substitui quando vier.
+✅ Todas as tabelas de músicas mostram as mesmas colunas, por ordem de importância: # · Música · Artista · Álbum · Gênero · Lançamento · Duração · Popularidade · Explícita · Tipo ("—" = dado que falta; ordenar joga esses pro fim).
+✅ Tabela "Músicas no filtro atual" agora numera sequencialmente de 1 em 1 (1 a N) em vez de exibir a colocação global pulada.
 
 IMPORTAÇÃO / SPOTIFY
 - Importar direto de outras plataformas: YouTube Music, Apple Music, Deezer.
-- Puxar o gênero musical de cada artista via API do Spotify e usar isso nos gráficos/filtros.
 - Importar a capa do álbum e exibir nas tabelas/tooltips.
 - Botão para reautenticar automaticamente quando o refresh token expirar/for revogado, em vez de só dar erro.
 
@@ -28,7 +36,6 @@ DASHBOARD / VISUALIZAÇÕES
 - Busca por nome de faixa (hoje os filtros são só por banda e álbum).
 - Prévia de 30s da música (quando disponível na API) ao passar o mouse/tocar na faixa.
 - Comparar duas playlists lado a lado (ex.: antes/depois de um período).
-- Gráfico de gêneros musicais, se os dados de gênero forem importados.
 
 PLATAFORMA / INFRAESTRUTURA
 - Deixar o painel instalável como PWA (ícone, abre offline com os dados já salvos).
@@ -39,24 +46,38 @@ PLATAFORMA / INFRAESTRUTURA
 EXPORTAÇÃO
 - Exportar em CSV e JSON, além do TXT/Excel que já existem.
 
-❗ enquanto o site está aberto vai tocando as musicas em ordem aleatoria e o usuario pode pausar passar ou escolher qual tocar (se possivel)
+DADOS DE FORA DO SPOTIFY (sem gastar o limite dele)
+- Apple (sem login): prévia de 30s de cada música (previewUrl, testado: toca normal no navegador) → player com fila aleatória, botão de tocar em cada linha da tabela, "ouvir" ao passar o mouse no gráfico.
+- Apple (sem login): explícita e álbum/single como reserva pra quem não tem Spotify — mesma ideia do gênero de reserva (aparece nos cálculos, mas continua "faltando" pro Atualizar dados).
+- MusicBrainz (sem login, 1 busca/seg): país de origem e ano de formação de cada banda, banda ou artista solo → "mapa musical" (bandas por país), "você ouve banda veterana ou novata", idade da banda quando lançou a música.
+- Wikidata (sem login): se a banda ainda existe ou já acabou, nº de integrantes → "X% das suas bandas já acabaram"; reserva quando o MusicBrainz não tiver o artista.
+- Last.fm (precisa de chave grátis): quantas pessoas ouvem cada música/artista no mundo → "mainstream ou lado B" de verdade, já que o Spotify não está mandando popularidade; tags de estilo bem ricas.
+- Letras (lyrics.ovh, sem login): idioma das músicas e palavras mais repetidas da playlist → "sua playlist é X% em inglês", nuvem de palavras. Cuidado: letra tem direito autoral, usar só pra estatística, sem exibir a letra.
+- Setlist.fm (precisa de chave grátis): quantas vezes cada música já foi tocada ao vivo → "suas músicas são hinos de show ou lados B que a banda nunca toca?".
 
-❗ ao adicionar uma nota musica vai ter um botão de tocar nova musica
+enquanto o site está aberto vai tocando as musicas em ordem aleatoria e o usuario pode pausar passar ou escolher qual tocar (se possivel)
+→ agora possível: só a prévia de 30s de cada música (Apple), não a música inteira
+
+ao adicionar uma nota musica vai ter um botão de tocar nova musica
+→ agora possível: mesma prévia de 30s da Apple
 
 
-colocar a foto dos albuns com mais musicas no grafico de areas
-
-em musicas no filtro atual, quero que apareça nessa ordem padrão ai que está só que apareça do em vez da # colocação apareça a quantidade de musicas que estão nesse filtro, tipo em vez de ir pulando por conta do numero da posição ele vai somando continuamente de 1 em 1 ate acabar a lista (lembrando, só nessa tabela)
 
 botão pra mostrar musicas com titulo parecido da mesma banda (sinal que está provavelmente duplicada)
 talvez o nome seria filtrar musicas duplicadas
-
-no modal de confirmação de remover musicas mostra a lista de quais são as musicas que serão removidas
 
 tambem quero o botão de mostrar lista de covers que vai aparecer a lista de musicas que tem nomes parecidos e artistas diferentes
 
 ao adicionar musicas quero que o site analise se quais cards de painel e insights mudaram significaticamentes e apareçam com cores que se destaquem um pouco mais que os outros
 
-quero que na tela normal de insights 
+quero que na tela normal de insights apareça só os mais intuitivos e não os complexos, daí tenha um botão lá em cima de habilitar insights tecnicos que desbloqueia e voce consegue ver os menos intuitivos caso queira
 
 testar se alterando a ordem da playlist pelos 3 tracinhos e não pelo ordenador em cima da coluna, não é possível finalmente adicionar as musicas só colando o link da playlist
+
+no duração por album quero que por padrão venha ordenado e o grafico de barras também leve isso em consideração -> quero que venha por padrão ordenado do que tem mais musicas pro menos e com um botão em cima de ordenar por minutagem pra ficar meio que alternando entre ordenar por minutagem ou por contagem
+
+quero que apareça um grafico de linhas da evolução das bandas com o x sendo a ordem de adição e o y seja a quantidade de musicas por banda e ai cada banda tenha a sua linha ao mesmo tempo no mesmo grafico com o usuario podendo mexer em quais linhas irão aparecer, copie essa função de poder mexer no grafico lá do meu site do pro clubs, varios graficos tem essa opção. quero além desse ai, apareça um desse só que de genero também
+
+quero que no final da pagina dos paineis apareça um botão de visualizar inssights
+
+quero que o grafico linha do tempo também seja uma forma de aplicar um filtro por ele clicando nas colunas de dados

@@ -20,10 +20,52 @@ const STORE = readStore();
 const RAW = STORE ? STORE.rows : DEFAULT_RAW;
 const NI = "Não identificado";
 const coll = new Intl.Collator("pt-BR", {sensitivity: "base", numeric: true});
-const T = RAW.map(([n, title, artist, album, sec, date]) => ({
-  n, title, artist: (artist || "").trim() || NI, album: (album || "").trim() || NI,
-  sec: sec, date: date || "", year: date ? +date.slice(0, 4) : NI
-}));
+const splitArtists = s => s.toLowerCase().split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/).map(x => x.trim()).filter(Boolean);
+const splitArtistsRaw = s => s.split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/i).map(x => x.trim()).filter(Boolean);
+/* gênero é do artista (não da faixa) no Spotify: um mapa nome-do-artista (minúsculo) → gêneros,
+   guardado à parte da playlist porque vale pra qualquer lista. [] = pesquisado e sem gênero */
+const GENRE_KEY = "catalogo-musical:genres";
+const GENRES = (() => { try { return JSON.parse(localStorage.getItem(GENRE_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveGenres = () => { try { localStorage.setItem(GENRE_KEY, JSON.stringify(GENRES)); } catch (e) {} };
+const hasGenre = k => Object.prototype.hasOwnProperty.call(GENRES, k) && Array.isArray(GENRES[k]);
+function genresOf(artist){
+  if (artist === NI) return [];
+  const parts = splitArtists(artist), out = new Set();
+  for (const p of parts){ if (!hasGenre(p)) return null; GENRES[p].forEach(g => out.add(g)); }   // null = falta pesquisar algum artista da faixa
+  return [...out];
+}
+/* gênero "de reserva" da Apple (sem login, não gasta o limite do Spotify). Só pra exibir e calcular:
+   a música continua "sem gênero" (t.gs) até buscar no Spotify — o gênero de lá é mais detalhado */
+const AGENRE_KEY = "catalogo-musical:genres-apple";
+const AGENRES = (() => { try { return JSON.parse(localStorage.getItem(AGENRE_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveAGenres = () => { try { localStorage.setItem(AGENRE_KEY, JSON.stringify(AGENRES)); } catch (e) {} };
+const spotifyHas = p => hasGenre(p) && GENRES[p].length > 0;
+// gênero que aparece: o do Spotify quando existe, senão o da Apple (por artista da faixa)
+function shownGenres(artist){
+  if (artist === NI) return [];
+  const out = new Set(); let any = false;
+  for (const p of splitArtists(artist)){
+    const g = spotifyHas(p) ? GENRES[p] : Array.isArray(AGENRES[p]) ? AGENRES[p] : null;
+    if (g){ any = true; g.forEach(x => out.add(x)); }
+  }
+  return any ? [...out] : null;
+}
+/* coluna 7 (opcional): dados extras que vêm de graça na resposta do Spotify —
+   x explícita (0/1) · ty tipo do lançamento (album/single/compilation) · tn nº da faixa no álbum ·
+   tt total de faixas do álbum · p popularidade 0–100 · aid IDs dos artistas */
+const TYPE_PT = {album: "Álbum", single: "Single/EP", compilation: "Coletânea"};
+// campos planos (pra tabelas e ordenação); null/"" = dado que não existe pra essa música
+function extraProps(m, gs){
+  const ok = !!(m && m.x !== undefined);
+  return {genre: gs && gs.length ? gs.join(", ") : "", pop: ok && typeof m.p === "number" ? m.p : null, ex: ok ? m.x : null,
+    ty: ok && m.ty || ""};
+}
+const T = RAW.map(([n, title, artist, album, sec, date, meta]) => {
+  const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
+  // gs = gênero do Spotify (null = falta buscar) · ge = gênero exibido/calculado (Spotify ou, na falta, Apple)
+  return {n, title, artist: a, album: (album || "").trim() || NI,
+    sec: sec, date: date || "", year: date ? +date.slice(0, 4) : NI, m, gs, ge, ...extraProps(m, ge)};
+});
 const ALL_BANDS = [...new Set(T.map(t => t.artist))].sort(niLast);
 const ALL_ALBUMS = [...new Set(T.map(t => t.album))].sort(niLast);
 const ALL_YEARS = [...new Set(T.map(t => t.year))].sort((a, b) => a === NI ? 1 : b === NI ? -1 : a - b);
@@ -33,7 +75,7 @@ for (const t of T){
   (bandAlbums.get(t.artist) || bandAlbums.set(t.artist, new Set()).get(t.artist)).add(t.album);
   (albumBands.get(t.album) || albumBands.set(t.album, new Set()).get(t.album)).add(t.artist);
 }
-const state = {bands: new Set(), albums: new Set()};
+const state = {bands: new Set(), albums: new Set(), genres: new Set()};
 const $ = s => document.querySelector(s);
 const fmtInt = n => n.toLocaleString("pt-BR");
 const pct = (a, b, d = 1) => (b ? (100 * a / b) : 0).toLocaleString("pt-BR", {minimumFractionDigits: d, maximumFractionDigits: d}) + "%";
@@ -47,9 +89,10 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", 
 function groupBy(rows, key){ const m = new Map(); for (const r of rows){ const k = r[key]; (m.get(k) || m.set(k, []).get(k)).push(r); } return m; }
 const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
 
-function rows(useBand = true, useAlbum = true){
+function rows(useBand = true, useAlbum = true, useGenre = true){
   return T.filter(t => (!useBand || !state.bands.size || state.bands.has(t.artist)) &&
-                       (!useAlbum || !state.albums.size || state.albums.has(t.album)));
+                       (!useAlbum || !state.albums.size || state.albums.has(t.album)) &&
+                       (!useGenre || !state.genres.size || (t.ge && t.ge.some(g => state.genres.has(g)))));
 }
 const bandEnabled = b => !state.albums.size || [...bandAlbums.get(b)].some(a => state.albums.has(a));
 const albumEnabled = a => !state.bands.size || [...albumBands.get(a)].some(b => state.bands.has(b));
@@ -131,6 +174,11 @@ document.addEventListener("keydown", e => { if (e.key === "Escape"){ document.bo
 const MS = {band: buildMS($("#ms-band"), "Banda/Artista", ALL_BANDS, "band"), album: buildMS($("#ms-album"), "Álbum", ALL_ALBUMS, "album")};
 
 function toggle(kind, v){
+  if (kind === "genre"){
+    if (state.genres.has(v)) state.genres.delete(v); else state.genres.add(v);
+    if (!rows().length){ state.genres.delete(v); toast("Nenhuma faixa desse gênero no recorte atual"); }
+    render(); return;
+  }
   const set = kind === "band" ? state.bands : state.albums;
   const enabled = kind === "band" ? bandEnabled(v) : albumEnabled(v);
   if (set.has(v)) set.delete(v);
@@ -145,7 +193,7 @@ function toggle(kind, v){
   }
   render();
 }
-function clearAll(){ state.bands.clear(); state.albums.clear(); render(); }
+function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); render(); }
 $("#clear").addEventListener("click", clearAll);
 $("#empty-clear").addEventListener("click", clearAll);
 
@@ -167,7 +215,7 @@ function renderFilters(){
     ms.foot.textContent = `${avail} de ${ms.els.size} disponíveis${set.size ? ` · ${set.size} selecionado${set.size > 1 ? "s" : ""}` : ""}`;
   }
   const chips = $("#chips"); chips.innerHTML = "";
-  for (const [kind, set, tag] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"]]){
+  for (const [kind, set, tag] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"], ["genre", state.genres, "Gênero"]]){
     for (const v of set){
       const c = document.createElement("button");
       c.className = "chip"; c.type = "button"; c.setAttribute("aria-label", `Remover ${v}`);
@@ -176,7 +224,7 @@ function renderFilters(){
       chips.appendChild(c);
     }
   }
-  $("#clear").classList.toggle("on", state.bands.size + state.albums.size > 0);
+  $("#clear").classList.toggle("on", state.bands.size + state.albums.size + state.genres.size > 0);
 }
 
 /* ---------------- text fitting (never break inside a word) ---------------- */
@@ -187,6 +235,14 @@ function fitsAt(text, size, font, weight, width, maxLines, ls = "-.03em"){
   measurer.style.font = `${weight} ${size}px ${font}`; measurer.style.width = width + "px"; measurer.style.letterSpacing = ls;
   measurer.textContent = text;
   return measurer.scrollWidth <= width + .5 && measurer.offsetHeight <= size * 1.05 * maxLines + 1;
+}
+function fitsOneLine(text, size, font, weight, width, ls){
+  measurer.style.font = `${weight} ${size}px ${font}`; measurer.style.letterSpacing = ls;
+  measurer.style.width = "auto"; measurer.style.whiteSpace = "nowrap";
+  measurer.textContent = text;
+  const ok = measurer.scrollWidth <= width + .5;
+  measurer.style.whiteSpace = "";
+  return ok;
 }
 function fitKpiText(el, text){
   const w = el.clientWidth, cs = getComputedStyle(el);
@@ -366,6 +422,129 @@ function tileTip(b){
     <div class="eyebrow">Álbuns que mais contribuem</div>
     ${sbars(albs.slice(0, 3).map(([a, c]) => [a, `${c} faixa${c > 1 ? "s" : ""}`, c / R.length]))}`;
 }
+/* capas via iTunes Search (público, sem login). A Apple aceita ~20 pedidos/min, então a fila
+   vai devagar e tudo fica guardado no navegador — inclusive "sem capa" (null), pra não repetir */
+const COVER_KEY = "catalogo-musical:covers:v2";   // v2 descarta os "sem capa" gravados antes de existir o fallback por discografia
+const COVER_MISS_TTL = 7 * 24 * 3600 * 1000;       // "sem capa" expira: a Apple pode passar a ter o álbum
+const COVERS = (() => {
+  try { localStorage.removeItem("catalogo-musical:covers"); } catch (e) {}
+  let c = {}; try { c = JSON.parse(localStorage.getItem(COVER_KEY) || "null") || {}; } catch (e) {}
+  for (const k in c) if (c[k] && typeof c[k] === "object" && Date.now() - c[k].miss > COVER_MISS_TTL) delete c[k];
+  return c;
+})();
+const coverOf = k => typeof COVERS[k] === "string" ? COVERS[k] : null;
+const saveCovers = () => { try { localStorage.setItem(COVER_KEY, JSON.stringify(COVERS)); } catch (e) {} };
+const spotifyCover = imgs => { const u = imgs && imgs[0] && imgs[0].url; return u && /^https:\/\/[^"'()\s]+$/.test(u) ? u : null; };   // [0] é a maior (640px)
+/* a capa do Spotify é exatamente a edição que a pessoa tem na playlist (a Apple às vezes só
+   tem outra edição, com outra arte) — então ela sempre vence a da Apple */
+function rememberSpotifyCovers(rows){
+  let changed = false;
+  for (const r of rows){
+    if (!r.cover) continue;
+    const key = ((r.artist || "").trim() || NI) + "|" + ((r.album || "").trim() || NI);
+    if (COVERS[key] !== r.cover){ COVERS[key] = r.cover; changed = true; }
+  }
+  if (changed) saveCovers();
+}
+const coverQueue = [], coverWaiting = new Map();
+let coverBusy = false;
+const normC = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s*[([].*?[)\]]/g, "").replace(/\s+-\s+.*$/, "").replace(/[^a-z0-9]+/g, " ").trim();
+function pickCover(results, artist, album){
+  const a = normC(artist), al = normC(album);
+  const sameArtist = results.filter(r => { const ra = normC(r.artistName || ""); return ra && (ra.includes(a) || a.includes(ra)); });
+  const score = r => { const c = normC(r.collectionName || ""); return c === al ? 3 : c.includes(al) || al.includes(c) ? 2 : 0; };
+  const best = sameArtist.map(r => [r, score(r)]).filter(x => x[1]).sort((x, y) => y[1] - x[1])[0];
+  return best ? artUrl(best[0]) : null;
+}
+function artUrl(r){
+  const url = r && r.artworkUrl100 ? r.artworkUrl100.replace(/\/\d+x\d+bb\./, "/600x600bb.") : null;
+  return url && /^https:\/\/[^"'()\s]+$/.test(url) ? url : null;
+}
+const coverSleep = ms => new Promise(res => setTimeout(res, ms));
+async function itunes(path){
+  const r = await fetch("https://itunes.apple.com/" + path);
+  if (!r.ok) throw new Error("itunes " + r.status);
+  return (await r.json()).results || [];
+}
+/* 1) álbum exato; 2) álbum na discografia do artista (a busca simples não acha alguns álbuns
+   que o lookup por artista acha); 3) o álbum mais popular dele — o lookup vem por popularidade,
+   e pulamos coletâneas/ao vivo/singles pra cair num disco "de verdade" */
+async function fetchCover(artist, album){
+  const main = splitArtistsRaw(artist)[0];
+  let url = pickCover(await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(main + " " + album)}`), main, album);
+  if (url) return url;
+  await coverSleep(3200);
+  const who = (await itunes(`search?entity=musicArtist&limit=5&term=${encodeURIComponent(main)}`)).find(r => normC(r.artistName || "") === normC(main));
+  if (!who) return null;
+  await coverSleep(3200);
+  const albums = (await itunes(`lookup?id=${who.artistId}&entity=album&limit=50`)).filter(r => r.wrapperType === "collection");
+  url = pickCover(albums, main, album);
+  if (url) return url;
+  const skip = /\b(best of|greatest|hits|collection|anthology|live|ao vivo|essentials?)\b|- (single|ep)$/i;
+  return artUrl(albums.find(r => !skip.test(r.collectionName || "")) || albums[0]);
+}
+function getCover(artist, album, cb){
+  const key = artist + "|" + album;
+  if (key in COVERS){ cb(coverOf(key)); return; }
+  if (!coverWaiting.has(key)){ coverWaiting.set(key, []); coverQueue.push([key, artist, album]); }
+  coverWaiting.get(key).push(cb);
+  pumpCovers();
+}
+/* gênero de reserva: 1 busca na Apple por artista que o Spotify ainda não classificou.
+   Entra na mesma fila das capas (a Apple limita as duas juntas), depois delas */
+function queueAppleGenres(){
+  const need = new Map();
+  for (const t of T){
+    if (t.artist === NI) continue;
+    const raw = splitArtistsRaw(t.artist);
+    splitArtists(t.artist).forEach((p, i) => { if (!spotifyHas(p) && !Array.isArray(AGENRES[p]) && !need.has(p)) need.set(p, raw[i] || p); });
+  }
+  for (const [p, name] of need) coverQueue.push({job: async () => {
+    const r = (await itunes(`search?entity=musicArtist&limit=5&term=${encodeURIComponent(name)}`)).find(x => normC(x.artistName || "") === normC(name));
+    AGENRES[p] = r && r.primaryGenreName ? [r.primaryGenreName.toLowerCase()] : [];
+    saveAGenres(); refreshShownGenres();
+  }});
+  if (need.size) pumpCovers();
+}
+let rgT;
+function refreshShownGenres(){
+  clearTimeout(rgT);
+  rgT = setTimeout(() => { for (const t of T){ t.ge = shownGenres(t.artist); t.genre = t.ge && t.ge.length ? t.ge.join(", ") : ""; } render(); }, 1500);
+}
+async function pumpCovers(){
+  if (coverBusy) return;
+  coverBusy = true;
+  let fails = 0;
+  while (coverQueue.length){
+    const item = coverQueue[0];
+    if (item.job){
+      try { await item.job(); } catch (e){ fails++; await coverSleep(Math.min(120000, 20000 * fails)); continue; }
+      fails = 0; coverQueue.shift(); await coverSleep(3200); continue;
+    }
+    const [key, artist, album] = item;
+    let url = null;
+    try { url = await fetchCover(artist, album); }
+    catch (e){
+      /* quase sempre é o limite da Apple: não desiste do artista — espera cada vez mais e tenta de novo */
+      fails++;
+      await coverSleep(Math.min(120000, 20000 * fails));
+      continue;
+    }
+    fails = 0;
+    coverQueue.shift();
+    if (!coverOf(key)){ COVERS[key] = url || {miss: Date.now()}; saveCovers(); }   // não sobrescreve uma capa do Spotify que chegou enquanto buscava
+    (coverWaiting.get(key) || []).forEach(cb => cb(url));
+    coverWaiting.delete(key);
+    await coverSleep(3200);
+  }
+  coverBusy = false;
+}
+function topAlbumOf(rs){
+  const c = new Map();
+  for (const t of rs) if (t.album !== NI) c.set(t.album, (c.get(t.album) || 0) + 1);
+  return [...c].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+}
+
 function renderTree(){
   const base = rows(false, true);
   const g = groupBy(base, "artist");
@@ -375,13 +554,24 @@ function renderTree(){
   const max = items.length ? items[0].value : 1;
   const hasSel = state.bands.size > 0;
   const seen = new Set();
+  // largest font where the whole name fits on one line (0 = only the cover)
+  const labelSize = (name, w, h) => {
+    for (const s of [17, 15, 13.5, 12, 11, 10]){
+      const roomForLine = h - 18 - Math.max(10, s - 2) * 1.2 - 4 >= s * 1.05;   // one name line above the count
+      if (w - 20 > 0 && roomForLine && fitsOneLine(name, s, "Sora, sans-serif", 600, w - 20, "-.01em")) return s;
+    }
+    return 0;
+  };
+  const labelSizes = new Map(laid.map(d => [d.k, labelSize(d.k, Math.max(0, d.w - 4), Math.max(0, d.h - 4))]));
+  // once a band loses its name, every band with fewer songs loses it too (no labels "skipping" around)
+  const hiddenMax = Math.max(0, ...laid.filter(d => !labelSizes.get(d.k)).map(d => d.value));
   for (const d of laid){
     seen.add(d.k);
     let el = TILES.get(d.k);
     const fresh = !el;
     if (fresh){
       el = document.createElement("div"); el.className = "tile";
-      el.innerHTML = `<div class="lbl"><strong></strong><span></span></div>`;
+      el.innerHTML = `<i class="cov"></i><div class="lbl"><strong></strong><span></span></div>`;
       el.querySelector("strong").textContent = d.k;
       el.addEventListener("click", () => toggle("band", d.k));
       bindTip(el, () => tileTip(d.k));
@@ -400,22 +590,19 @@ function renderTree(){
     const lbl = el.querySelector(".lbl");
     lbl.style.color = sel ? "#022C22" : "#ECFDF5";
     el.querySelector("span").textContent = d.value;
-    // choose the largest font where the name fits without breaking a word; otherwise fall
-    // back to the smallest size and truncate with "…" — only hide if there's no room at all
-    let size = 0, truncated = false;
-    for (const s of [17, 15, 13.5, 12, 11, 10]){
-      const lines = Math.floor((h - 18 - Math.max(10, s - 2) * 1.2 - 4) / (s * 1.05));   // name lines that fit above the count
-      if (w - 20 > 0 && lines >= 1 && fitsAt(d.k, s, "Sora, sans-serif", 600, w - 20, lines, "-.01em")){ size = s; break; }
-    }
-    if (!size){
-      const s = 10, lines = Math.floor((h - 18 - Math.max(10, s - 2) * 1.2 - 4) / (s * 1.05));
-      if (w - 20 >= 22 && lines >= 1){ size = s; truncated = true; }
-    }
+    const album = topAlbumOf(g.get(d.k));
+    const covKey = album ? d.k + "|" + album : "";
+    if (el.dataset.cov !== covKey){ el.dataset.cov = covKey; el.classList.remove("hascov"); }
+    if (album) getCover(d.k, album, url => {
+      if (el.dataset.cov !== covKey || !url) return;
+      el.querySelector(".cov").style.backgroundImage = `url("${url}")`;
+      el.classList.add("hascov");
+    });
+    const size = d.value >= hiddenMax ? labelSizes.get(d.k) : 0;
     lbl.style.opacity = size ? 1 : 0;
     el.style.borderRadius = Math.max(3, Math.min(10, w / 4, h / 4)) + "px";
     const strongEl = lbl.querySelector("strong");
     strongEl.style.fontSize = size + "px";
-    strongEl.classList.toggle("trunc", truncated);
     lbl.querySelector("span").style.fontSize = Math.max(10, size - 2) + "px";
     const apply = () => { el.style.opacity = ""; el.style.left = x + "px"; el.style.top = y + "px"; el.style.width = w + "px"; el.style.height = h + "px"; };
     fresh ? requestAnimationFrame(() => requestAnimationFrame(apply)) : apply();
@@ -519,19 +706,108 @@ function renderRank(){
     label: d => `${d.value}<small>${pct(d.value, base.length)}</small>`});
 }
 
+/* ---------------- chart 5: genres · chart 6: track profile ---------------- */
+const capFirst = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+function genreTip(g){
+  const R = rows(true, true, false).filter(t => t.ge && t.ge.includes(g));
+  const arts = [...groupBy(R, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1] || coll.compare(a[0], b[0]));
+  return `<div class="eyebrow">Gênero</div><div class="t">${esc(capFirst(g))}</div>
+    <div class="k"><span>Faixas</span><b>${R.length}</b></div><hr><div class="eyebrow">Artistas</div>
+    ${arts.slice(0, 5).map(([a, n]) => `<div class="k"><span>${esc(a)}</span><b>${n}</b></div>`).join("")}${arts.length > 5 ? `<div class="k"><span>+ ${arts.length - 5} artistas</span></div>` : ""}`;
+}
+function renderGenres(){
+  const base = rows(true, true, false), el = $("#genres");
+  const counts = new Map();
+  for (const t of base) for (const g of t.ge || []) counts.set(g, (counts.get(g) || 0) + 1);
+  const missing = base.filter(t => !t.gs).length;
+  const upd = missing ? ` · <button type="button" class="lnk" data-upd style="padding:0">buscar gênero de ${faixas(missing)}</button>` : "";
+  if (!counts.size){
+    el.innerHTML = `<div class="empty-in"><p>${missing ? "Nenhuma música tem gênero ainda." : "O Spotify não informa gênero para os artistas dessa seleção."}</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Gasta 1 busca no Spotify por artista, não por música.</p>` : ""}</div>`;
+    $("#gen-hint").innerHTML = "";
+    return;
+  }
+  if (el.querySelector(".empty-in")) el.innerHTML = "";
+  const items = [...counts].map(([k, value]) => ({k, value})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
+  const withG = base.filter(t => t.ge && t.ge.length).length;
+  renderList(el, items, {kind: "genre", rank: true, selected: state.genres, tip: genreTip, scrollToSel: true,
+    label: d => `${d.value}<small>${pct(d.value, withG)}</small>`});
+  $("#gen-hint").innerHTML = `${items.length} gêneros · uma música conta em cada gênero do artista${upd}`;
+}
+function profStack(title, big, segs, total){
+  const on = segs.filter(s => s[0] > 0);
+  return `<div class="pf"><div class="pf-h"><span>${title}</span><b>${big}</b></div>
+    <div class="stack pf-bar">${on.map(([n, c]) => `<i style="background:${c};flex:${n}"></i>`).join("")}</div>
+    <div class="legend">${on.map(([n, c, l]) => `<span><i style="background:${c}"></i>${l} · ${n} (${pct(n, total, 0)})</span>`).join("")}</div></div>`;
+}
+function renderProfile(R){
+  const M = R.filter(hasMeta), el = $("#profile");
+  const missing = R.filter(t => !t.m).length;
+  $("#prof-hint").innerHTML = M.length ? `${M.length === R.length ? `todas as ${faixas(M.length)}` : `${nf(M.length)} de ${faixas(R.length)}`} com esses dados${missing ? ` · <button type="button" class="lnk" data-upd style="padding:0">completar ${missing}</button>` : ""}` : "";
+  if (!M.length){
+    el.innerHTML = `<div class="empty-in"><p>Explícitas, singles e popularidade aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
+    return;
+  }
+  const ex = M.filter(t => t.m.x).length;
+  const ty = {album: 0, single: 0, compilation: 0}; M.forEach(t => { if (t.m.ty in ty) ty[t.m.ty]++; });
+  const tyN = ty.album + ty.single + ty.compilation;
+  const P = M.filter(t => typeof t.m.p === "number"), hist = [0, 0, 0, 0, 0];
+  P.forEach(t => hist[Math.min(4, Math.floor(t.m.p / 20))]++);
+  const hi = P.length ? P.reduce((a, b) => b.m.p > a.m.p ? b : a) : null, lo = P.length ? P.reduce((a, b) => b.m.p < a.m.p ? b : a) : null;
+  let html = tyN ? profStack("De onde vêm", pct(ty.album, tyN, 0) + " de álbuns", [[ty.album, "#34D399", "Álbum"], [ty.single, "#A3E635", "Single/EP"], [ty.compilation, "#047857", "Coletânea"]], tyN) : "";
+  html += profStack("Explícitas", pct(ex, M.length, 0), [[ex, "#F0FDF7", "Explícitas"], [M.length - ex, "#047857", "Sem palavrão"]], M.length);
+  if (P.length){
+    const avg = Math.round(sum(P, t => t.m.p) / P.length), pm = Math.max(1, ...hist);
+    html += `<div class="pf"><div class="pf-h"><span>Popularidade no Spotify</span><b>média ${avg}</b></div>
+      <div class="mbars pf-pop">${hist.map((v, i) => `<div><b>${v}</b><i style="height:${Math.max(3, v / pm * 44)}px"></i><span>${i * 20}–${i === 4 ? 100 : i * 20 + 19}</span></div>`).join("")}</div>
+      <div class="legend"><span>Mais popular: <strong>${esc(cleanTitle(hi.title))}</strong> (${hi.m.p})</span><span>Mais lado B: <strong>${esc(cleanTitle(lo.title))}</strong> (${lo.m.p})</span></div></div>`;
+  }
+  // sem popularidade (o Spotify nem sempre manda) o card ficaria com buraco: entra o ranking de explícitas por artista
+  if (!P.length && ex){
+    const arts = [...groupBy(M, "artist")].map(([k, rs]) => ({k, n: rs.length, e: rs.filter(t => t.m.x).length}))
+      .filter(a => a.n >= 3 && a.e).sort((a, b) => b.e / b.n - a.e / a.n || b.e - a.e).slice(0, 4);
+    if (arts.length) html += `<div class="pf"><div class="pf-h"><span>Artistas mais explícitos</span><b>% das faixas</b></div>
+      ${arts.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%"></i></div></div>`).join("")}</div>`;
+  }
+  el.innerHTML = html;
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-upd]")) openDataUpdate(); });
+
+/* ---------------- song tables: same columns, by importance, everywhere ---------------- */
+const ND = `<span class="nd">—</span>`;
+const SONG_COLS = [
+  {k: "n", l: "#", num: true, cell: t => t.n ?? ""},
+  {k: "title", l: "Música", cls: "tt", cell: t => esc(t.title)},
+  {k: "artist", l: "Artista", cell: t => esc(t.artist)},
+  {k: "album", l: "Álbum", cell: t => esc(t.album)},
+  {k: "genre", l: "Gênero", cls: "gn", cell: t => t.genre ? esc(t.genre) : ND},
+  {k: "date", l: "Lançamento", cell: t => t.date ? esc(t.date) : ND},
+  {k: "sec", l: "Duração", num: true, cell: t => t.sec ? durTxt(t.sec) : ND},
+  {k: "pop", l: "Popularidade", num: true, cell: t => t.pop ?? ND},
+  {k: "ex", l: "Explícita", cell: t => t.ex === null ? ND : t.ex ? "Sim" : "Não"},
+  {k: "ty", l: "Tipo", cell: t => TYPE_PT[t.ty] || ND}
+];
+const songHead = (sortable = true) => SONG_COLS.map(c => `<th${sortable ? ` data-k="${c.k}" tabindex="0"` : ""} class="${c.num ? "num" : ""}">${c.l}${sortable ? "<i></i>" : ""}</th>`).join("");
+const songCells = (t, first) => SONG_COLS.map((c, i) => `<td class="${[c.num ? "num" : "", c.cls || ""].join(" ").trim()}">${i === 0 && first !== undefined ? first : c.cell(t)}</td>`).join("");
+// sem dado vai sempre pro fim, nas duas direções
+const cmpSong = (k, dir) => (a, b) => {
+  const x = a[k], y = b[k], mx = x === null || x === undefined || x === "", my = y === null || y === undefined || y === "";
+  if (mx || my) return mx === my ? a.n - b.n : mx ? 1 : -1;
+  return (typeof x === "number" && typeof y === "number" ? x - y : coll.compare(String(x), String(y))) * dir || a.n - b.n;
+};
+// linha importada/colada (ainda não está na playlist) no mesmo formato das faixas do painel
+const songView = r => { const a = (r.artist || "").trim() || NI; return {n: r.n, title: r.title, artist: a, album: (r.album || "").trim() || NI, sec: r.sec, date: r.date || "", ...extraProps(r.meta, shownGenres(a))}; };
+const songTable = list => `<div class="ptab"><table><thead><tr>${songHead(false)}</tr></thead><tbody>${list.map(t => `<tr>${songCells(t)}</tr>`).join("")}</tbody></table></div>`;
+
 /* ---------------- render ---------------- */
+$("#filtered-list-card thead tr").innerHTML = songHead();
 let flSortK = "n", flSortDir = 1;
 function renderFilteredList(R){
   const card = $("#filtered-list-card");
-  const active = state.bands.size + state.albums.size > 0;
+  const active = state.bands.size + state.albums.size + state.genres.size > 0;
   card.style.display = active ? "" : "none";
   if (!active) return;
-  const list = [...R].sort((a, b) => {
-    const x = a[flSortK], y = b[flSortK];
-    return (typeof x === "number" && typeof y === "number" ? x - y : coll.compare(String(x), String(y))) * flSortDir || a.n - b.n;
-  });
-  $("#filtered-list-body").innerHTML = list.map(t =>
-    `<tr><td class="num">${t.n}</td><td class="tt">${esc(t.title)}</td><td>${esc(t.artist)}</td><td>${esc(t.album)}</td><td class="num"><span class="durchip">${durTxt(t.sec)}</span></td><td>${esc(t.date || NI)}</td></tr>`).join("");
+  const list = [...R].sort(cmpSong(flSortK, flSortDir));
+  $("#filtered-list-body").innerHTML = list.map((t, i) => `<tr title="Posição original na playlist: #${t.n}">${songCells(t, i + 1)}</tr>`).join("");
   $("#filtered-list-hint").textContent = `${faixas(list.length)} no filtro atual`;
   card.querySelectorAll("th[data-k]").forEach(th => th.setAttribute("aria-sort", th.dataset.k === flSortK ? (flSortDir > 0 ? "ascending" : "descending") : "none"));
 }
@@ -547,7 +823,7 @@ function render(){
   $("#content").style.display = empty ? "none" : "";
   $("#empty").classList.toggle("on", empty);
   if (empty){ hideTip(); return; }
-  renderKPIs(R); renderWave(R); renderYears(R); renderTree(); renderAlbums(); renderRank();
+  renderKPIs(R); renderWave(R); renderYears(R); renderTree(); renderAlbums(); renderRank(); renderGenres(); renderProfile(R);
   renderFilteredList(R);
 }
 
@@ -581,8 +857,6 @@ const listPt = arr => arr.length <= 1 ? (arr[0] || "") : arr.slice(0, -1).join("
 const fracWord = f => f >= .45 ? "quase metade" : f >= .3 ? "um terço" : f >= .2 ? "um quarto" : `${Math.round(f * 100)}%`;
 const faixas = n => `${nf(n)} faixa${n === 1 ? "" : "s"}`;
 const yearsSpan = rs => { const ys = rs.map(r => r.year).filter(y => y !== NI); return ys.length ? [Math.min(...ys), Math.max(...ys)] : [null, null]; };
-const splitArtists = s => s.toLowerCase().split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/).map(x => x.trim()).filter(Boolean);
-const splitArtistsRaw = s => s.split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/i).map(x => x.trim()).filter(Boolean);
 
 /* ---------- statistics shared by all rules ---------- */
 const NOW_Y = new Date().getFullYear();
@@ -675,9 +949,12 @@ const V = {
     return list.map(a => `<div class="sb" style="margin:8px 0"><div class="l" style="display:flex;justify-content:space-between;gap:12px;font-size:13px"><span>${esc(a.k)} <span style="color:var(--ink-3)">· ${esc(a.artist)}</span></span><em style="font-style:normal;color:var(--ink-2);white-space:nowrap">${faixas(a.c)}</em></div>
       <div style="height:6px;border-radius:6px;background:rgba(110,231,183,.08);margin-top:5px;overflow:hidden"><i data-w="${(a.c / mx) * 100}" style="display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#047857,#6EE7B7);transition:width 1.1s cubic-bezier(.2,.75,.15,1)"></i></div></div>`).join("");
   },
-  stack(seg){
+  stack(seg, tot = NN){
     return `<div class="stack">${seg.filter(s => s[0] > 0).map(([n, c]) => `<i style="background:${c};flex-grow:0" data-g="${n}"></i>`).join("")}</div>
-      <div class="legend">${seg.filter(s => s[0] > 0).map(([n, c, l]) => `<span><i style="background:${c}"></i>${l} · ${n} (${pc1(n, NN)})</span>`).join("")}</div>`;
+      <div class="legend">${seg.filter(s => s[0] > 0).map(([n, c, l]) => `<span><i style="background:${c}"></i>${l} · ${n} (${pc1(n, tot)})</span>`).join("")}</div>`;
+  },
+  bars(rows, max){
+    return rows.map(([label, sub, v]) => `<div class="hrow"><div class="hl"><span>${esc(label)} <em>${esc(sub)}</em></span><b>${v}</b></div><div class="ht"><i style="width:${Math.max(2, v / max * 100)}%"></i></div></div>`).join("");
   },
   decComp(arts){
     const decs = IS.dec.map(d => d.d).slice(-5), shade = ["#065F46", "#047857", "#10B981", "#6EE7B7", "#D1FAE5"].slice(-decs.length);
@@ -977,10 +1254,103 @@ rule(() => {
     viz: V.pairs(pairs.slice(0, 4)), kick: [`${k} de ${m}`, `versões mais antigas entraram primeiro na playlist`]};
 });
 
+/* ---------- rules from the extra Spotify data (only when enough tracks have it) ---------- */
+const MT = T.filter(t => t.m && t.m.x !== undefined);
+const covNote = M => M.length < NN ? `<p class="muted" style="margin-top:10px">Com base nas ${nf(M.length)} faixas que têm esse dado (importadas por link ou atualizadas).</p>` : "";
+
+// CATÁLOGO · explicit lyrics
+rule(() => {
+  if (MT.length < 20) return null;
+  const ex = MT.filter(t => t.m.x).length, f = ex / MT.length;
+  const by = IS.art.map(a => { const mm = a.rs.filter(t => t.m && t.m.x !== undefined); return {a, n: mm.length, e: mm.filter(t => t.m.x).length}; })
+    .filter(x => x.n >= 5).map(x => ({...x, f: x.e / x.n})).sort((p, q) => q.f - p.f || q.e - p.e);
+  const top = by[0], clean = by.filter(x => x.e === 0).sort((p, q) => q.n - p.n)[0];
+  const li = [];
+  if (top && top.e) li.push(`<li>${B(`${top.a.k} é o mais "boca suja"`)}: ${top.e} de ${top.n} faixas explícitas (${pc0(top.e, top.n)}).</li>`);
+  if (clean) li.push(`<li>${B(`${clean.a.k} não tem nenhuma explícita`)} em ${faixas(clean.n)}.</li>`);
+  if (!li.length) li.push(`<li>${B(`${faixas(ex)} explícitas`)} de ${nf(MT.length)}.</li>`);
+  return {extra: true, kind: "cat", theme: 5, score: f >= .4 || f <= .05 ? 64 : 50,
+    title: f >= .5 ? "Mais da metade da playlist tem palavrão" : f >= .25 ? "Uma playlist de linguagem pesada" : f <= .05 ? "Uma playlist quase sem palavrão" : "Explícitas são minoria",
+    body: `<ul>${li.join("")}</ul>${covNote(MT)}`,
+    viz: V.stack([[ex, "#F0FDF7", "Explícitas"], [MT.length - ex, "#047857", "Sem palavrão"]], MT.length),
+    kick: [pc0(ex, MT.length), "das faixas são marcadas como explícitas no Spotify"]};
+});
+
+// CATÁLOGO · album person or single person
+rule(() => {
+  const M = MT.filter(t => t.m.ty); if (M.length < 20) return null;
+  const c = {album: 0, single: 0, compilation: 0}; M.forEach(t => { if (t.m.ty in c) c[t.m.ty]++; });
+  const fs = c.single / M.length;
+  const singArt = [...groupBy(M.filter(t => t.m.ty === "single"), "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1])[0];
+  const li = [];
+  if (singArt && singArt[1] >= 2) li.push(`<li>${B(`${singArt[0]} é quem mais aparece em single`)}: ${faixas(singArt[1])}.</li>`);
+  if (c.compilation) li.push(`<li>${B(`${faixas(c.compilation)} vieram de coletâneas`)} (greatest hits, trilhas sonoras…).</li>`);
+  li.push(`<li>${B(`${faixas(c.album)} vêm de álbuns de estúdio`)}.</li>`);
+  return {extra: true, kind: "cat", theme: 3, score: fs >= .35 || fs <= .08 ? 63 : 49,
+    title: fs >= .35 ? "Você é de single, não de álbum" : fs <= .08 ? "Você é de álbum: quase nada vem de single solto" : "Álbuns na base, singles no tempero",
+    body: `<ul>${li.join("")}</ul>${covNote(M)}`,
+    viz: V.stack([[c.album, "#34D399", "Álbum"], [c.single, "#A3E635", "Single/EP"], [c.compilation, "#047857", "Coletânea"]], M.length),
+    kick: [pc0(c.single, M.length), "das faixas vieram de singles ou EPs"]};
+});
+
+// CATÁLOGO · mainstream or deep cuts (only if Spotify still sends popularity)
+rule(() => {
+  const P = MT.filter(t => typeof t.m.p === "number"); if (P.length < 20) return null;
+  const avg = sum(P, t => t.m.p) / P.length, srt = [...P].sort((a, b) => b.m.p - a.m.p);
+  const hits = P.filter(t => t.m.p >= 60).length, deep = P.filter(t => t.m.p < 30).length;
+  const byArt = IS.art.map(a => { const pp = a.rs.filter(t => t.m && typeof t.m.p === "number"); return {a, n: pp.length, avg: pp.length ? sum(pp, t => t.m.p) / pp.length : 0}; }).filter(x => x.n >= 4).sort((x, y) => x.avg - y.avg);
+  const under = byArt[0];
+  return {extra: true, kind: "cat", theme: 4, score: avg >= 60 || avg < 35 ? 67 : 55,
+    title: avg >= 60 ? "Uma playlist de hits" : avg < 35 ? "Você garimpa o lado B" : "Entre os hits e o lado B",
+    body: `<ul><li>${B(`${faixas(hits)} são hits`)} (popularidade 60+) e ${B(`${faixas(deep)} são lado B`)} (abaixo de 30).</li>
+      ${under ? `<li>${B(`${under.a.k} é o seu artista mais "underground"`)}: popularidade média ${Math.round(under.avg)} nas suas faixas.</li>` : ""}</ul>${covNote(P)}`,
+    viz: V.bars([[cleanTitle(srt[0].title), srt[0].artist, srt[0].m.p], ["Média da playlist", faixas(P.length), Math.round(avg)], [cleanTitle(srt[srt.length - 1].title), srt[srt.length - 1].artist, srt[srt.length - 1].m.p]], 100),
+    kick: [String(Math.round(avg)), "de popularidade média no Spotify (0 a 100)"]};
+});
+
+// CATÁLOGO · genre profile
+const GT = T.filter(t => t.ge && t.ge.length);
+const GCOUNT = (() => { const m = new Map(); for (const t of GT) for (const g of t.ge) m.set(g, (m.get(g) || 0) + 1); return [...m].sort((a, b) => b[1] - a[1]); })();
+rule(() => {
+  if (GT.length < 20 || GCOUNT.length < 2) return null;
+  const [g1, n1] = GCOUNT[0], f1 = n1 / GT.length;
+  const top = GCOUNT.slice(0, 5).map(([k, c]) => {
+    const art = [...groupBy(GT.filter(t => t.ge.includes(k)), "artist")].sort((a, b) => b[1].length - a[1].length)[0];
+    return {k: capFirst(k), c, artist: art ? art[0] : ""};
+  });
+  const solo = GCOUNT.filter(([, c]) => c === 1).length;
+  return {extra: true, kind: "cat", theme: 4, score: 80, wide: true,
+    title: f1 >= .4 ? `${capFirst(g1)} domina a playlist` : f1 >= .2 ? `${capFirst(g1)} lidera, mas tem companhia` : `${nf(GCOUNT.length)} gêneros e nenhum dominante`,
+    body: `<ul><li>${B(`${capFirst(g1)} aparece em ${pc0(n1, GT.length)} das faixas`)} com gênero conhecido.</li>
+      <li>${B(`${nf(GCOUNT.length)} gêneros diferentes`)} no total${solo ? `, ${solo} deles com uma faixa só` : ""}.</li></ul>
+      <p class="muted" style="margin-top:10px">O Spotify dá gênero ao artista, não à música: cada faixa conta em todos os gêneros do artista.${GT.length < NN ? ` Base: ${nf(GT.length)} faixas com gênero.` : ""}</p>`,
+    viz: V.topAlb(top), kick: [nf(GCOUNT.length), "gêneros diferentes na playlist"]};
+});
+
+// PLAYLIST · the genre that grew over time
+rule(() => {
+  if (!IS.journey || GT.length < 40) return null;
+  const G = BY_PLAYLIST.filter(t => t.ge && t.ge.length), half = Math.floor(G.length / 2);
+  const share = (rs, g) => rs.filter(t => t.ge.includes(g)).length / rs.length;
+  const a = G.slice(0, half), b = G.slice(half);
+  const deltas = GCOUNT.filter(([, c]) => c >= 8).map(([g]) => ({g, from: share(a, g), to: share(b, g)})).map(x => ({...x, d: x.to - x.from})).sort((x, y) => y.d - x.d);
+  if (!deltas.length) return null;
+  const up = deltas[0], down = deltas[deltas.length - 1];
+  if (up.d < .08) return null;
+  const perCh = CHI.map(c => c.seg.filter(t => t.ge && t.ge.includes(up.g)).length);
+  return {extra: true, kind: "pl", theme: 0, score: 77,
+    title: `${capFirst(up.g)} ganhou espaço com o tempo`,
+    body: `<p>Na primeira metade da playlist, ${esc(up.g)} estava em ${B(pc0(up.from, 1))} das faixas; na segunda, em ${B(pc0(up.to, 1))}.${down.d <= -.08 ? ` No caminho contrário, ${esc(down.g)} caiu de ${pc0(down.from, 1)} para ${pc0(down.to, 1)}.` : ""}</p>`,
+    viz: V.mbars(perCh, CHI.map((c, i) => `cap. ${i + 1}`), `faixas de ${up.g} por capítulo da playlist`),
+    kick: [`${pc0(up.from, 1)} → ${pc0(up.to, 1)}`, `das faixas com ${up.g}: primeira vs. segunda metade`]};
+});
+
 /* ---------- selection, ordering and row packing ---------- */
 function buildCards(){
   let cards = RULES.map(fn => { try { return fn(); } catch (e) { console.warn("regra ignorada", e); return null; } }).filter(Boolean);
-  cards.sort((a, b) => b.score - a.score); cards = cards.slice(0, 14);
+  // os cards dos dados extras (gênero, explícita…) sempre entram, por cima dos 14 clássicos de maior nota
+  cards.sort((a, b) => b.score - a.score);
+  cards = [...cards.filter(c => !c.extra).slice(0, 14), ...cards.filter(c => c.extra)];
   // interleave: by theme, catalogue first then playlist, so related readings sit side by side
   cards.sort((a, b) => a.theme - b.theme || (a.kind === "cat" ? 0 : 1) - (b.kind === "cat" ? 0 : 1) || b.score - a.score);
   const rows = [];
@@ -1182,12 +1552,13 @@ const ICON = {
   list: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12M2 8h12M2 12.5h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
   up: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2.5M4.5 6 8 2.5 11.5 6M2.5 13.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   down: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5M2.5 13.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
-  x: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+  x: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  sync: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 6.5A5.5 5.5 0 0 0 3.3 4.6M2.5 9.5a5.5 5.5 0 0 0 10.2 1.9M3 2v3h3M13 14v-3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
 };
 const pad2 = n => String(n).padStart(2, "0");
 const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
-const currentRows = () => BY_PLAYLIST.map(t => [t.n, t.title, t.artist === NI ? "" : t.artist, t.album === NI ? "" : t.album, t.sec, t.date]);
+const currentRows = () => BY_PLAYLIST.map(t => { const r = [t.n, t.title, t.artist === NI ? "" : t.artist, t.album === NI ? "" : t.album, t.sec, t.date]; if (t.m) r.push(t.m); return r; });
 
 /* ---------- modal system ---------- */
 const modalStack = [];
@@ -1225,7 +1596,7 @@ function confirmModal({title, html, ok = "Confirmar", danger = false, extra}){
 
 /* ---------- commit: save the new list and rebuild the whole dashboard ---------- */
 async function commitRows(rows, flash){
-  const sorted = [...rows].sort((a, b) => a[0] - b[0]).map((r, i) => [i + 1, r[1], r[2], r[3], r[4], r[5]]);
+  const sorted = [...rows].sort((a, b) => a[0] - b[0]).map((r, i) => r[6] ? [i + 1, r[1], r[2], r[3], r[4], r[5], r[6]] : [i + 1, r[1], r[2], r[3], r[4], r[5]]);
   if (!sorted.length){ toast("A playlist não pode ficar vazia."); return; }
   writeStore({rows: sorted, updated: Date.now()});
   /* confere se o navegador realmente gravou (abrir o arquivo via file:// pode bloquear
@@ -1288,7 +1659,13 @@ function parseDate(v){
   return undefined;
 }
 const HDR = {n: /^(n[uú]mero|numero|n[ºo°]?|#|pos(i[cç][aã]o)?|ordem|index)$/i, title: /^(m[uú]sicas?|faixas?|t[ií]tulo|title|track|song|nome(_da_m[uú]sica)?)$/i, artist: /^(bandas?|artistas?|banda_artista|banda\/artista|artist|int[eé]rprete)$/i,
-  album: /^([aá]lbum|album)$/i, dur: /^(dura[cç][aã]o|tempo|duration|length|dur)$/i, date: /^(data|lan[cç]amento|data_(de_)?lan[cç]amento|release(_date)?|ano|year|date)$/i};
+  album: /^([aá]lbum|album)$/i, dur: /^(dura[cç][aã]o|tempo|duration|length|dur)$/i, date: /^(data|lan[cç]amento|data_(de_)?lan[cç]amento|release(_date)?|ano|year|date)$/i,
+  meta: /^(dados_spotify|meta)$/i};
+// coluna extra que a própria exportação em texto grava: os dados do Spotify em JSON (explícita, tipo, popularidade…)
+function parseMeta(v){
+  if (!v || v[0] !== "{") return null;
+  try { const m = JSON.parse(v); return m && typeof m === "object" && !Array.isArray(m) ? m : null; } catch (e) { return null; }
+}
 function cellsToRows(cells){
   const warnings = []; let start = 0, map = null;
   const h = cells[0] ? cells[0].map(c => String(c).trim().toLowerCase().replace(/\s+/g, "_")) : [];
@@ -1302,9 +1679,9 @@ function cellsToRows(cells){
   for (let li = start; li < cells.length; li++){
     const c = cells[li].map(x => String(x == null ? "" : x).trim());
     if (!c.some(Boolean)) continue;
-    let n, title, artist, album, dur, date;
-    if (map){ n = c[map.n]; title = c[map.title]; artist = c[map.artist]; album = c[map.album]; dur = c[map.dur]; date = c[map.date]; }
-    else if (c.length >= 6 && /^\d+$/.test(c[0])) [n, title, artist, album, dur, date] = c;
+    let n, title, artist, album, dur, date, metaTxt;
+    if (map){ n = c[map.n]; title = c[map.title]; artist = c[map.artist]; album = c[map.album]; dur = c[map.dur]; date = c[map.date]; metaTxt = map.meta !== undefined ? c[map.meta] : undefined; }
+    else if (c.length >= 6 && /^\d+$/.test(c[0])) [n, title, artist, album, dur, date, metaTxt] = c;
     else if (c.length >= 5) [title, artist, album, dur, date] = c;
     else if (c.length >= 2){ [title, artist, album, dur, date] = c; }
     else { warnings.push({line: li + 1, msg: "linha com poucas colunas, ignorada"}); continue; }
@@ -1315,7 +1692,8 @@ function cellsToRows(cells){
     let d = parseDate(date);
     if (d === undefined){ warnings.push({line: li + 1, msg: `data "${date}" não reconhecida (fica "${NI}")`}); d = ""; }
     if (!artist) warnings.push({line: li + 1, msg: `sem artista (fica "${NI}")`});
-    rows.push({n: /^\d+$/.test(n || "") ? +n : null, title, artist: artist || "", album: album || "", sec, date: d});
+    const meta = parseMeta(metaTxt);
+    rows.push({n: /^\d+$/.test(n || "") ? +n : null, title, artist: artist || "", album: album || "", sec, date: d, ...(meta ? {meta} : {})});
   }
   return {rows, warnings};
 }
@@ -1381,7 +1759,7 @@ const SPOTIFY_TRACK_CACHE_KEY = "catalogo-musical:spotify-tracks";
 function loadTrackCache(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_TRACK_CACHE_KEY) || "null") || {}; } catch (e) { return {}; } }
 function saveTrackCache(rows){
   const c = loadTrackCache();
-  for (const r of rows) if (r.id) c[r.id] = {title: r.title, artist: r.artist, album: r.album, sec: r.sec, date: r.date};
+  for (const r of rows) if (r.id) c[r.id] = {title: r.title, artist: r.artist, album: r.album, sec: r.sec, date: r.date, cover: r.cover, meta: r.meta};
   try { localStorage.setItem(SPOTIFY_TRACK_CACHE_KEY, JSON.stringify(c)); } catch (e) {}
 }
 function parseSpotifyIds(text){
@@ -1408,6 +1786,18 @@ async function spotifyToken(id, secret){
   if (!j.access_token) throw new Error("Resposta inesperada do Spotify ao autenticar.");
   try { localStorage.setItem(SPOTIFY_APP_OK_KEY, "1"); } catch (e) {}
   return j.access_token;
+}
+/* tudo isso já vem na mesma resposta da faixa/álbum — guardar não custa pedido nenhum.
+   popularidade só vem na faixa completa (GET /tracks), e pode faltar em apps de desenvolvimento */
+function spotifyMeta(t, album){
+  const m = {x: t.explicit ? 1 : 0};
+  if (album && album.album_type) m.ty = album.album_type;
+  if (t.track_number) m.tn = t.track_number;
+  if (album && album.total_tracks) m.tt = album.total_tracks;
+  if (typeof t.popularity === "number") m.p = t.popularity;
+  const aid = (t.artists || []).map(a => a.id).filter(Boolean);
+  if (aid.length) m.aid = aid;
+  return m;
 }
 function spotifyDate(album){
   const d = (album && album.release_date) || ""; if (!d) return "";
@@ -1445,7 +1835,7 @@ async function spotifyFetchTracks(ids, token, onProgress, onWait){
         if (r.status === 403) throw new Error("Spotify recusou o acesso (HTTP 403). Confira se a conta dona do app tem Spotify Premium (exigido para apps em modo de desenvolvimento) e se o Client ID/Secret estão corretos.");
         if (!r.ok) throw new Error(`Falha ao buscar faixas no Spotify (HTTP ${r.status}).`);
         const t = await r.json();
-        rows.push({n: null, id, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album)});
+        rows.push({n: null, id, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: t.album ? t.album.name : "", sec: Math.round(t.duration_ms / 1000), date: spotifyDate(t.album), cover: spotifyCover(t.album && t.album.images), meta: spotifyMeta(t, t.album)});
         onProgress && onProgress(i + 1, ids.length);
         break;
       }
@@ -1465,7 +1855,7 @@ async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait){
     for (let ai = 0; ai < albumIds.length; ai++){
       const id = albumIds[ai];
       let url = `https://api.spotify.com/v1/albums/${id}?limit=50`, first = true;
-      let albumName = "", albumDate = "", total = Infinity, got = 0;
+      let albumName = "", albumDate = "", albumCover = null, albumObj = null, total = Infinity, got = 0;
       while (url){
         let r;
         for (;;){
@@ -1488,11 +1878,11 @@ async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait){
         }
         const j = await r.json();
         const page = first ? j.tracks : j;
-        if (first){ albumName = j.name || ""; albumDate = spotifyDate({release_date: j.release_date}); }
+        if (first){ albumName = j.name || ""; albumDate = spotifyDate({release_date: j.release_date}); albumCover = spotifyCover(j.images); albumObj = {album_type: j.album_type, total_tracks: j.total_tracks}; }
         total = typeof page.total === "number" ? page.total : got + (page.items || []).length;
         for (const t of (page.items || [])){
           if (!t) continue;
-          rows.push({n: null, id: t.id, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: albumName, sec: Math.round(t.duration_ms / 1000), date: albumDate});
+          rows.push({n: null, id: t.id, title: t.name, artist: (t.artists || []).map(a => a.name).join(", "), album: albumName, sec: Math.round(t.duration_ms / 1000), date: albumDate, cover: albumCover, meta: spotifyMeta(t, albumObj)});
         }
         got += (page.items || []).length;
         url = page.next || null;
@@ -1603,7 +1993,7 @@ function openPlaylistLinkHelp(){
     size: "sm"
   }));
 }
-function openRateLimitModal({done, total}){
+function openRateLimitModal({done, total, update = false}){
   /* só aparece depois de algumas tentativas seguidas (não a cada 429 isolado, que é normal
      e resolve em poucos segundos) — e volta a aparecer periodicamente se continuar travado,
      caso a pessoa escolha "continuar esperando" e o bloqueio persista. */
@@ -1611,16 +2001,17 @@ function openRateLimitModal({done, total}){
     let decided = false;
     const foot = document.createElement("div"); foot.className = "mfrow"; foot.style.flexWrap = "wrap";
     const hasSome = done > 0;
-    foot.innerHTML = `<button class="gbtn" type="button" data-cancel>${hasSome ? "Cancelar tudo" : "Cancelar"}</button><span class="sp"></span>${hasSome ? `<button class="gbtn" type="button" data-keep>Usar as ${done} carregadas</button>` : ""}<button class="pbtn" type="button" data-wait autofocus>Esperar</button>`;
+    const keepLbl = done === 1 ? (update ? "Salvar a 1 atualizada" : "Usar a 1 carregada") : update ? `Salvar as ${done} atualizadas` : `Usar as ${done} carregadas`;
+    foot.innerHTML = `<button class="gbtn" type="button" data-cancel>${hasSome ? "Cancelar tudo" : "Cancelar"}</button><span class="sp"></span>${hasSome ? `<button class="gbtn" type="button" data-keep>${keepLbl}</button>` : ""}<button class="pbtn" type="button" data-wait autofocus>Esperar</button>`;
     const md = openModal({
       title: "O Spotify pediu uma pausa",
       body: `<div class="confirm">
-          <p>O Spotify limita quantas músicas dá pra buscar em pouco tempo. Isso costuma acontecer quando <strong>já foram buscadas muitas músicas hoje</strong> ou agora há pouco.</p>
-          <p>${hasSome ? `Já carregamos <strong>${done} de ${total}</strong>. As outras só vão carregar quando o Spotify liberar` : `Nenhuma das <strong>${total}</strong> músicas carregou. Elas só vão carregar quando o Spotify liberar`} — pode levar minutos ou até horas.</p>
+          <p>O Spotify limita quantas buscas dá pra fazer em pouco tempo. Isso costuma acontecer quando <strong>já foram buscadas muitas músicas hoje</strong> ou agora há pouco.</p>
+          <p>${hasSome ? `Já ${update ? "atualizamos" : "carregamos"} <strong>${done} de ${total}</strong>. ${update ? "O resto só vai ser atualizado" : "As outras só vão carregar"} quando o Spotify liberar` : `${update ? `Nada foi atualizado ainda (${total} buscas na fila)` : `Nenhuma das <strong>${total}</strong> músicas carregou`}. ${update ? "Só vai continuar" : "Elas só vão carregar"} quando o Spotify liberar`} — pode levar minutos ou até horas.</p>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
             <div><strong>Esperar:</strong> <span class="muted">continua sozinho quando o Spotify liberar.</span></div>
-            ${hasSome ? `<div><strong>Usar as ${done} carregadas:</strong> <span class="muted">importa só essas agora.</span></div>` : ""}
-            <div><strong>${hasSome ? "Cancelar tudo" : "Cancelar"}:</strong> <span class="muted">${hasSome ? "não importa nenhuma." : "para tudo. Tente de novo mais tarde."}</span></div>
+            ${hasSome ? `<div><strong>${keepLbl}:</strong> <span class="muted">${update ? "guarda o que já veio e para." : "importa só essas agora."}</span></div>` : ""}
+            <div><strong>${hasSome ? "Cancelar tudo" : "Cancelar"}:</strong> <span class="muted">${hasSome ? (update ? "não salva nada desta atualização." : "não importa nenhuma.") : "para tudo. Tente de novo mais tarde."}</span></div>
           </div>
         </div>`,
       foot, size: "sm",
@@ -1700,6 +2091,184 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn}){
   } finally { btn.disabled = false; }
 }
 
+/* ---------- dados extras: gênero (por artista) e "Atualizar dados" (músicas antigas, sem ID) ---------- */
+const GENRE_ON_KEY = "catalogo-musical:genre-on";
+const genreOn = () => { try { return localStorage.getItem(GENRE_ON_KEY) !== "0"; } catch (e) { return true; } };
+const setGenreOn = v => { try { localStorage.setItem(GENRE_ON_KEY, v ? "1" : "0"); } catch (e) {} };
+const hasMeta = t => !!(t.m && t.m.x !== undefined);   // {nf:1} = procurada no Spotify e não achada
+/* GET com a mesma espera crescente da importação; depois de muitos 429 seguidos desiste com
+   e.limited = true, pra quem chamou salvar o que já veio em vez de travar a tela */
+async function spotifyGetJSON(url, token, onWait){
+  let backoff = 0;
+  for (let attempt = 1; ; attempt++){
+    let r; try { r = await fetch(url, {headers: {Authorization: `Bearer ${token}`}}); }
+    catch (e) { throw new Error("Não foi possível conectar ao Spotify."); }
+    if (r.status === 429){
+      if (attempt > 40){ const e = new Error("O Spotify pediu uma pausa longa."); e.limited = true; throw e; }
+      const hw = parseInt(r.headers.get("Retry-After") || "", 10);
+      backoff = Math.min(90, Math.max(Number.isFinite(hw) && hw > 0 ? hw : 2, backoff ? backoff * 1.7 : 2));
+      if (onWait) await onWait(Math.round(backoff), attempt);   // pode abrir o modal e lançar (parar/cancelar)
+      await coverSleep(backoff * 1000);
+      continue;
+    }
+    if (r.status === 404) return null;
+    if (r.status === 401) throw new Error("A autorização do Spotify expirou. Tente de novo.");
+    if (!r.ok) throw new Error(`Falha ao consultar o Spotify (HTTP ${r.status}).`);
+    return r.json();
+  }
+}
+// artistas (por nome minúsculo, igual ao GENRES) que ainda não têm gênero pesquisado
+function genreTargets(list){
+  const m = new Map();
+  for (const r of list){
+    const artist = (r.artist || "").trim(); if (!artist || artist === NI) continue;
+    const parts = splitArtists(artist), raw = splitArtistsRaw(artist), aid = (r.meta && r.meta.aid) || [];
+    parts.forEach((p, i) => { if (!hasGenre(p) && !m.has(p)) m.set(p, {key: p, name: raw[i] || p, id: parts.length === aid.length ? aid[i] : null}); });
+  }
+  return [...m.values()];
+}
+async function spotifyFetchGenres(list, token, onProgress){
+  let done = 0;
+  for (const a of list){
+    const wait = (s, att) => onProgress && onProgress(done, list.length, s, att);
+    const j = await spotifyGetJSON(a.id ? `https://api.spotify.com/v1/artists/${a.id}` : `https://api.spotify.com/v1/search?type=artist&limit=5&q=${encodeURIComponent(a.name)}`, token, wait);
+    const art = !j ? null : a.id ? j : ((j.artists && j.artists.items) || []).find(x => normC(x.name || "") === normC(a.name));
+    GENRES[a.key] = art && Array.isArray(art.genres) ? art.genres : [];
+    saveGenres(); done++;
+    onProgress && onProgress(done, list.length);
+  }
+  return done;
+}
+// música antiga não tem ID do Spotify: procura pelo título + artista e só aceita se o artista bater
+function pickTrack(items, title, artist){
+  const nt = normC(cleanTitle(title)), arts = splitArtists(artist).map(normC);
+  const ok = (items || []).filter(it => it && (it.artists || []).some(a => arts.includes(normC(a.name || ""))));
+  return ok.find(it => normC(cleanTitle(it.name || "")) === nt) || ok.find(it => { const n = normC(cleanTitle(it.name || "")); return n && (n.includes(nt) || nt.includes(n)); }) || null;
+}
+function openDataUpdate(){
+  const tracks = BY_PLAYLIST.filter(t => !t.m && t.artist !== NI && t.title);
+  const genreArts = () => genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m})));
+  const ga = genreArts().length;
+  if (!tracks.length && !ga){ toast("Todas as músicas já estão com os dados completos."); return; }
+  let useGenre = genreOn() && ga > 0;
+  const incomplete = BY_PLAYLIST.filter(t => !t.m || !t.gs);
+  const body = document.createElement("div");
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-go autofocus>Atualizar dados</button>`;
+  const md = openModal({title: "Atualizar dados das músicas", body, foot, size: "sm"});
+  const total = () => tracks.length + (useGenre ? ga : 0);
+  const drawConfirm = () => {
+    body.innerHTML = `<div class="confirm">
+      <p>Vamos buscar no Spotify o que falta nas suas músicas (explícita, single ou álbum, popularidade${ga ? " e gênero" : ""}).</p>
+      <div class="du-rows">
+        ${tracks.length ? `<div><b>${nf(tracks.length)}</b><span>música${tracks.length > 1 ? "s" : ""} sem dados · <strong>1 busca por música</strong></span></div>` : ""}
+        ${ga ? `<label class="chk"><input type="checkbox" id="du-genre" ${useGenre ? "checked" : ""}><span><b>${nf(ga)}</b> artista${ga > 1 ? "s" : ""} sem gênero · <strong>1 busca por artista</strong></span></label>` : ""}
+      </div>
+      <p>Total: <strong id="du-total">${nf(total())} busca${total() === 1 ? "" : "s"}</strong>. Cada uma conta no limite do Spotify, igual a importar uma música.</p>
+      <p><button type="button" class="lnk" id="du-list" style="padding:0">Ver as ${faixas(incomplete.length)} com dados faltando</button></p>
+      <p class="muted">Se o Spotify pedir uma pausa longa, o que já veio fica salvo e dá pra continuar depois.</p></div>`;
+    const cb = body.querySelector("#du-genre");
+    if (cb) cb.addEventListener("change", () => { useGenre = cb.checked; setGenreOn(cb.checked); const n = total(); body.querySelector("#du-total").textContent = `${nf(n)} busca${n === 1 ? "" : "s"}`; foot.querySelector("[data-go]").disabled = !n; });
+    body.querySelector("#du-list").addEventListener("click", () => openModal({title: `${faixas(incomplete.length)} com dados faltando`, size: "lg",
+      sub: "“—” é o que ainda falta buscar", body: songTable(incomplete)}));
+  };
+  drawConfirm();
+  foot.querySelector("[data-c]").onclick = () => md.close();
+  foot.querySelector("[data-go]").onclick = () => {
+    const c = loadSpotifyCreds();
+    if (SPOTIFY_ID_RE.test(c.id || "") && SPOTIFY_ID_RE.test(c.secret || "")) run(c.id, c.secret);
+    else openSpotifyAppHelp({returning: hasSpotifyApp(), onDone: (id, secret) => run(id, secret)});
+  };
+  async function run(id, secret){
+    let stop = false, found = 0, nf_ = 0, gDone = 0, limited = false;
+    const metaByN = new Map();
+    body.innerHTML = `<div class="confirm"><p id="du-st">Conectando ao Spotify…</p><p class="muted" id="du-eta" style="margin-top:4px;min-height:1.4em"></p><div class="ht" style="margin-top:12px"><i id="du-bar" style="width:0%"></i></div><p class="muted" style="margin-top:12px">Pode parar quando quiser: o que já veio fica salvo.</p></div>`;
+    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-stop>Parar e salvar</button>`;
+    foot.querySelector("[data-stop]").onclick = () => { stop = true; foot.querySelector("[data-stop]").disabled = true; foot.querySelector("[data-stop]").textContent = "Parando…"; };
+    const st = body.querySelector("#du-st"), bar = body.querySelector("#du-bar");
+    const all = total(), t0 = performance.now();
+    /* estimativa pela média real de cada busca até aqui (já contando as pausas do Spotify),
+       então se ajusta sozinha se o Spotify começar a segurar */
+    // a cada busca recalcula "quando termina"; entre uma busca e outra o relógio só desce de segundo em segundo
+    let endTs = null;
+    const etaEl = body.querySelector("#du-eta");
+    const drawEta = () => {
+      if (endTs === null){ etaEl.textContent = ""; return; }
+      const s = Math.max(0, Math.round((endTs - performance.now()) / 1000)), m = Math.floor(s / 60);
+      etaEl.textContent = `Faltam cerca de ${m ? `${m} min ` : ""}${s % 60} s`;
+    };
+    const tick = setInterval(drawEta, 1000);
+    const show = (txt, k) => {
+      st.textContent = txt;
+      endTs = k >= 3 && k < all ? performance.now() + (performance.now() - t0) / k * (all - k) : null;
+      drawEta();
+      bar.style.width = (all ? 100 * k / all : 100) + "%";
+    };
+    const save = () => {
+      if (!metaByN.size) return;
+      const rowsNow = currentRows().map(r => metaByN.has(r[0]) ? [r[0], r[1], r[2], r[3], r[4], r[5], metaByN.get(r[0])] : r);
+      writeStore({rows: rowsNow, updated: Date.now()});
+    };
+    // "Cancelar tudo" desfaz o que esta atualização já tinha gravado (o progresso é salvo aos poucos)
+    const storeBefore = readStore(), genresBefore = JSON.stringify(GENRES);
+    /* pausa do Spotify: igual à importação — some a estimativa (não dá pra prever o bloqueio) e,
+       depois de 3 tentativas seguidas (e a cada 5 depois), a pessoa escolhe esperar, salvar ou cancelar */
+    const pause = async (label, attempt, k) => {
+      st.textContent = `O Spotify pediu uma pausa… (${label})`;
+      endTs = null; drawEta();
+      if (attempt === 3 || (attempt > 3 && (attempt - 3) % 5 === 0)){
+        const choice = await openRateLimitModal({done: k, total: all, update: true});
+        if (choice === "keep"){ const e = new Error("stop"); e.stopped = true; throw e; }
+        if (choice === "cancel"){ const e = new Error("cancel"); e.cancelled = true; throw e; }
+      }
+    };
+    try {
+      const token = await spotifyToken(id, secret);
+      for (let i = 0; i < tracks.length && !stop; i++){
+        const t = tracks[i];
+        const q = `track:${cleanTitle(t.title)} artist:${splitArtistsRaw(t.artist)[0]}`;
+        show(`Buscando música ${i + 1} de ${tracks.length}: ${t.title}`, i);
+        const j = await spotifyGetJSON(`https://api.spotify.com/v1/search?type=track&limit=5&q=${encodeURIComponent(q)}`, token, (_, att) => pause(`música ${i + 1} de ${tracks.length}`, att, i));
+        const it = pickTrack(j && j.tracks && j.tracks.items, t.title, t.artist);
+        if (it){
+          const meta = spotifyMeta(it, it.album); metaByN.set(t.n, meta); t.m = meta; found++;
+          const cv = spotifyCover(it.album && it.album.images);
+          if (cv && it.album && normC(it.album.name || "") === normC(t.album)) rememberSpotifyCovers([{artist: t.artist, album: t.album, cover: cv}]);
+        } else { metaByN.set(t.n, {nf: 1}); t.m = {nf: 1}; nf_++; }
+        if (metaByN.size % 20 === 0) save();
+      }
+      save();
+      if (useGenre && !stop){
+        const arts = genreArts();   // recalculado: as músicas achadas agora trazem o ID do artista (busca mais certeira)
+        gDone = await spotifyFetchGenres(arts, token, (d, n, s, att) => {
+          if (stop){ const e = new Error("stop"); e.stopped = true; throw e; }
+          if (s) return pause(`gênero ${d + 1} de ${n}`, att, tracks.length + d);
+          show(`Buscando gênero: artista ${Math.min(d + 1, n)} de ${n}`, tracks.length + d);
+        });
+      }
+    } catch (e){
+      if (e.cancelled){
+        clearInterval(tick);
+        if (storeBefore) writeStore(storeBefore); else clearStore();
+        try { localStorage.setItem(GENRE_KEY, genresBefore); } catch (e2) {}
+        setFlash("Atualização cancelada: nada foi salvo");
+        document.body.classList.add("leaving"); setTimeout(() => location.reload(), 260);
+        return;
+      }
+      save();
+      if (e.limited) limited = true;
+      else if (!e.stopped){ clearInterval(tick); show(e.message, 0); foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Fechar</button>`; foot.querySelector("[data-c]").onclick = () => md.close(); return; }
+    }
+    const parts = [];
+    if (found) parts.push(`${faixas(found)} com dados novos`);
+    if (nf_) parts.push(`${nf_} não encontrada${nf_ > 1 ? "s" : ""} no Spotify`);
+    if (gDone) parts.push(`gênero de ${gDone} artista${gDone > 1 ? "s" : ""}`);
+    setFlash(`${parts.join(" · ") || "Nada novo"}${limited ? " · o Spotify pediu pausa: continue depois em Atualizar dados" : stop ? " · parado por você" : ""}`);
+    clearInterval(tick);
+    document.body.classList.add("leaving"); setTimeout(() => location.reload(), 260);
+  }
+}
+
 /* ---------- import modal ---------- */
 function openImport(initialMode = "add", prefillText = null){
   let mode = initialMode, parsed = null;
@@ -1714,6 +2283,7 @@ function openImport(initialMode = "add", prefillText = null){
         <p class="mdesc">Informe o <strong>Client ID</strong> e o <strong>Client Secret</strong> do seu app no Spotify — <strong>Não é seu usuário nem senha de login</strong>.</p>
         <div class="imrow"><input type="text" id="sp-id" name="spotify-client-id" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off"><input type="password" id="sp-secret" name="spotify-client-secret" placeholder="Ex: 9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c" autocomplete="new-password">
           <label class="chk" style="flex:none"><input type="checkbox" id="sp-remember" checked><span>Salvar neste navegador</span></label></div>
+        <div class="imrow" style="margin:0"><label class="chk"><input type="checkbox" id="sp-genre"><span>Buscar gênero musical <span class="muted">· 1 busca a mais por artista novo (não por música)</span></span></label></div>
         <div class="imrow" style="gap:18px;margin:4px 0 8px"><button class="lnk" type="button" id="sp-why">Pra que pedimos isso?</button><button class="lnk" type="button" id="sp-id-help">Não sei meu ID/Secret</button></div>
         <div class="imrow"><span class="sp-status" id="sp-status"></span></div>
       </div>
@@ -1752,13 +2322,12 @@ function openImport(initialMode = "add", prefillText = null){
     const arts = new Set(parsed.rows.map(r => r.artist || NI)).size;
     go.disabled = n === 0; go.classList.toggle("danger", mode === "replace");
     go.textContent = mode === "add" ? `Adicionar ${faixas(n)}` : `Substituir por ${faixas(n)}…`;
-    const rowHtml = r => `<tr><td>${r.n ?? ""}</td><td>${esc(r.title)}</td><td>${esc(r.artist || NI)}</td><td>${esc(r.album || NI)}</td><td>${durTxt(r.sec)}</td><td>${esc(r.date || NI)}</td></tr>`;
     q("#im-prev").innerHTML = `<div class="pv ok"><b>${faixas(parsed.rows.length)}</b> reconhecidas · ${arts} artistas${dup.length ? ` · <b>${dup.length}</b> já estão na playlist e serão ignoradas` : ""}${parsed.warnings.length ? ` · <span class="warn">${parsed.warnings.length} aviso${parsed.warnings.length > 1 ? "s" : ""}</span>` : ""}</div>
       ${parsed.warnings.length ? `<details class="warns"><summary>Ver avisos</summary><ul>${parsed.warnings.slice(0, 30).map(w => `<li>Linha ${w.line}: ${esc(w.msg)}</li>`).join("")}${parsed.warnings.length > 30 ? `<li>+ ${parsed.warnings.length - 30} avisos</li>` : ""}</ul></details>` : ""}
       ${dup.length ? `<details class="warns"><summary>Ver as ${dup.length} já existentes (ignoradas)</summary><ul>${dup.slice(0, 30).map(r => `<li>${esc(r.title)} — ${esc(r.artist || NI)}</li>`).join("")}${dup.length > 30 ? `<li>+ ${dup.length - 30} faixas</li>` : ""}</ul></details>` : ""}
       <p class="muted" style="margin:10px 0 4px">${dedupeOn && dup.length ? `Serão adicionadas (${faixas(fresh.length)}):` : "Faixas:"}</p>
-      <div class="ptab"><table><thead><tr><th>#</th><th>Música</th><th>Artista</th><th>Álbum</th><th>Duração</th><th>Lançamento</th></tr></thead><tbody>
-      ${fresh.slice(0, 8).map(rowHtml).join("")}</tbody></table>
+      <div class="ptab"><table><thead><tr>${songHead(false)}</tr></thead><tbody>
+      ${fresh.slice(0, 8).map(r => `<tr>${songCells(songView(r))}</tr>`).join("")}</tbody></table>
       ${fresh.length > 8 ? `<div class="more">+ ${fresh.length - 8} faixas</div>` : ""}</div>`;
   }
   function setSpotifyMode(on, n, an){
@@ -1832,24 +2401,52 @@ function openImport(initialMode = "add", prefillText = null){
     const albumRows = res.rows.filter(r => !fetchedSet.has(r.id));
     const trackRows = ids.map(x => cache[x] ? {n: null, id: x, ...cache[x]} : got.get(x)).filter(Boolean);
     parsed = {rows: [...albumRows, ...trackRows], warnings: res.warnings};
+    rememberSpotifyCovers(parsed.rows);
     if (known){
       status.classList.remove("err");
       const msg = `${known === 1 ? "1 música já era conhecida" : `${known} músicas já eram conhecidas`} — não precisou buscar no Spotify.`;
       status.textContent = toFetch.length || albumIds.length ? `${status.textContent} ${msg}` : msg;
     }
+    const arts = q("#sp-genre").checked && id && secret ? genreTargets(parsed.rows) : [];
+    if (arts.length){
+      const before = status.textContent, token = await getToken(id, secret, status);
+      if (token){
+        btn.disabled = true;
+        try {
+          const n = await spotifyFetchGenres(arts, token, async (d, tot, s, att) => {
+            status.textContent = s ? `O Spotify pediu uma pausa… (gênero ${d + 1} de ${tot})` : `Buscando gênero musical: artista ${Math.min(d + 1, tot)} de ${tot}…`;
+            // qualquer escolha que não seja esperar só encerra os gêneros: as músicas já buscadas continuam
+            if (s && (att === 3 || (att > 3 && (att - 3) % 5 === 0)) && await openRateLimitModal({done: d, total: tot, update: true}) !== "wait"){ const e = new Error("Gêneros interrompidos"); e.limited = true; throw e; }
+          });
+          status.textContent = `${before} Gênero de ${n} artista${n > 1 ? "s" : ""} encontrado.`;
+        } catch (e){
+          status.textContent = `${before} ${e.limited ? "O Spotify pediu uma pausa nos gêneros" : "Não deu pra buscar todos os gêneros"} — complete depois em "Atualizar dados".`;
+        } finally { btn.disabled = false; }
+      }
+    }
     update();
   }
-  async function fetchFromSpotify(id, secret, ids, albumIds, status, btn){
+  let lastToken = null;
+  async function getToken(id, secret, status){
+    if (lastToken) return lastToken;
     if (!id && !secret){ status.classList.add("err"); status.textContent = "Informe o Client ID e o Client Secret."; return; }
     if (id && !SPOTIFY_ID_RE.test(id)){ status.classList.add("err"); status.textContent = "Esse Client ID não parece válido: deveria ter 32 letras/números (ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d)."; openWizard(); return; }
     if (!id){ status.classList.add("err"); status.textContent = "Informe o Client ID."; return; }
     if (secret && !SPOTIFY_ID_RE.test(secret)){ status.classList.add("err"); status.textContent = "Esse Client Secret não parece válido: deveria ter 32 letras/números."; openWizard(); return; }
     if (!secret){ status.classList.add("err"); status.textContent = "Informe o Client Secret."; return; }
     if (q("#sp-remember").checked) saveSpotifyCreds(id, secret); else clearSpotifyCreds();
-    let token; try { token = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
+    try { lastToken = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
+    setTimeout(() => { lastToken = null; }, 50 * 60 * 1000);   // token do Spotify vale 1h
+    return lastToken;
+  }
+  async function fetchFromSpotify(id, secret, ids, albumIds, status, btn){
+    const token = await getToken(id, secret, status);
+    if (!token) return;
     return spotifyRunFetch({token, ids, albumIds, status, btn});
   }
   q("#im-copy-help").addEventListener("click", openPlaylistLinkHelp);
+  q("#sp-genre").checked = genreOn();
+  q("#sp-genre").addEventListener("change", e => setGenreOn(e.target.checked));
   q("#sp-why").addEventListener("click", () => {
     openModal({
       title: "Por que pedimos isso?",
@@ -1875,7 +2472,7 @@ function openImport(initialMode = "add", prefillText = null){
       if (q("#sp-fields").style.display !== "none") return runCcFetch();
       return;
     }
-    const toRow = (r, n) => [n, r.title, r.artist, r.album, r.sec, r.date];
+    const toRow = (r, n) => r.meta ? [n, r.title, r.artist, r.album, r.sec, r.date, r.meta] : [n, r.title, r.artist, r.album, r.sec, r.date];
     if (mode === "add"){
       const skip = q("#im-dup").checked;
       const seen = new Set(existing), fresh = [];
@@ -1906,19 +2503,18 @@ function openTable(){
   const marked = new Set(); let sortK = "n", sortDir = 1, query = "";
   const body = document.createElement("div"); body.className = "tbwrap";
   body.innerHTML = `<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button><span class="tbcount" id="tb-count"></span></div>
-    <div class="tbscroll"><table class="tb"><thead><tr><th class="ck"></th>${[["n", "#"], ["title", "Música"], ["artist", "Artista"], ["album", "Álbum"], ["sec", "Duração"], ["date", "Lançamento"]].map(([k, l]) => `<th data-k="${k}" class="${k === "n" || k === "sec" ? "num" : ""}" tabindex="0">${l}<i></i></th>`).join("")}</tr></thead><tbody></tbody></table></div>`;
+    <div class="tbscroll"><table class="tb"><thead><tr><th class="ck"></th>${songHead()}</tr></thead><tbody></tbody></table></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `<span class="hintf" id="tb-hint">Marque as faixas que quer remover. Nada é apagado até você salvar.</span><span class="sp"></span><button class="gbtn" type="button" id="tb-cancel">Fechar</button><button class="pbtn danger" type="button" id="tb-save" disabled>Remover faixas</button>`;
   const md = openModal({title: "Músicas da playlist", sub: `${faixas(NN)} · ${IS.art.length} artistas · ${IS.alb.length} álbuns`, body, foot, size: "lg"});
   const q = s => md.m.querySelector(s), tbody = q("tbody");
-  const rowsHtml = list => list.map(t => `<tr data-n="${t.n}" class="${marked.has(t.n) ? "mk" : ""}"><td class="ck"><button type="button" class="rm" aria-pressed="${marked.has(t.n)}" aria-label="${marked.has(t.n) ? "Manter" : "Remover"} ${esc(t.title)}">${ICON.x}</button></td>
-    <td class="num">${t.n}</td><td class="tt">${esc(t.title)}</td><td>${esc(t.artist)}</td><td>${esc(t.album)}</td><td class="num">${durTxt(t.sec)}</td><td>${esc(t.date || NI)}</td></tr>`).join("");
+  const rowsHtml = list => list.map(t => `<tr data-n="${t.n}" class="${marked.has(t.n) ? "mk" : ""}"><td class="ck"><button type="button" class="rm" aria-pressed="${marked.has(t.n)}" aria-label="${marked.has(t.n) ? "Manter" : "Remover"} ${esc(t.title)}">${ICON.x}</button></td>${songCells(t)}</tr>`).join("");
   let visible = [];
   function draw(){
     const qq = query.trim().toLowerCase();
-    visible = BY_PLAYLIST.filter(t => !qq || (t.title + " " + t.artist + " " + t.album).toLowerCase().includes(qq));
-    visible.sort((a, b) => { const x = a[sortK], y = b[sortK]; return (typeof x === "number" && typeof y === "number" ? x - y : coll.compare(String(x), String(y))) * sortDir || a.n - b.n; });
-    tbody.innerHTML = visible.length ? rowsHtml(visible) : `<tr><td colspan="7" class="none">Nenhuma faixa encontrada.</td></tr>`;
+    visible = BY_PLAYLIST.filter(t => !qq || (t.title + " " + t.artist + " " + t.album + " " + t.genre).toLowerCase().includes(qq));
+    visible.sort(cmpSong(sortK, sortDir));
+    tbody.innerHTML = visible.length ? rowsHtml(visible) : `<tr><td colspan="${SONG_COLS.length + 1}" class="none">Nenhuma faixa encontrada.</td></tr>`;
     md.m.querySelectorAll("th[data-k]").forEach(th => th.setAttribute("aria-sort", th.dataset.k === sortK ? (sortDir > 0 ? "ascending" : "descending") : "none"));
     counts();
   }
@@ -1945,10 +2541,18 @@ function openTable(){
     const k = marked.size; if (!k || k >= NN) return;
     const gone = BY_PLAYLIST.filter(t => marked.has(t.n));
     const arts = [...groupBy(gone, "artist")].map(([a, rs]) => [a, rs.length]).sort((x, y) => y[1] - x[1]);
-    const ok = await confirmModal({title: `Remover ${faixas(k)}?`, danger: true, ok: "Remover",
+    const pending = confirmModal({title: `Remover ${faixas(k)}?`, danger: true, ok: "Remover",
       html: `<p>${k <= 3 ? gone.map(t => `<strong>${esc(t.title)}</strong> (${esc(t.artist)})`).join(", ") : `Faixas de ${listPt(arts.slice(0, 3).map(([a, n]) => `${esc(a)} (${n})`))}${arts.length > 3 ? ` e mais ${arts.length - 3} artistas` : ""}`} sairão da playlist.</p>
+        ${k > 3 ? `<p><button type="button" class="lnk" id="rm-see-all" style="padding:0">Ver todas as ${faixas(k)} que serão apagadas</button></p>` : ""}
         <p>A playlist fica com <strong>${faixas(NN - k)}</strong>, renumeradas de 1 a ${NN - k} mantendo a ordem de entrada. Painel e insights serão recalculados.</p><p class="muted">Para guardar a lista antes, exporte primeiro.</p>`,
       extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+    const seeAll = document.querySelector("#rm-see-all");
+    if (seeAll) seeAll.addEventListener("click", () => openModal({
+      title: `${faixas(k)} serão apagadas`,
+      body: songTable(gone),
+      size: "lg"
+    }));
+    const ok = await pending;
     if (!ok) return;
     commitRows(currentRows().filter(r => !marked.has(r[0])), `${faixas(k)} removida${k > 1 ? "s" : ""} · playlist com ${faixas(NN - k)}`);
   });
@@ -1961,7 +2565,7 @@ function download(name, blob){
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
 function exportTxt(){
-  const txt = currentRows().map(r => [r[0], r[1], r[2], r[3], durTxt(r[4]), r[5]].map(v => String(v ?? "").replace(/[\t\r\n]+/g, " ")).join("\t")).join("\n") + "\n";
+  const txt = currentRows().map(r => [r[0], r[1], r[2], r[3], durTxt(r[4]), r[5], ...(r[6] ? [JSON.stringify(r[6])] : [])].map(v => String(v ?? "").replace(/[\t\r\n]+/g, " ")).join("\t")).join("\n") + "\n";
   download(`playlist-${today()}.txt`, new Blob([txt], {type: "text/plain;charset=utf-8"}));
   toast(`Lista exportada em texto · ${faixas(NN)}`);
 }
@@ -1990,14 +2594,18 @@ function zipStore(files){
 function exportXlsx(){
   const x = s => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const col = i => String.fromCharCode(65 + i);
-  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento"];
+  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento", "gêneros", "popularidade", "explícita", "tipo_lançamento"];
   const rows = currentRows();
+  const extra = r => {
+    const m = r[6] || {}, gs = shownGenres((r[2] || "").trim() || NI);
+    return [gs ? gs.join(", ") : "", typeof m.p === "number" ? m.p : "", m.x === undefined ? "" : m.x ? "Sim" : "Não", TYPE_PT[m.ty] || ""];
+  };
   const cell = (v, r, i, s) => typeof v === "number" ? `<c r="${col(i)}${r}"${s ? ` s="${s}"` : ""}><v>${v}</v></c>` : `<c r="${col(i)}${r}" t="inlineStr"${s ? ` s="${s}"` : ""}><is><t xml:space="preserve">${x(v)}</t></is></c>`;
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
 <cols><col min="1" max="1" width="9" customWidth="1"/><col min="2" max="2" width="48" customWidth="1"/><col min="3" max="3" width="26" customWidth="1"/><col min="4" max="4" width="38" customWidth="1"/><col min="5" max="5" width="10" customWidth="1"/><col min="6" max="6" width="16" customWidth="1"/></cols>
-<sheetData><row r="1">${head.map((h, i) => cell(h, 1, i, 1)).join("")}</row>${rows.map((r, k) => `<row r="${k + 2}">${[r[0], r[1], r[2], r[3], durTxt(r[4]), r[5]].map((v, i) => cell(v, k + 2, i)).join("")}</row>`).join("")}</sheetData>
-<autoFilter ref="A1:F${rows.length + 1}"/></worksheet>`;
+<sheetData><row r="1">${head.map((h, i) => cell(h, 1, i, 1)).join("")}</row>${rows.map((r, k) => `<row r="${k + 2}">${[r[0], r[1], r[2], r[3], durTxt(r[4]), r[5], ...extra(r)].map((v, i) => cell(v, k + 2, i)).join("")}</row>`).join("")}</sheetData>
+<autoFilter ref="A1:${col(head.length - 1)}${rows.length + 1}"/></worksheet>`;
   const files = [
     {name: "[Content_Types].xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},
     {name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
@@ -2025,6 +2633,10 @@ $("#dt-export").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
 $("#dt-table").addEventListener("click", openTable);
 $("#dt-import").addEventListener("click", () => openImport());
 $("#dt-export").addEventListener("click", openExport);
+$("#dt-update").innerHTML = `${ICON.sync}<span>Atualizar dados</span>`;
+$("#dt-update").addEventListener("click", openDataUpdate);
+// mesma conta do openDataUpdate: música sem dados do Spotify ou artista sem gênero pesquisado
+$("#dt-update").hidden = !BY_PLAYLIST.some(t => !t.m && t.artist !== NI && t.title) && !genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m}))).length;
 $("#foot-src").textContent = STORE ? `Lista editada neste navegador · ${faixas(NN)} · ${new Date(STORE.updated || Date.now()).toLocaleDateString("pt-BR")}` : `Fonte: lista de ${faixas(NN)} fornecida · sem dados externos`;
 if (STORE) $("#srcline").textContent += " · lista editada";
 
@@ -2034,6 +2646,7 @@ addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { pla
 function boot(){
   placePill();
   render();
+  queueAppleGenres();
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
   if (location.hash === "#insights") showTab("insights");
   const params = new URLSearchParams(location.search);

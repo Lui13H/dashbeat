@@ -32,6 +32,7 @@
       <button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button>
       <button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button>
       <button class="dbtn" id="dt-export" type="button" title="Baixar a lista em Excel ou texto"></button>
+      <button class="dbtn" id="dt-update" type="button" title="Buscar no Spotify os dados que faltam (gênero, explícita, popularidade…)"></button>
     </div>
   </div>
 
@@ -84,19 +85,20 @@
           <header><div><div class="eyebrow">04 · Ranking</div><h2>Bandas/artistas do maior para o menor</h2></div><div class="hint">Com participação e acumulado</div></header>
           <div class="body"><div class="list rank" id="rank"></div></div>
         </article>
+        <article class="card chart rise" style="--d:11">
+          <header><div><div class="eyebrow">05 · Estilo</div><h2>Músicas por gênero</h2></div><div class="hint" id="gen-hint"></div></header>
+          <div class="body"><div class="list rank genres" id="genres"></div></div>
+        </article>
+        <article class="card chart rise" style="--d:12">
+          <header><div><div class="eyebrow">06 · Perfil</div><h2>Como são as faixas</h2></div><div class="hint" id="prof-hint"></div></header>
+          <div class="body"><div class="prof" id="profile"></div></div>
+        </article>
       </div>
 
-      <article class="card chart rise" id="filtered-list-card" style="--d:11;display:none">
-        <header><div><div class="eyebrow">05 · Seleção</div><h2>Músicas no filtro atual</h2></div><div class="hint" id="filtered-list-hint"></div></header>
+      <article class="card chart rise" id="filtered-list-card" style="--d:13;display:none">
+        <header><div><div class="eyebrow">07 · Seleção</div><h2>Músicas no filtro atual</h2></div><div class="hint" id="filtered-list-hint"></div></header>
         <div class="body"><div class="tbscroll inline"><table class="tb">
-          <thead><tr>
-            <th data-k="n" class="num" tabindex="0">#<i></i></th>
-            <th data-k="title" tabindex="0">Música<i></i></th>
-            <th data-k="artist" tabindex="0">Artista<i></i></th>
-            <th data-k="album" tabindex="0">Álbum<i></i></th>
-            <th data-k="sec" class="num" tabindex="0">Duração<i></i></th>
-            <th data-k="date" tabindex="0">Lançamento<i></i></th>
-          </tr></thead>
+          <thead><tr></tr></thead>
           <tbody id="filtered-list-body"></tbody>
         </table></div></div>
       </article>
