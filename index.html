@@ -497,9 +497,16 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
             var avatarHtml = avatar
                 ? '<img src="' + esc(avatar) + '" alt="" class="w-6 h-6 rounded-full object-cover flex-none">'
                 : '<span class="w-6 h-6 rounded-full bg-spotify text-black flex items-center justify-center text-xs font-bold flex-none">' + esc(name.slice(0, 1).toUpperCase()) + '</span>';
-            bar.innerHTML = glyph + avatarHtml + '<span class="truncate max-w-[150px]">' + esc(name) + '</span>';
+            var logoutBtn = '<button type="button" id="sp-logout-x" title="Sair da conta Spotify" aria-label="Sair da conta Spotify" class="ml-1 -mr-1.5 w-5 h-5 rounded-full flex items-center justify-center text-base-400 hover:text-white hover:bg-white/10 transition-colors flex-none"><svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>';
+            bar.innerHTML = glyph + avatarHtml + '<span class="truncate max-w-[150px]">' + esc(name) + '</span>' + logoutBtn;
             bar.classList.remove('hidden');
             bar.classList.add('flex');
+            document.getElementById('sp-logout-x').addEventListener('click', function () {
+                try { localStorage.removeItem('catalogo-musical:spotify-oauth'); } catch (e) {}
+                bar.classList.add('hidden');
+                bar.classList.remove('flex');
+                bar.innerHTML = '';
+            });
         })();
     </script>
 </body>
