@@ -1689,7 +1689,7 @@ function openImport(initialMode = "add", prefillText = null, autoFetch = false){
   const body = document.createElement("div");
   body.innerHTML = `<p class="mdesc" id="im-desc"></p>
     <div class="imrow"><label class="chk" id="im-dupwrap"><input type="checkbox" id="im-dup" checked><span>Ignorar faixas que já estão na playlist (mesmo título e artista)</span></label></div>
-    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Aceita: link do Spotify, lista colada (TAB entre colunas) ou arquivo .txt/.tsv/.csv/.xlsx.&#10;&#10;Link do Spotify:&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;&#10;Ou lista colada:&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26"></textarea></label>
+    <label class="drop" id="im-drop"><textarea id="im-text" spellcheck="false" placeholder="Aceita: link de playlist/faixa/álbum do Spotify, lista colada (1 faixa por linha, colunas separadas por TAB), ou arquivo .txt/.tsv/.csv/.xlsx (arraste para cá).&#10;&#10;Link do Spotify:&#10;https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M&#10;&#10;Ou lista colada:&#10;1&#9;Nome da música&#9;Artista&#9;Álbum&#9;4:51&#9;2004-08-26"></textarea></label>
     <div class="imrow"><label class="gbtn file">${ICON.up}<span>Escolher arquivo</span><input type="file" id="im-file" accept=".txt,.tsv,.csv,.xlsx,text/plain,text/csv"></label></div>
     <div id="sp-fields" style="display:none">
       <p class="mdesc" id="sp-detect-msg"></p>
