@@ -1165,7 +1165,7 @@ function openModal({title, sub = "", body, foot, size = "", headerExtra = "", on
   const bg = document.createElement("div");
   bg.className = "mbg";
   bg.innerHTML = `<div class="modal${size ? " m-" + size : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-    <header class="mh"><div><h3>${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ""}</div><button class="mx" type="button" aria-label="Fechar">${ICON.x}</button>${headerExtra ? `<div class="mh-extra">${headerExtra}</div>` : ""}</header>
+    <header class="mh"><div class="mh-left"><div><h3>${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ""}</div>${headerExtra ? `<div class="mh-extra">${headerExtra}</div>` : ""}</div><button class="mx" type="button" aria-label="Fechar">${ICON.x}</button></header>
     <div class="mb"></div><footer class="mf"></footer></div>`;
   const m = bg.querySelector(".modal");
   if (typeof body === "string") m.querySelector(".mb").innerHTML = body; else m.querySelector(".mb").appendChild(body);
