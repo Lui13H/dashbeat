@@ -719,10 +719,11 @@ function renderGenres(){
   const base = rows(true, true, false), el = $("#genres");
   const counts = new Map();
   for (const t of base) for (const g of t.ge || []) counts.set(g, (counts.get(g) || 0) + 1);
-  const missing = base.filter(t => !t.gs).length;
+  // na playlist de exemplo não tem "Atualizar dados" (o botão do topo também some)
+  const missing = STORE ? base.filter(t => !t.gs).length : 0;
   const upd = missing ? ` · <button type="button" class="lnk" data-upd style="padding:0">buscar gênero de ${faixas(missing)}</button>` : "";
   if (!counts.size){
-    el.innerHTML = `<div class="empty-in"><p>${missing ? "Nenhuma música tem gênero ainda." : "O Spotify não informa gênero para os artistas dessa seleção."}</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Gasta 1 busca no Spotify por artista, não por música.</p>` : ""}</div>`;
+    el.innerHTML = `<div class="empty-in"><p>${!STORE ? "Os gêneros aparecem aqui assim que forem encontrados." : missing ? "Nenhuma música tem gênero ainda." : "O Spotify não informa gênero para os artistas dessa seleção."}</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Gasta 1 busca no Spotify por artista, não por música.</p>` : ""}</div>`;
     $("#gen-hint").innerHTML = "";
     return;
   }
@@ -741,7 +742,7 @@ function profStack(title, big, segs, total){
 }
 function renderProfile(R){
   const M = R.filter(hasMeta), el = $("#profile");
-  const missing = R.filter(t => !t.m).length;
+  const missing = STORE ? R.filter(t => !t.m).length : 0;
   $("#prof-hint").innerHTML = M.length ? `${M.length === R.length ? `todas as ${faixas(M.length)}` : `${nf(M.length)} de ${faixas(R.length)}`} com esses dados${missing ? ` · <button type="button" class="lnk" data-upd style="padding:0">completar ${missing}</button>` : ""}` : "";
   if (!M.length){
     el.innerHTML = `<div class="empty-in"><p>Explícitas, singles e popularidade aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
@@ -2636,7 +2637,9 @@ $("#dt-export").addEventListener("click", openExport);
 $("#dt-update").innerHTML = `${ICON.sync}<span>Atualizar dados</span>`;
 $("#dt-update").addEventListener("click", openDataUpdate);
 // mesma conta do openDataUpdate: música sem dados do Spotify ou artista sem gênero pesquisado
-$("#dt-update").hidden = !BY_PLAYLIST.some(t => !t.m && t.artist !== NI && t.title) && !genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m}))).length;
+// playlist de exemplo (nada salvo no navegador): baixar ou completar dados não faz sentido
+$("#dt-export").hidden = !STORE;
+$("#dt-update").hidden = !STORE || !BY_PLAYLIST.some(t => !t.m && t.artist !== NI && t.title) && !genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m}))).length;
 $("#foot-src").textContent = STORE ? `Lista editada neste navegador · ${faixas(NN)} · ${new Date(STORE.updated || Date.now()).toLocaleDateString("pt-BR")}` : `Fonte: lista de ${faixas(NN)} fornecida · sem dados externos`;
 if (STORE) $("#srcline").textContent += " · lista editada";
 
