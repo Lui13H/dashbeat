@@ -2381,7 +2381,8 @@ function openImport(prefillText = null){
     <div id="im-prev" class="prev"></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
-  const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add"${STORE || spotifyUserDisplay === "Crowd Goes Wild" ? "" : ` disabled title="A playlist atual é só um exemplo: primeiro substitua pela sua"`}>Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
+  const isAllowedUser = spotifyUserDisplay === "Crowd Goes Wild" || spotifyUserDisplay === "juia";
+  const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add"${STORE || isAllowedUser ? "" : ` disabled title="A playlist atual é só um exemplo: primeiro substitua pela sua"`}>Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
   const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md", headerExtra});
   const q = s => md.m.querySelector(s), ta = q("#im-text");
   const existing = new Set(BY_PLAYLIST.map(t => (t.title + "|" + t.artist).toLowerCase()));
@@ -2389,7 +2390,7 @@ function openImport(prefillText = null){
     md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
     q("#im-desc").innerHTML = mode === "add"
       ? `As músicas novas entram <strong>no fim da playlist</strong>, como as adições mais recentes (a partir da #${NN + 1}). Nada do que já existe é apagado.`
-      : !STORE && spotifyUserDisplay !== "Crowd Goes Wild" ? `A playlist atual é só um <strong>exemplo</strong>: a sua lista entra no lugar dela. Depois disso, "Adicionar músicas" fica liberado pra ir somando novas.`
+      : !STORE && !isAllowedUser ? `A playlist atual é só um <strong>exemplo</strong>: a sua lista entra no lugar dela. Depois disso, "Adicionar músicas" fica liberado pra ir somando novas.`
       : `A lista colada <strong>substitui toda a playlist atual</strong>. Painel, gráficos e insights são recalculados do zero com as músicas novas.`;
     q("#im-dupwrap").style.display = mode === "add" ? "" : "none";
     const go = q("#im-go");
