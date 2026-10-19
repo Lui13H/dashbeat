@@ -602,10 +602,10 @@ function renderTree(){
     const sel = state.bands.has(d.k);
     el.classList.toggle("sel", sel);
     el.classList.toggle("dim", hasSel && !sel);
-    el.style.background = sel ? "linear-gradient(150deg,#D1FAE5,#34D399)" :
+    el.style.background = sel ? "linear-gradient(150deg,rgba(209,250,229,.4),rgba(52,211,153,.3))" :
       `linear-gradient(150deg, hsl(156,62%,${16 + 26 * k}%), hsl(162,70%,${10 + 18 * k}%))`;
     const lbl = el.querySelector(".lbl");
-    lbl.style.color = sel ? "#022C22" : "#ECFDF5";
+    lbl.style.color = sel ? "#ECFDF5" : "#ECFDF5";
     el.querySelector("span").textContent = d.value;
     const album = topAlbumOf(g.get(d.k));
     const covKey = album ? d.k + "|" + album : "";

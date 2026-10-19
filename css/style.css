@@ -182,8 +182,8 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 .tile .cov::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(2,44,34,.45),rgba(2,20,15,.88))}
 .tile.hascov .cov{opacity:1}
 .tile.hascov .lbl{text-shadow:0 1px 3px rgba(0,0,0,.7)}
-.tile.sel .cov{opacity:0}
-.tile.sel .lbl{text-shadow:none}
+.tile.sel .cov{opacity:.35}
+.tile.sel .lbl{text-shadow:0 1px 3px rgba(0,0,0,.3)}
 .tile.sel{box-shadow:0 0 0 2px var(--glow), 0 0 30px rgba(110,231,183,.5)}
 .tile.dim{opacity:.32;filter:saturate(.4)}
 .tile.leaving{opacity:0 !important}
