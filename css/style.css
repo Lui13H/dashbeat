@@ -451,6 +451,8 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .modal.m-full{width:min(1800px,100%);height:94vh;max-height:94vh}
 .modal.m-full .mb{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .tree-big{position:relative;flex:1;min-height:0}
+.tree-big:fullscreen{background:#030B08;cursor:pointer}
+.tree-big:fullscreen .tile{cursor:pointer}
 .tree.nolabels .lbl{display:none}
 .tree .cov::after{transition:opacity .3s}
 .tree.nolabels .cov::after{opacity:0}

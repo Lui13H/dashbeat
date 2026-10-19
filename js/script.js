@@ -639,19 +639,32 @@ function openTreeBig(){
   const body = document.createElement("div"); body.className = "tree-big";
   const md = openModal({title: "", body, size: "full",
     headerExtra: `<label class="chk"><input type="checkbox" class="tree-nonames"${treeEl.classList.contains("nolabels") ? " checked" : ""}><span>Esconder nomes</span></label>
-      <label class="chk"><input type="checkbox" id="tree-flush"><span>Sem bordas</span></label>`,
+      <label class="chk"><input type="checkbox" id="tree-flush"><span>Sem bordas</span></label>
+      ${document.fullscreenEnabled ? `<button class="gbtn tree-exp" type="button" id="tree-super">Tela super cheia</button>` : ""}`,
     onClose: () => { hideTip(); treeEl.classList.remove("flush"); moveTree(home); }});   // "sem bordas" é só da tela cheia
   md.m.setAttribute("aria-label", "Músicas por banda/artista em tela cheia");
   md.q("#tree-flush").addEventListener("change", e => {
     treeEl.classList.add("notrans"); treeEl.classList.toggle("flush", e.target.checked); renderTree();
     setTimeout(() => treeEl.classList.remove("notrans"), 60);
   });
+  /* "tela super cheia" = tela cheia do navegador (igual F11) só com o gráfico. Esc o próprio navegador
+     trata; clicar em qualquer lugar também sai */
+  const sup = md.q("#tree-super");
+  if (sup) sup.addEventListener("click", () => { hideTip(); body.requestFullscreen().catch(() => toast("O navegador não deixou entrar em tela cheia.")); });
+  body.addEventListener("click", () => { if (document.fullscreenElement === body) document.exitFullscreen(); });
   moveTree(body);
 }
+document.addEventListener("fullscreenchange", () => {
+  if (!treeEl.closest(".tree-big")) return;
+  hideTip(); moveTree(treeEl.parentElement);   // mesmo lugar, só recalcula pro tamanho novo (sem animação)
+});
 $("#tree-expand").addEventListener("click", openTreeBig);
-// uma opção só pro card e pra tela cheia: marcar em um marca no outro
+// uma opção só pro card e pra tela cheia: marcar em um marca no outro — e fica salva (vale depois do F5)
+const NONAMES_KEY = "catalogo-musical:tree-nonames";
+try { if (localStorage.getItem(NONAMES_KEY) === "1"){ treeEl.classList.add("nolabels"); document.querySelectorAll(".tree-nonames").forEach(cb => { cb.checked = true; }); } } catch (e) {}
 document.addEventListener("change", e => {
   if (!e.target.classList.contains("tree-nonames")) return;
+  try { localStorage.setItem(NONAMES_KEY, e.target.checked ? "1" : "0"); } catch (e2) {}
   treeEl.classList.toggle("nolabels", e.target.checked);
   document.querySelectorAll(".tree-nonames").forEach(cb => { cb.checked = e.target.checked; });
 });

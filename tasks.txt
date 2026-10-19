@@ -86,3 +86,7 @@ quero que o grafico linha do tempo também seja uma forma de aplicar um filtro p
 
 
 habilitar compartilhamento de playlist
+
+fazer grafico desse de musicas quadradas só que de albuns como uma segunda opção de visualização (voce escolhe se quer ver por banda ou por album)
+
+quero que quando a pessoa clicar na banda pra filtrar a mudança visual que da no grafico dos quadrados seja um pouco mais sutil em vez de tampar completamente a ofto da banda com um quadrado comicamente verde
