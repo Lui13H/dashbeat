@@ -23,7 +23,7 @@ CONCLUÍDO
 ✅ Tabela "Músicas no filtro atual" agora numera sequencialmente de 1 em 1 (1 a N) em vez de exibir a colocação global pulada.
 
 IMPORTAÇÃO / SPOTIFY
-- Importar direto de outras plataformas: YouTube Music, Apple Music, Deezer.
+- Importar direto de outras plataformas: YouTube Music, Apple Music, Deezer, Sound Cloud.
 - Importar a capa do álbum e exibir nas tabelas/tooltips.
 - Botão para reautenticar automaticamente quando o refresh token expirar/for revogado, em vez de só dar erro.
 

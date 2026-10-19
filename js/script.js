@@ -76,6 +76,7 @@ for (const t of T){
   (albumBands.get(t.album) || albumBands.set(t.album, new Set()).get(t.album)).add(t.artist);
 }
 const state = {bands: new Set(), albums: new Set(), genres: new Set()};
+let spotifyUserDisplay = null;  // nome do usuário logado no Spotify (preenchido ao obter token)
 const $ = s => document.querySelector(s);
 const fmtInt = n => n.toLocaleString("pt-BR");
 const pct = (a, b, d = 1) => (b ? (100 * a / b) : 0).toLocaleString("pt-BR", {minimumFractionDigits: d, maximumFractionDigits: d}) + "%";
@@ -2220,6 +2221,12 @@ async function spotifyFetchGenres(list, token, onProgress){
   }
   return done;
 }
+async function spotifyFetchUserProfile(token){
+  try {
+    const profile = await spotifyGetJSON("https://api.spotify.com/v1/me", token);
+    if (profile && profile.display_name) spotifyUserDisplay = profile.display_name;
+  } catch (e) {}  // ignorar erros ao buscar o perfil
+}
 // música antiga não tem ID do Spotify: procura pelo título + artista e só aceita se o artista bater
 function pickTrack(items, title, artist){
   const nt = normC(cleanTitle(title)), arts = splitArtists(artist).map(normC);
@@ -2374,7 +2381,7 @@ function openImport(prefillText = null){
     <div id="im-prev" class="prev"></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
-  const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add"${STORE ? "" : ` disabled title="A playlist atual é só um exemplo: primeiro substitua pela sua"`}>Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
+  const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add"${STORE || spotifyUserDisplay === "Crowd Goes Wild" ? "" : ` disabled title="A playlist atual é só um exemplo: primeiro substitua pela sua"`}>Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
   const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md", headerExtra});
   const q = s => md.m.querySelector(s), ta = q("#im-text");
   const existing = new Set(BY_PLAYLIST.map(t => (t.title + "|" + t.artist).toLowerCase()));
@@ -2382,7 +2389,7 @@ function openImport(prefillText = null){
     md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
     q("#im-desc").innerHTML = mode === "add"
       ? `As músicas novas entram <strong>no fim da playlist</strong>, como as adições mais recentes (a partir da #${NN + 1}). Nada do que já existe é apagado.`
-      : !STORE ? `A playlist atual é só um <strong>exemplo</strong>: a sua lista entra no lugar dela. Depois disso, "Adicionar músicas" fica liberado pra ir somando novas.`
+      : !STORE && spotifyUserDisplay !== "Crowd Goes Wild" ? `A playlist atual é só um <strong>exemplo</strong>: a sua lista entra no lugar dela. Depois disso, "Adicionar músicas" fica liberado pra ir somando novas.`
       : `A lista colada <strong>substitui toda a playlist atual</strong>. Painel, gráficos e insights são recalculados do zero com as músicas novas.`;
     q("#im-dupwrap").style.display = mode === "add" ? "" : "none";
     const go = q("#im-go");
@@ -2532,6 +2539,8 @@ function openImport(prefillText = null){
     if (!secret){ status.classList.add("err"); status.textContent = "Informe o Client Secret."; return; }
     if (q("#sp-remember").checked) saveSpotifyCreds(id, secret); else clearSpotifyCreds();
     try { lastToken = await spotifyToken(id, secret); } catch (e2) { status.classList.add("err"); status.textContent = e2.message; return; }
+    // busca o perfil do usuário pra saber quem está logado (usado pra "Crowd Goes Wild")
+    spotifyFetchUserProfile(lastToken);
     setTimeout(() => { lastToken = null; }, 50 * 60 * 1000);   // token do Spotify vale 1h
     return lastToken;
   }

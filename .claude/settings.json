@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check \"C:\\\\Users\\\\Luis Henrique\\\\OneDrive\\\\Desktop\\\\PROJETOS VS.CODE\\\\MEUS PROJETOS\\\\Painel Musical\\\\js\\\\script.js\")",
+      "Bash(node --check js/script.js)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git push *)",
+      "Bash(node -e ' *)",
+      "Bash(curl -s \"https://itunes.apple.com/search?entity=album&limit=10&term=Slipknot%20Vol.%203%20Deluxe\")",
+      "Bash(grep -n \"^/\\\\* -\\\\|^// -\\\\|^function \\\\|^const [A-Z_]* =\\\\|^async function \" js/script.js)",
+      "Bash(grep -n \"^/\\\\* -\\\\|^function \\\\|^const [A-Za-z_]* =\\\\|^async function \\\\|^let \" js/script.js)",
+      "Bash(grep -n \"^const ICON\\\\|^function render\\(\\)\\\\|^\\\\$\\(\\\\\"#dt-export\\\\\"\\)\\\\|^const nf\\\\|^const cleanTitle\" js/script.js)",
+      "PowerShell($edge = @\\(\"${env:ProgramFiles\\(x86\\)}\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\", \"$env:ProgramFiles\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\"\\) | Where-Object { Test-Path $_ } | Select-Object -First 1; $edge)",
+      "Bash(gh api *)",
+      "Bash(grep -n \"const treeEl\\\\|^\\\\$\\(\\\\\"#tree-expand\\\\\"\\)\" js/script.js)",
+      "Bash(git commit *)"
+    ]
+  }
+}
