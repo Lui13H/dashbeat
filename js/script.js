@@ -2024,7 +2024,8 @@ function openRateLimitModal({done, total, update = false}){
     foot.querySelector("[data-cancel]").onclick = () => pick("cancel");
   });
 }
-async function spotifyRunFetch({token, ids, albumIds, status, btn}){
+// known = músicas da mesma colagem que já vieram do que está salvo (não passam pelo Spotify, mas contam como "carregadas")
+async function spotifyRunFetch({token, ids, albumIds, status, btn, known = 0}){
   status.classList.remove("err");
   btn.disabled = true;
   status.textContent = albumIds.length ? `Buscando álbum${albumIds.length > 1 ? "ns" : ""}…` : `Buscando ${faixas(ids.length)}…`;
@@ -2046,7 +2047,7 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn}){
     const shouldPrompt = attempt === 3 || (attempt > 3 && (attempt - 3) % 5 === 0);
     if (shouldPrompt){
       clearInterval(tick);
-      const decision = await openRateLimitModal({done: i, total: t, attempt});
+      const decision = await openRateLimitModal({done: known + i, total: known + t, attempt});
       startTick();
       if (decision === "keep"){ const e = new Error("keep"); e.keepPartial = true; throw e; }
       if (decision === "cancel"){ const e = new Error("Importação cancelada: nenhuma música foi adicionada."); e.cancelled = true; throw e; }
@@ -2079,11 +2080,12 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn}){
     const rows = results.flatMap(r => r.rows), warnings = results.flatMap(r => r.warnings);
     saveTrackCache(rows);
     const partial = results.some(r => r.partial);
+    if (!rows.length && partial && known){ status.textContent = "Carregamento parado: o Spotify está limitando."; return {rows, warnings, partial}; }   // nenhuma nova, mas as já salvas valem
     if (!rows.length){ status.classList.add("err"); status.textContent = "Nenhuma faixa encontrada."; return null; }
     status.textContent = partial
       ? `${faixas(rows.length)} encontrada${rows.length > 1 ? "s" : ""} até você parar o carregamento${warnings.length ? ` · ${warnings.length} não encontrada(s)` : ""}.`
       : `${faixas(rows.length)} encontrada${rows.length > 1 ? "s" : ""}${warnings.length ? ` · ${warnings.length} não encontrada(s)` : ""}.`;
-    return {rows, warnings};
+    return {rows, warnings, partial};
   } catch (e) {
     clearInterval(tick);
     if (e.cancelled){ status.textContent = e.message; return null; }
@@ -2395,7 +2397,7 @@ function openImport(initialMode = "add", prefillText = null){
     const cache = loadTrackCache(), toFetch = ids.filter(x => !cache[x]), known = ids.length - toFetch.length;
     let res = {rows: [], warnings: []};
     if (toFetch.length || albumIds.length){
-      res = await fetchFromSpotify(id, secret, toFetch, albumIds, status, btn);
+      res = await fetchFromSpotify(id, secret, toFetch, albumIds, status, btn, known);
       if (!res){ parsed = null; update(); return; }
     }
     const fetchedSet = new Set(toFetch), got = new Map(res.rows.filter(r => fetchedSet.has(r.id)).map(r => [r.id, r]));
@@ -2408,24 +2410,25 @@ function openImport(initialMode = "add", prefillText = null){
       const msg = `${known === 1 ? "1 música já era conhecida" : `${known} músicas já eram conhecidas`} — não precisou buscar no Spotify.`;
       status.textContent = toFetch.length || albumIds.length ? `${status.textContent} ${msg}` : msg;
     }
-    const arts = q("#sp-genre").checked && id && secret ? genreTargets(parsed.rows) : [];
-    if (arts.length){
-      const before = status.textContent, token = await getToken(id, secret, status);
-      if (token){
-        btn.disabled = true;
-        try {
-          const n = await spotifyFetchGenres(arts, token, async (d, tot, s, att) => {
-            status.textContent = s ? `O Spotify pediu uma pausa… (gênero ${d + 1} de ${tot})` : `Buscando gênero musical: artista ${Math.min(d + 1, tot)} de ${tot}…`;
-            // qualquer escolha que não seja esperar só encerra os gêneros: as músicas já buscadas continuam
-            if (s && (att === 3 || (att > 3 && (att - 3) % 5 === 0)) && await openRateLimitModal({done: d, total: tot, update: true}) !== "wait"){ const e = new Error("Gêneros interrompidos"); e.limited = true; throw e; }
-          });
-          status.textContent = `${before} Gênero de ${n} artista${n > 1 ? "s" : ""} encontrado.`;
-        } catch (e){
-          status.textContent = `${before} ${e.limited ? "O Spotify pediu uma pausa nos gêneros" : "Não deu pra buscar todos os gêneros"} — complete depois em "Atualizar dados".`;
-        } finally { btn.disabled = false; }
-      }
-    }
+    // as músicas aparecem (e já dá pra adicionar) antes do gênero: gênero é extra e nunca pode segurar a importação
     update();
+    const arts = q("#sp-genre").checked && id && secret && parsed.rows.length ? genreTargets(parsed.rows) : [];
+    if (!arts.length) return;
+    const before = status.textContent;
+    // se o Spotify já estava limitando (a pessoa parou e ficou com o que carregou), pedir gênero agora só travaria de novo
+    if (res.partial){ status.textContent = `${before} Gênero fica pra depois: use "Atualizar dados" quando o Spotify liberar.`; return; }
+    const token = await getToken(id, secret, status);
+    if (!token) return;
+    try {
+      const n = await spotifyFetchGenres(arts, token, (d, tot, s) => {
+        // primeiro sinal de limite: para os gêneros na hora (sem modal) — as músicas continuam prontas pra adicionar
+        if (s){ const e = new Error("limite"); e.limited = true; throw e; }
+        status.textContent = `${before} Buscando gênero musical: artista ${Math.min(d + 1, tot)} de ${tot}…`;
+      });
+      status.textContent = n ? `${before} Gênero de ${n} artista${n > 1 ? "s" : ""} encontrado.` : before;
+    } catch (e){
+      status.textContent = `${before} ${e.limited ? "O Spotify pediu uma pausa, então o gênero ficou pra depois" : "Não deu pra buscar todos os gêneros"} — complete em "Atualizar dados".`;
+    }
   }
   let lastToken = null;
   async function getToken(id, secret, status){
@@ -2440,10 +2443,10 @@ function openImport(initialMode = "add", prefillText = null){
     setTimeout(() => { lastToken = null; }, 50 * 60 * 1000);   // token do Spotify vale 1h
     return lastToken;
   }
-  async function fetchFromSpotify(id, secret, ids, albumIds, status, btn){
+  async function fetchFromSpotify(id, secret, ids, albumIds, status, btn, known = 0){
     const token = await getToken(id, secret, status);
     if (!token) return;
-    return spotifyRunFetch({token, ids, albumIds, status, btn});
+    return spotifyRunFetch({token, ids, albumIds, status, btn, known});
   }
   q("#im-copy-help").addEventListener("click", openPlaylistLinkHelp);
   q("#sp-genre").checked = genreOn();
