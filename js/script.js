@@ -389,7 +389,21 @@ function layoutYears(){
 /* ---------------- chart 2: treemap ---------------- */
 const treeEl = $("#tree");
 const TILES = new Map();
+/* o squarify clássico decide linha por linha e às vezes estica um bloco grande pra poupar os pequenos.
+   Aqui testamos todos os jeitos de montar as 3 primeiras linhas (1 a 6 blocos cada, o resto no clássico)
+   e ficamos com o que deixa os MAIORES mais quadrados (peso = área²). 216 tentativas, ~3ms. */
 function squarify(items, W, H){
+  if (!items.length || !W || !H) return squarifyRows(items, W, H, []);
+  const asp = d => d.w && d.h ? Math.max(d.w / d.h, d.h / d.w) : 1;
+  let best = null, bc = Infinity;
+  for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) for (let c = 1; c <= 6; c++){
+    const L = squarifyRows(items, W, H, [a, b, c]), k = sum(L, d => d.area * d.area * (asp(d) - 1));
+    if (k < bc){ bc = k; best = L; }
+    if (items.length <= a + b) break;   // as outras combinações dariam o mesmo resultado
+  }
+  return best;
+}
+function squarifyRows(items, W, H, forced){
   const total = sum(items, d => d.value), out = [];
   if (!total) return out;
   const scale = W * H / total;
@@ -401,6 +415,7 @@ function squarify(items, W, H){
     if (rect.w >= rect.h){ const cw = s / rect.h; let y = rect.y; for (const d of r){ const h = d.area / cw; out.push({...d, x: rect.x, y, w: cw, h}); y += h; } rect.x += cw; rect.w -= cw; }
     else { const rh = s / rect.w; let x = rect.x; for (const d of r){ const w = d.area / rh; out.push({...d, x, y: rect.y, w, h: rh}); x += w; } rect.y += rh; rect.h -= rh; }
   };
+  for (const n of forced){ if (i >= list.length) break; lay(list.slice(i, i + n)); i += n; }
   while (i < list.length){
     const len = Math.min(rect.w, rect.h);
     if (!row.length || worst([...row, list[i]], len) <= worst(row, len)){ row.push(list[i]); i++; }
@@ -555,15 +570,16 @@ function renderTree(){
   const hasSel = state.bands.size > 0;
   const seen = new Set();
   // largest font where the whole name fits on one line (0 = only the cover)
+  const sizes = [17, 15, 13.5, 12, 11, 10];
   const labelSize = (name, w, h) => {
-    for (const s of [17, 15, 13.5, 12, 11, 10]){
+    for (const s of sizes){
       const roomForLine = h - 18 - Math.max(10, s - 2) * 1.2 - 4 >= s * 1.05;   // one name line above the count
       if (w - 20 > 0 && roomForLine && fitsOneLine(name, s, "Sora, sans-serif", 600, w - 20, "-.01em")) return s;
     }
     return 0;
   };
   const labelSizes = new Map(laid.map(d => [d.k, labelSize(d.k, Math.max(0, d.w - 4), Math.max(0, d.h - 4))]));
-  // once a band loses its name, every band with fewer songs loses it too (no labels "skipping" around)
+  // once a band loses its name, every band with the same or fewer songs loses it too (no labels "skipping" around)
   const hiddenMax = Math.max(0, ...laid.filter(d => !labelSizes.get(d.k)).map(d => d.value));
   for (const d of laid){
     seen.add(d.k);
@@ -573,14 +589,14 @@ function renderTree(){
       el = document.createElement("div"); el.className = "tile";
       el.innerHTML = `<i class="cov"></i><div class="lbl"><strong></strong><span></span></div>`;
       el.querySelector("strong").textContent = d.k;
-      el.addEventListener("click", () => toggle("band", d.k));
+      el.addEventListener("click", () => { if (!treeEl.closest(".tree-big")) toggle("band", d.k); });   // em tela cheia é só pra ver
       bindTip(el, () => tileTip(d.k));
       el.style.opacity = "0";
       el.style.left = (d.x + d.w / 2) + "px"; el.style.top = (d.y + d.h / 2) + "px"; el.style.width = "0px"; el.style.height = "0px";
       treeEl.appendChild(el); TILES.set(d.k, el);
     }
     el.classList.remove("leaving");
-    const g2 = 2, x = d.x + g2, y = d.y + g2, w = Math.max(0, d.w - 2 * g2), h = Math.max(0, d.h - 2 * g2);
+    const g2 = treeEl.classList.contains("flush") ? 0 : 2, x = d.x + g2, y = d.y + g2, w = Math.max(0, d.w - 2 * g2), h = Math.max(0, d.h - 2 * g2);
     const k = Math.sqrt(d.value / max);
     const sel = state.bands.has(d.k);
     el.classList.toggle("sel", sel);
@@ -598,7 +614,7 @@ function renderTree(){
       el.querySelector(".cov").style.backgroundImage = `url("${url}")`;
       el.classList.add("hascov");
     });
-    const size = d.value >= hiddenMax ? labelSizes.get(d.k) : 0;
+    const size = d.value > hiddenMax ? labelSizes.get(d.k) : 0;
     lbl.style.opacity = size ? 1 : 0;
     el.style.borderRadius = Math.max(3, Math.min(10, w / 4, h / 4)) + "px";
     const strongEl = lbl.querySelector("strong");
@@ -610,6 +626,35 @@ function renderTree(){
   for (const [k, el] of TILES) if (!seen.has(k)){ el.classList.add("leaving"); el.style.pointerEvents = "none"; }
   for (const [k, el] of TILES) if (seen.has(k)) el.style.pointerEvents = "";
 }
+
+/* o mesmo gráfico (não uma cópia) vai pro modal e volta ao fechar: capas, filtro e tooltip continuam valendo */
+// ao trocar de lugar os blocos pulam direto pro tamanho novo (sem a transição, que ficava "voando" pela tela)
+function moveTree(to){
+  treeEl.classList.add("notrans");
+  to.appendChild(treeEl);
+  setTimeout(() => { renderTree(); setTimeout(() => treeEl.classList.remove("notrans"), 60); }, 30);
+}
+function openTreeBig(){
+  const home = treeEl.parentElement;
+  const body = document.createElement("div"); body.className = "tree-big";
+  const md = openModal({title: "", body, size: "full",
+    headerExtra: `<label class="chk"><input type="checkbox" class="tree-nonames"${treeEl.classList.contains("nolabels") ? " checked" : ""}><span>Esconder nomes</span></label>
+      <label class="chk"><input type="checkbox" id="tree-flush"><span>Sem bordas</span></label>`,
+    onClose: () => { hideTip(); treeEl.classList.remove("flush"); moveTree(home); }});   // "sem bordas" é só da tela cheia
+  md.m.setAttribute("aria-label", "Músicas por banda/artista em tela cheia");
+  md.q("#tree-flush").addEventListener("change", e => {
+    treeEl.classList.add("notrans"); treeEl.classList.toggle("flush", e.target.checked); renderTree();
+    setTimeout(() => treeEl.classList.remove("notrans"), 60);
+  });
+  moveTree(body);
+}
+$("#tree-expand").addEventListener("click", openTreeBig);
+// uma opção só pro card e pra tela cheia: marcar em um marca no outro
+document.addEventListener("change", e => {
+  if (!e.target.classList.contains("tree-nonames")) return;
+  treeEl.classList.toggle("nolabels", e.target.checked);
+  document.querySelectorAll(".tree-nonames").forEach(cb => { cb.checked = e.target.checked; });
+});
 
 /* ---------------- ranked lists (albums & ranking) with FLIP reordering ---------------- */
 function renderList(container, items, opts){
@@ -1614,10 +1659,30 @@ async function commitRows(rows, flash){
   document.body.classList.add("leaving");
   setTimeout(() => location.reload(), 260);
 }
+const RESET_PHRASE = "EU ACEITO RESETAR A LISTA DE MÚSICAS";
+// apagar a playlist inteira não tem volta: só libera depois de digitar a frase (sem diferenciar maiúscula/acento)
+function confirmReset(){
+  const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
+  return new Promise(res => {
+    let done = false;
+    const foot = document.createElement("div"); foot.className = "mfrow";
+    foot.innerHTML = `<button class="gbtn" type="button" data-x>${ICON.down} Exportar atual</button><span class="sp"></span><button class="gbtn" type="button" data-c autofocus>Cancelar</button><button class="pbtn danger" type="button" data-o disabled>Apagar e restaurar</button>`;
+    const md = openModal({title: "Apagar a sua playlist?", size: "sm", foot, onClose: () => { if (!done) res(false); },
+      body: `<div class="confirm">
+        <p><strong>Isso apaga as ${faixas(NN)} da sua playlist</strong> e o painel volta para a lista de exemplo do site. Não dá pra desfazer.</p>
+        <p class="muted">Se quiser guardar a lista, clique em "Exportar atual" antes.</p>
+        <p style="margin-top:14px">Para confirmar, digite <strong class="rs-phrase">${RESET_PHRASE}</strong></p>
+        <div class="imrow"><input type="text" id="rs-in" autocomplete="off" spellcheck="false" placeholder="${RESET_PHRASE}"></div></div>`});
+    const inp = md.q("#rs-in"), go = foot.querySelector("[data-o]");
+    inp.addEventListener("input", () => { go.disabled = norm(inp.value) !== norm(RESET_PHRASE); });
+    inp.addEventListener("paste", e => e.preventDefault());   // tem que digitar, não colar
+    foot.querySelector("[data-x]").onclick = () => exportTxt();
+    foot.querySelector("[data-c]").onclick = () => md.close();
+    go.onclick = () => { done = true; md.close(); res(true); };
+  });
+}
 async function restoreOriginal(){
-  const ok = await confirmModal({title: "Restaurar a playlist original?", danger: true, ok: "Restaurar original",
-    html: `<p>A lista atual (${faixas(NN)}) será descartada e o painel volta para a lista padrão de exemplo do site (${faixas(DEFAULT_RAW.length)}).</p><p class="muted">Se quiser guardar a lista atual, exporte antes.</p>`,
-    extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+  const ok = await confirmReset();
   if (!ok) return;
   clearStore(); setFlash(`Playlist original restaurada · ${faixas(DEFAULT_RAW.length)}`);
   document.body.classList.add("leaving"); setTimeout(() => location.reload(), 260);
@@ -2273,8 +2338,10 @@ function openDataUpdate(){
 }
 
 /* ---------- import modal ---------- */
-function openImport(initialMode = "add", prefillText = null){
-  let mode = initialMode, parsed = null;
+function openImport(prefillText = null){
+  // somar músicas à playlist de exemplo misturaria o exemplo com as da pessoa: aí só dá pra substituir
+  // e com playlist própria o modal sempre abre em "Adicionar": substituir só passando pela confirmação da aba
+  let mode = STORE ? "add" : "replace", parsed = null;
   const body = document.createElement("div");
   body.innerHTML = `<p class="mdesc" id="im-desc"></p>
     <div class="imrow"><label class="chk" id="im-dupwrap"><input type="checkbox" id="im-dup" checked><span>Ignorar faixas que já estão na playlist (mesmo título e artista)</span></label></div>
@@ -2294,7 +2361,7 @@ function openImport(initialMode = "add", prefillText = null){
     <div id="im-prev" class="prev"></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
-  const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add">Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
+  const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add"${STORE ? "" : ` disabled title="A playlist atual é só um exemplo: primeiro substitua pela sua"`}>Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
   const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md", headerExtra});
   const q = s => md.m.querySelector(s), ta = q("#im-text");
   const existing = new Set(BY_PLAYLIST.map(t => (t.title + "|" + t.artist).toLowerCase()));
@@ -2302,6 +2369,7 @@ function openImport(initialMode = "add", prefillText = null){
     md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
     q("#im-desc").innerHTML = mode === "add"
       ? `As músicas novas entram <strong>no fim da playlist</strong>, como as adições mais recentes (a partir da #${NN + 1}). Nada do que já existe é apagado.`
+      : !STORE ? `A playlist atual é só um <strong>exemplo</strong>: a sua lista entra no lugar dela. Depois disso, "Adicionar músicas" fica liberado pra ir somando novas.`
       : `A lista colada <strong>substitui toda a playlist atual</strong>. Painel, gráficos e insights são recalculados do zero com as músicas novas.`;
     q("#im-dupwrap").style.display = mode === "add" ? "" : "none";
     const go = q("#im-go");
@@ -2379,7 +2447,18 @@ function openImport(initialMode = "add", prefillText = null){
   ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
   drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
-  md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.addEventListener("click", () => { mode = b.dataset.m; update(); }));
+  md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.addEventListener("click", async () => {
+    // com uma playlist própria salva, entrar em "Substituir" pede confirmação (a lista atual vai ser apagada)
+    if (b.dataset.m === "replace" && mode !== "replace" && STORE){
+      const ok = await confirmModal({title: "Substituir a playlist inteira?", danger: true, ok: "Quero substituir",
+        html: `<p>Nesse modo, a lista que você subir <strong>apaga as ${faixas(NN)} da playlist atual</strong> e fica no lugar delas.</p>
+          <p>Se a ideia é só colocar músicas novas, use <strong>Adicionar músicas</strong>: nada do que já existe é apagado.</p>
+          <p class="muted">Você ainda vai confirmar mais uma vez antes de apagar.</p>`,
+        extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+      if (!ok) return;
+    }
+    mode = b.dataset.m; update();
+  }));
   const creds = loadSpotifyCreds();
   q("#sp-id").value = creds.id || ""; q("#sp-secret").value = creds.secret || "";
   const openWizard = (returning = false) => openSpotifyAppHelp({returning, id: q("#sp-id").value.trim(), secret: q("#sp-secret").value.trim(), onDone: (id, secret) => {
@@ -2660,7 +2739,7 @@ function boot(){
     params.delete("import");
     const qs = params.toString();
     history.replaceState({}, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
-    openImport("replace");
+    openImport();
   } else if (!STORE) openExampleNotice();
 }
 function openExampleNotice(){
@@ -2672,6 +2751,6 @@ function openExampleNotice(){
     foot, size: "sm"
   });
   foot.querySelector("[data-ex]").onclick = () => md.close();
-  foot.querySelector("[data-mine]").onclick = () => { md.close(); openImport("replace"); };
+  foot.querySelector("[data-mine]").onclick = () => { md.close(); openImport(); };
 }
 (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(boot);

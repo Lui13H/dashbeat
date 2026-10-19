@@ -16,6 +16,8 @@ CONCLUÍDO
 ✅ Gênero musical: interruptor na importação "Buscar gênero musical" (1 busca a mais por artista novo, não por música; começa ligado). Gráfico "Músicas por gênero" com filtro por gênero (clique).
 ✅ Botão "Atualizar dados" no topo do painel: completa as músicas antigas sem dados (1 busca por música, procurando pelo nome) e os artistas sem gênero (1 busca por artista); confirmação mostra as contas e a lista das músicas incompletas, e dá pra parar no meio sem perder o que veio.
 ✅ Card "Como são as faixas" (explícitas, de onde vêm, popularidade) e 5 insights novos: palavrão, álbum x single, hits x lado B, gênero dominante e gênero que cresceu na playlist. Exportação em Excel ganhou essas colunas; o TXT guarda tudo pra reimportar.
+✅ Gráfico de áreas (banda/artista) com botão "Tela cheia": abre num modal quase do tamanho da tela (só com a opção "Esconder nomes" no topo), mesma fonte do card, só pra visualizar (clique não filtra lá dentro).
+✅ Playlist de exemplo: "Adicionar músicas" bloqueado (só Substituir), sem Baixar lista/Atualizar dados. Com playlist própria: entrar em Substituir pede confirmação, e Restaurar original exige digitar "EU ACEITO RESETAR A LISTA DE MÚSICAS".
 ✅ Gênero de reserva pela Apple (sem login, não gasta o Spotify): aparece em gráficos, tabelas, filtro e insights enquanto o artista não tem gênero do Spotify — mas a música continua contando como "sem gênero" pro botão Atualizar dados, e o do Spotify (mais detalhado) substitui quando vier.
 ✅ Todas as tabelas de músicas mostram as mesmas colunas, por ordem de importância: # · Música · Artista · Álbum · Gênero · Lançamento · Duração · Popularidade · Explícita · Tipo ("—" = dado que falta; ordenar joga esses pro fim).
 ✅ Tabela "Músicas no filtro atual" agora numera sequencialmente de 1 em 1 (1 a N) em vez de exibir a colocação global pulada.
@@ -81,3 +83,6 @@ quero que apareça um grafico de linhas da evolução das bandas com o x sendo a
 quero que no final da pagina dos paineis apareça um botão de visualizar inssights
 
 quero que o grafico linha do tempo também seja uma forma de aplicar um filtro por ele clicando nas colunas de dados
+
+
+habilitar compartilhamento de playlist
