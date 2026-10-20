@@ -67,8 +67,9 @@
             transition: all 0.2s;
         }
     </style>
+    <link rel="stylesheet" href="css/scrollfx.css?v=1.4.0">
 </head>
-<body class="bg-base-100 text-white font-sans antialiased min-h-screen flex flex-col selection:bg-spotify selection:text-white">
+<body data-fx="guide" class="bg-base-100 text-white font-sans antialiased min-h-screen flex flex-col selection:bg-spotify selection:text-white">
 
     <!-- Header / Hero -->
     <header class="pt-16 pb-12 px-6 text-center max-w-4xl mx-auto w-full">
@@ -87,7 +88,7 @@
     <main class="flex-grow w-full max-w-5xl mx-auto px-4 sm:px-6 pb-24">
 
         <!-- Tabs Navigation -->
-        <div class="flex border-b border-base-300 mb-8 overflow-x-auto no-scrollbar">
+        <div class="flex border-b border-base-300 mb-8 overflow-x-auto no-scrollbar sticky top-0 z-30 bg-base-100/90 backdrop-blur pt-3">
             <div class="flex-1 flex flex-col">
                 <p class="text-xs sm:text-sm text-base-400 text-center px-2 pb-2"><strong class="text-white">Tem Spotify Premium (pago)?</strong> Use este método.</p>
                 <button onclick="switchTab('premium')" id="btn-premium" class="w-full py-4 px-6 text-center font-medium text-spotify border-b-2 border-spotify bg-spotify/5 transition-colors whitespace-nowrap outline-none focus:outline-none">
@@ -489,5 +490,6 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
         // Tab styling is already correct in initial HTML, but we can enforce it:
         switchTab('premium');
     </script>
+    <script src="js/scrollfx.js?v=1.4.0"></script>
 </body>
 </html>

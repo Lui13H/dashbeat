@@ -20,12 +20,18 @@ const STORE = readStore();
 const RAW = STORE ? STORE.rows : DEFAULT_RAW;
 const NI = "Não identificado";
 const coll = new Intl.Collator("pt-BR", {sensitivity: "base", numeric: true});
-/* numa faixa com vários artistas (feat., parceria) só o primeiro — o principal — conta nas estatísticas;
+/* numa faixa com vários artistas (feat., parceria) o principal (o primeiro) sempre conta; os outros só contam
+   se tiverem pelo menos uma faixa solo (sem feat.) na lista. Sem faixa solo, a faixa vai só pro principal —
+   até aparecer uma faixa solo de algum participante, e aí ele passa a contar também nas parcerias.
    splitArtistsAll devolve todos, só pra saber se a faixa é uma parceria */
 const ARTIST_SEP = /\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/i;
 const splitArtistsAll = s => s.split(ARTIST_SEP).map(x => x.trim()).filter(Boolean);
-const splitArtists = s => splitArtistsAll(s.toLowerCase()).slice(0, 1);
-const splitArtistsRaw = s => splitArtistsAll(s).slice(0, 1);
+const SOLO = new Set();   // artistas (minúsculo) com pelo menos uma faixa solo na lista
+for (const r of RAW){ const all = splitArtistsAll(String(r[2] || "")); if (all.length === 1) SOLO.add(all[0].toLowerCase()); }
+// posições (em splitArtistsAll) dos artistas que contam nessa faixa: o principal e quem tem faixa solo
+const countedIdx = all => all.map((a, i) => i).filter(i => i === 0 || SOLO.has(all[i].toLowerCase()));
+const splitArtists = s => { const all = splitArtistsAll(s.toLowerCase()); return countedIdx(all).map(i => all[i]); };
+const splitArtistsRaw = s => { const all = splitArtistsAll(s); return countedIdx(all).map(i => all[i]); };
 /* gênero é do artista (não da faixa) no Spotify: um mapa nome-do-artista (minúsculo) → gêneros,
    guardado à parte da playlist porque vale pra qualquer lista. [] = pesquisado e sem gênero */
 const GENRE_KEY = "catalogo-musical:genres";
@@ -64,22 +70,35 @@ function extraProps(m, gs){
   return {genre: gs && gs.length ? gs.join(", ") : "", pop: ok && typeof m.p === "number" ? m.p : null, ex: ok ? m.x : null,
     ty: ok && m.ty || ""};
 }
+/* "bandas" de uma faixa = os artistas que contam nela (principal + quem tem faixa solo). Cada uma é uma banda
+   nos filtros, nas contagens e nos gráficos; o texto original ("A, B") continua em t.artist só para exibir.
+   A grafia é a da primeira vez que o artista aparece, pra "Lamb of God" e "lamb of god" serem a mesma banda. */
+const BAND_NAME = new Map();
+function bandsOf(artist){
+  if (artist === NI) return [NI];
+  return splitArtistsRaw(artist).map(n => { const k = n.toLowerCase(); if (!BAND_NAME.has(k)) BAND_NAME.set(k, n); return BAND_NAME.get(k); });
+}
+const bandsOfRow = r => r.bands || [r.artist];
+const hasBand = (r, name) => { const k = String(name).toLowerCase(); return bandsOfRow(r).some(b => b.toLowerCase() === k); };
 const T = RAW.map(([n, title, artist, album, sec, date, meta]) => {
   const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
   // gs = gênero do Spotify (null = falta buscar) · ge = gênero exibido/calculado (Spotify ou, na falta, Apple)
-  return {n, title, artist: a, album: (album || "").trim() || NI,
+  return {n, title, artist: a, bands: bandsOf(a), album: (album || "").trim() || NI,
     sec: sec, date: date || "", year: date ? +date.slice(0, 4) : NI, m, gs, ge, ...extraProps(m, ge)};
 });
-const ALL_BANDS = [...new Set(T.map(t => t.artist))].sort(niLast);
+const ALL_BANDS = [...new Set(T.flatMap(t => t.bands))].sort(niLast);
 const ALL_ALBUMS = [...new Set(T.map(t => t.album))].sort(niLast);
 const ALL_YEARS = [...new Set(T.map(t => t.year))].sort((a, b) => a === NI ? 1 : b === NI ? -1 : a - b);
 function niLast(a, b){ return a === NI ? 1 : b === NI ? -1 : coll.compare(a, b); }
 const bandAlbums = new Map(), albumBands = new Map();
 for (const t of T){
-  (bandAlbums.get(t.artist) || bandAlbums.set(t.artist, new Set()).get(t.artist)).add(t.album);
-  (albumBands.get(t.album) || albumBands.set(t.album, new Set()).get(t.album)).add(t.artist);
+  for (const b of t.bands){
+    (bandAlbums.get(b) || bandAlbums.set(b, new Set()).get(b)).add(t.album);
+    (albumBands.get(t.album) || albumBands.set(t.album, new Set()).get(t.album)).add(b);
+  }
 }
-const state = {bands: new Set(), albums: new Set(), genres: new Set()};
+const state = {bands: new Set(), albums: new Set(), genres: new Set(), upTo: null};   // upTo: máquina do tempo (só faixas até a #n); null = playlist inteira
+let tmBusy = false;   // tocando ou arrastando a máquina do tempo: sem animações caras nos gráficos
 let spotifyUserDisplay = null;  // nome do usuário logado no Spotify (preenchido ao obter token)
 const $ = s => document.querySelector(s);
 const fmtInt = n => n.toLocaleString("pt-BR");
@@ -91,11 +110,16 @@ function fmtDur(s){
 }
 function fmtLong(s){ const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? `${h}h ${String(m).padStart(2, "0")}min` : `${m}min`; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
-function groupBy(rows, key){ const m = new Map(); for (const r of rows){ const k = r[key]; (m.get(k) || m.set(k, []).get(k)).push(r); } return m; }
+function groupBy(rows, key){
+  const m = new Map(), add = (k, r) => (m.get(k) || m.set(k, []).get(k)).push(r);
+  for (const r of rows){ if (key === "artist") bandsOfRow(r).forEach(b => add(b, r)); else add(r[key], r); }
+  return m;
+}
 const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
 
-function rows(useBand = true, useAlbum = true, useGenre = true){
-  return T.filter(t => (!useBand || !state.bands.size || state.bands.has(t.artist)) &&
+function rows(useBand = true, useAlbum = true, useGenre = true, useTime = true){
+  return T.filter(t => (!useTime || state.upTo == null || t.n <= state.upTo) &&
+                       (!useBand || !state.bands.size || t.bands.some(b => state.bands.has(b))) &&
                        (!useAlbum || !state.albums.size || state.albums.has(t.album)) &&
                        (!useGenre || !state.genres.size || (t.ge && t.ge.some(g => state.genres.has(g)))));
 }
@@ -109,7 +133,7 @@ const tweens = new WeakMap();
 function tween(el, to, fmt, dur = 900){
   const from = tweens.has(el) ? tweens.get(el) : 0;
   tweens.set(el, to);
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches || from === to || document.hidden){ el.textContent = fmt(to); return; }
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || from === to || document.hidden || tmBusy){ tweens.set(el, to); el.textContent = fmt(to); return; }
   const t0 = performance.now();
   const step = now => {
     const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 4);
@@ -196,9 +220,10 @@ function toggle(kind, v){
     const what = gone.length <= 2 ? gone.join(" e ") : `${gone.length} ${kind === "band" ? "álbuns" : "artistas"}`;
     toast(`${what} saí${gone.length > 1 ? "ram" : "u"} do filtro: sem faixas no novo recorte`);
   }
+  if (!rows().length){ set.delete(v); toast(`Sem faixas de ${v} até a #${state.upTo} da máquina do tempo`); }
   render();
 }
-function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); render(); }
+function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.upTo = null; tmSync(); render(); }
 $("#clear").addEventListener("click", clearAll);
 $("#empty-clear").addEventListener("click", clearAll);
 
@@ -219,17 +244,23 @@ function renderFilters(){
     const cnt = ms.btn.querySelector(".cnt"); cnt.textContent = set.size; cnt.classList.toggle("on", set.size > 0);
     ms.foot.textContent = `${avail} de ${ms.els.size} disponíveis${set.size ? ` · ${set.size} selecionado${set.size > 1 ? "s" : ""}` : ""}`;
   }
-  const chips = $("#chips"); chips.innerHTML = "";
-  for (const [kind, set, tag] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"], ["genre", state.genres, "Gênero"]]){
-    for (const v of set){
-      const c = document.createElement("button");
-      c.className = "chip"; c.type = "button"; c.setAttribute("aria-label", `Remover ${v}`);
-      c.innerHTML = `<b>${tag}</b><span>${esc(v)}</span><span class="x">×</span>`;
-      c.addEventListener("click", () => toggle(kind, v));
-      chips.appendChild(c);
+  const chips = $("#chips");
+  const sig = [["band", state.bands], ["album", state.albums], ["genre", state.genres]].map(([k, s]) => k + ":" + [...s].join("")).join("|");
+  if (chips._sig !== sig){   // só reconstrói quando os filtros mudam: a cada quadro da máquina do tempo isso fazia os chips piscarem
+    chips._sig = sig;
+    const nodes = [];
+    for (const [kind, set, tag] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"], ["genre", state.genres, "Gênero"]]){
+      for (const v of set){
+        const c = document.createElement("button");
+        c.className = "chip"; c.type = "button"; c.setAttribute("aria-label", `Remover ${v}`);
+        c.innerHTML = `<b>${tag}</b><span>${esc(v)}</span><span class="x">×</span>`;
+        c.addEventListener("click", () => toggle(kind, v));
+        nodes.push(c);
+      }
     }
+    chips.replaceChildren(...nodes, ROW_TIME);   // o chip do tempo é um elemento fixo: continua aqui, na linha de filtros
   }
-  $("#clear").classList.toggle("on", state.bands.size + state.albums.size + state.genres.size > 0);
+  $("#clear").classList.toggle("on", state.bands.size + state.albums.size + state.genres.size > 0 || state.upTo != null);
 }
 
 /* ---------------- text fitting (never break inside a word) ---------------- */
@@ -265,11 +296,15 @@ function modeOf(rows, key){
   for (const k of keys){ const c = g.get(k).length; if (c > max){ max = c; best = k; ties = 0; } else if (c === max) ties++; }
   return {best, max, ties};
 }
-function renderKPIs(R){
+function renderHeroTotal(R){
   const total = R.length, secs = sum(R, r => r.sec);
   tween($("#k-total"), total, v => fmtInt(Math.round(v)));
-  $("#k-total-sub").innerHTML = `<strong>${fmtLong(secs)}</strong> de música${state.bands.size + state.albums.size ? ` · ${pct(total, T.length)} do catálogo` : " em sequência"}`;
-  const arts = new Set(R.filter(r => r.artist !== NI).map(r => r.artist)).size;
+  $("#k-total-sub").innerHTML = `<strong>${fmtLong(secs)}</strong> de música${state.bands.size + state.albums.size + (state.upTo != null ? 1 : 0) ? ` · ${pct(total, T.length)} do catálogo` : " em sequência"}`;
+}
+function renderKPIs(R){
+  renderHeroTotal(R);
+  const total = R.length;
+  const arts = new Set(R.filter(r => r.artist !== NI).flatMap(bandsOfRow)).size;
   tween($("#k-art"), arts, v => fmtInt(Math.round(v)));
   const albs = new Set(R.map(r => r.album)).size;
   $("#k-art-sub").textContent = `em ${albs} álbu${albs === 1 ? "m" : "ns"}`;
@@ -322,7 +357,7 @@ const wave = $("#wave");
     const i = Math.min(W - 1, Math.max(0, Math.floor((e.clientX - b.left) / b.width * W)));
     const t = WAVE[i];
     if (hot !== t){ hot && hot._w.classList.remove("hot"); t._w.classList.add("hot"); hot = t; }
-    const mine = T.filter(x => x.artist === t.artist);
+    const mine = T.filter(x => hasBand(x, bandsOfRow(t)[0]));
     showTip(`<div class="eyebrow">#${t.n} na playlist · lançada em ${t.date || NI}</div><div class="t">${esc(t.title)}</div>
       <div class="k"><span>${esc(t.artist)}</span></div><div class="k"><span>${esc(t.album)}</span></div><hr>
       <div class="k"><span>Duração</span><b>${fmtDur(t.sec)}</b></div>
@@ -335,7 +370,7 @@ const wave = $("#wave");
 const AVG_ALL = sum(T, t => t.sec) / T.length;
 function renderWave(R){
   const on = new Set(R);
-  const all = state.bands.size + state.albums.size === 0;
+  const all = state.bands.size + state.albums.size === 0 && state.upTo == null;
   for (const t of T) t._w.classList.toggle("off", !all && !on.has(t));
 }
 
@@ -357,7 +392,7 @@ function yearTip(y){
   const top = albs.slice(0, 4);
   const rest = albs.length - top.length;
   return `<div class="eyebrow">${y === NI ? "Ano não identificado" : y}</div><div class="t">${R.length} faixa${R.length > 1 ? "s" : ""} · ${fmtLong(sum(R, r => r.sec))}</div>
-    <div class="k"><span>${(na => `${na} artista${na > 1 ? "s" : ""}`)(new Set(R.map(r => r.artist)).size)} · ${albs.length} álbu${albs.length > 1 ? "ns" : "m"}</span></div><hr>
+    <div class="k"><span>${(na => `${na} artista${na > 1 ? "s" : ""}`)(new Set(R.flatMap(bandsOfRow)).size)} · ${albs.length} álbu${albs.length > 1 ? "ns" : "m"}</span></div><hr>
     <div class="eyebrow">Principais álbuns e peso no ano</div>
     ${sbars(top.map(([a, c, art]) => [a + " — " + art, `${c} · ${pct(c, R.length, 0)}`, c / R.length]))}
     ${rest > 0 ? `<div class="k" style="margin-top:8px"><span>+ ${rest} outro${rest > 1 ? "s" : ""} álbu${rest > 1 ? "ns" : "m"}</span></div>` : ""}`;
@@ -397,15 +432,20 @@ const TILES = new Map();
 /* o squarify clássico decide linha por linha e às vezes estica um bloco grande pra poupar os pequenos.
    Aqui testamos todos os jeitos de montar as 3 primeiras linhas (1 a 6 blocos cada, o resto no clássico)
    e ficamos com o que deixa os MAIORES mais quadrados (peso = área²). 216 tentativas, ~3ms. */
-function squarify(items, W, H){
-  if (!items.length || !W || !H) return squarifyRows(items, W, H, []);
-  const asp = d => d.w && d.h ? Math.max(d.w / d.h, d.h / d.w) : 1;
-  let best = null, bc = Infinity;
+function squarifyAll(items, W, H){
+  if (!items.length || !W || !H) return [];
+  const asp = d => d.w && d.h ? Math.max(d.w / d.h, d.h / d.w) : 1, out = [];
   for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) for (let c = 1; c <= 6; c++){
-    const L = squarifyRows(items, W, H, [a, b, c]), k = sum(L, d => d.area * d.area * (asp(d) - 1));
-    if (k < bc){ bc = k; best = L; }
+    const L = squarifyRows(items, W, H, [a, b, c]);
+    out.push({L, k: sum(L, d => d.area * d.area * (asp(d) - 1))});
     if (items.length <= a + b) break;   // as outras combinações dariam o mesmo resultado
   }
+  return out;
+}
+function squarify(items, W, H){
+  if (!items.length || !W || !H) return squarifyRows(items, W, H, []);
+  let best = null, bc = Infinity;
+  for (const c of squarifyAll(items, W, H)) if (c.k < bc){ bc = c.k; best = c.L; }
   return best;
 }
 function squarifyRows(items, W, H, forced){
@@ -414,8 +454,10 @@ function squarifyRows(items, W, H, forced){
   const scale = W * H / total;
   const list = items.map(d => ({...d, area: d.value * scale}));
   let rect = {x: 0, y: 0, w: W, h: H}, row = [], i = 0;
+  const struct = [];   // linhas na ordem em que foram montadas (chaves): é o "esqueleto" que o layout estável reaproveita
   const worst = (r, len) => { if (!r.length) return Infinity; const s = sum(r, d => d.area); let mx = 0, mn = Infinity; for (const d of r){ mx = Math.max(mx, d.area); mn = Math.min(mn, d.area); } return Math.max(len * len * mx / (s * s), s * s / (len * len * mn)); };
   const lay = r => {
+    struct.push(r.map(d => d.k));
     const s = sum(r, d => d.area);
     if (rect.w >= rect.h){ const cw = s / rect.h; let y = rect.y; for (const d of r){ const h = d.area / cw; out.push({...d, x: rect.x, y, w: cw, h}); y += h; } rect.x += cw; rect.w -= cw; }
     else { const rh = s / rect.w; let x = rect.x; for (const d of r){ const w = d.area / rh; out.push({...d, x, y: rect.y, w, h: rh}); x += w; } rect.y += rh; rect.h -= rh; }
@@ -427,10 +469,124 @@ function squarifyRows(items, W, H, forced){
     else { lay(row); row = []; }
   }
   if (row.length) lay(row);
+  out.struct = struct;
   return out;
 }
+/* Layout ESTÁVEL: refazer o melhor layout do zero a cada mudança fazia vários blocos "pularem" por causa de uma
+   música só. Agora, a cada mudança, juntamos os candidatos (as 216 montagens do squarify + o esqueleto da
+   montagem anterior, só com os tamanhos novos), mantemos só os que respeitam a TOLERÂNCIA DE FORMATO DE CADA BLOCO
+   e, entre eles, escolhemos o que MENOS MEXE nos blocos em relação ao desenho anterior (cantos dos blocos, pesando pela área).
+
+   Tolerância de cada bloco = quanto a proporção (lado maior / lado menor) dele pode passar da que ele teria no melhor layout.
+   Ela vem de três taxas, combinadas pela soma de taxas composta (a forma padrão de somar taxas: (1+a)^p · (1+b)^q · (1+c)^r − 1,
+   com pesos p+q+r = 1, ou seja, uma média geométrica das taxas compostas):
+     • taxa pelo tamanho ATUAL do bloco (peso maior): bloco pequeno tolera mais, o maior quase nada;
+     • taxa pelo tamanho ESPERADO, medido pelo tamanho que a banda terá no fim da máquina do tempo: quem vai terminar grande tolera menos
+       mesmo enquanto ainda é pequeno;
+     • taxa pelo AVANÇO na linha do tempo: larga no começo (poucas bandas, pouco a perder) e baixa no momento atual.
+   No momento atual (sem tocar) o tamanho esperado é o próprio tamanho atual e o avanço é 100%. */
+let TREE_STRUCT = null, TREE_PREV = null;
+/* velocidade da troca dos quadrados acompanha a velocidade da animação: 0,125x ≈ 3,1 s, 0,25x ≈ 2,2 s, 0,5x ≈ 1,5 s, 1x ≈ 1,1 s, 2x ≈ 0,77 s, 4x ≈ 0,54 s (referência: 1,25 s em 0,75x).
+   Quando a animação ACABA e o gráfico se ajusta pro melhor layout, essa duração é mantida por mais um tempo (o ajuste é tão lento quanto a animação) */
+let tileHold = 0;
+const tileDur = () => 1.25 * Math.sqrt(0.75 / (tm.speed || 1));   // 1,25 s é a duração de referência na velocidade 0,75x; as outras seguem a raiz da razão entre as velocidades
+function holdTiles(){
+  treeEl.style.setProperty("--tile-dur", tileDur().toFixed(2) + "s"); treeEl.classList.add("flow");
+  clearTimeout(tileHold);
+  tileHold = setTimeout(() => { tileHold = 0; if (!tmBusy){ treeEl.style.removeProperty("--tile-dur"); treeEl.classList.remove("flow"); } }, tileDur() * 1000 + 500);
+}
+function releaseTiles(){ clearTimeout(tileHold); tileHold = 0; treeEl.style.removeProperty("--tile-dur"); }
+const TREE_CFG = {
+  tolMax: 2.0, tolMin: 0.05,        // taxa do menor bloco / do maior bloco (0,05 = pode ficar 5% mais esticado que no ideal; 2,0 = até 3x)
+  progStart: 3, progEnd: 0.03,    // taxa do avanço: no começo da linha do tempo / no momento atual
+  wCur: 0.45, wExp: 0.3, wProg: 0.25   // pesos das três taxas (somam 1); o tamanho atual pesa um pouco mais que o esperado
+};
+function treeCost(L, W, H){
+  const A = (W * H) || 1;
+  return sum(L, d => d.area * d.area * ((d.w && d.h ? Math.max(d.w / d.h, d.h / d.w) : 1) - 1)) / (A * A);
+}
+function layoutFromStruct(struct, items, W, H){
+  const val = new Map(items.map(d => [d.k, d.value])), total = sum(items, d => d.value), out = [];
+  if (!total || !W || !H) return out;
+  const scale = W * H / total;
+  let rect = {x: 0, y: 0, w: W, h: H};
+  for (const keys of struct){
+    const r = keys.map(k => ({k, value: val.get(k), area: val.get(k) * scale}));
+    const s = sum(r, d => d.area);
+    if (rect.w >= rect.h){ const cw = s / rect.h; let y = rect.y; for (const d of r){ const h = d.area / cw; out.push({...d, x: rect.x, y, w: cw, h}); y += h; } rect.x += cw; rect.w -= cw; }
+    else { const rh = s / rect.w; let x = rect.x; for (const d of r){ const w = d.area / rh; out.push({...d, x, y: rect.y, w, h: rh}); x += w; } rect.y += rh; rect.h -= rh; }
+  }
+  return out;
+}
+function patchStruct(struct, items){
+  const val = new Map(items.map(d => [d.k, d.value]));
+  const rowsK = struct.map(r => r.filter(k => val.has(k))).filter(r => r.length);
+  const have = new Set(rowsK.flat());
+  for (const d of items){
+    if (have.has(d.k)) continue;
+    if (!rowsK.length){ rowsK.push([d.k]); continue; }
+    let idx = rowsK.findIndex(r => { const vs = r.map(k => val.get(k)); return d.value <= Math.max(...vs) && d.value >= Math.min(...vs); });
+    if (idx < 0) idx = d.value > Math.max(...rowsK[0].map(k => val.get(k))) ? 0 : rowsK.length - 1;
+    rowsK[idx].push(d.k);
+  }
+  return rowsK;
+}
+const tileAsp = d => d.w && d.h ? Math.max(d.w / d.h, d.h / d.w) : 1;
+// quanto o layout L se afasta do desenho anterior: soma, por bloco que existia nos dois, do deslocamento dos cantos pesado pela área
+function treeMove(L, W, H){
+  if (!TREE_PREV) return 0;
+  let m = 0;
+  for (const d of L){
+    const p = TREE_PREV.get(d.k); if (!p) continue;
+    m += d.area * (Math.abs(d.x / W - p.x0) + Math.abs(d.y / H - p.y0) + Math.abs((d.x + d.w) / W - p.x1) + Math.abs((d.y + d.h) / H - p.y1));
+  }
+  return m;
+}
+/* final: Map banda -> faixas no momento atual (null = sem máquina do tempo: o esperado é o próprio tamanho atual). */
+const treeRate = rel => TREE_CFG.tolMin + (1 - rel) * (TREE_CFG.tolMax - TREE_CFG.tolMin);   // rel 1 (maior) -> tolMin, rel 0 -> tolMax
+function treeSlack(rCur, rExp, rProg){   // soma de taxas composta com pesos
+  const {wCur, wExp, wProg} = TREE_CFG;
+  return Math.pow(1 + rCur, wCur) * Math.pow(1 + rExp, wExp) * Math.pow(1 + rProg, wProg) - 1;
+}
+function stableSquarify(items, W, H, now = false, progress = 1, final = null){
+  const cands = squarifyAll(items, W, H);
+  if (!cands.length){ TREE_STRUCT = TREE_PREV = null; return []; }
+  const kBest = Math.min(...cands.map(c => c.k));
+  const best = cands.reduce((a, c) => c.k < a.k ? c : a);
+  const bestAsp = new Map(best.L.map(d => [d.k, tileAsp(d)]));
+  const vmax = Math.max(...items.map(d => d.value)), fmax = final ? Math.max(1, ...final.values()) : vmax;
+  const rProg = TREE_CFG.progEnd + (TREE_CFG.progStart - TREE_CFG.progEnd) * (1 - Math.min(1, Math.max(0, now ? 1 : progress)));
+  const slack = new Map(items.map(d => {
+    const rCur = treeRate(Math.sqrt(d.value / vmax)), rExp = treeRate(Math.sqrt(Math.min(1, (final ? (final.get(d.k) || d.value) : d.value) / fmax)));
+    return [d.k, treeSlack(rCur, rExp, rProg)];
+  }));
+  const A2 = (W * H) * (W * H) || 1, eps = 0.004 * A2;
+  let pick = null, pm = Infinity;
+  const consider = (L, k, struct) => {
+    if (k > kBest * 4 + eps) return;   // trava de segurança no custo global
+    if (!L.every(d => tileAsp(d) <= (bestAsp.get(d.k) || 1) * (1 + (slack.get(d.k) || 0)) + 0.02)) return;
+    const m = treeMove(L, W, H);
+    if (m < pm - 1e-9 || (Math.abs(m - pm) <= 1e-9 && pick && k < pick.k)){ pm = m; pick = {L, k, struct}; }
+  };
+  for (const c of cands) consider(c.L, c.k, c.L.struct);
+  if (TREE_STRUCT){
+    const patched = patchStruct(TREE_STRUCT, items), reused = layoutFromStruct(patched, items, W, H);
+    if (reused.length === best.L.length) consider(reused, treeCost(reused, W, H) * A2, patched);
+  }
+  if (!pick) pick = {L: best.L, k: best.k, struct: best.L.struct};
+  TREE_STRUCT = pick.struct;
+  TREE_PREV = new Map(pick.L.map(d => [d.k, {x0: d.x / W, y0: d.y / H, x1: (d.x + d.w) / W, y1: (d.y + d.h) / H}]));
+  return pick.L;
+}
+let TREE_FINAL = null, TREE_FINAL_KEY = "";
+function treeFinal(){   // quantas faixas cada banda tem no momento atual (sem a máquina do tempo), pra saber quem vai terminar grande
+  const key = T.length + "|" + [...state.albums].join(",");
+  if (TREE_FINAL && TREE_FINAL_KEY === key) return TREE_FINAL;
+  TREE_FINAL = new Map(); for (const [k, rs] of groupBy(rows(false, true, true, false), "artist")) TREE_FINAL.set(k, rs.length);
+  TREE_FINAL_KEY = key; return TREE_FINAL;
+}
 function tileTip(b){
-  const R = rows(false, true).filter(r => r.artist === b);
+  const R = rows(false, true).filter(r => hasBand(r, b));
   const all = rows(false, true);
   const albs = [...groupBy(R, "album")].map(([a, rs]) => [a, rs.length]).sort((x, y) => y[1] - x[1]);
   const yrs = R.map(r => r.year).filter(y => y !== NI);
@@ -570,26 +726,52 @@ function renderTree(){
   const g = groupBy(base, "artist");
   const items = [...g].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
   const W = treeEl.clientWidth, H = treeEl.clientHeight;
-  const laid = squarify(items, W, H);
+  const laid = stableSquarify(items, W, H, state.upTo == null && !tmBusy, state.upTo == null ? 1 : state.upTo / TM_N, state.upTo == null ? null : treeFinal());
+  treeEl.classList.toggle("flow", tmBusy || !!tileHold);
+  if (tmBusy) treeEl.style.setProperty("--tile-dur", tileDur().toFixed(2) + "s"); else if (!tileHold) treeEl.style.removeProperty("--tile-dur");   // tocando a máquina do tempo: movimento mais curto e contínuo
   const max = items.length ? items[0].value : 1;
   const hasSel = state.bands.size > 0;
   const seen = new Set();
-  // largest font where the whole name fits on one line (0 = only the cover)
-  const sizes = [17, 15, 13.5, 12, 11, 10];
+  /* a fonte acompanha o tamanho do quadrado (quadrado pequeno = letra pequena, até 7px) e a margem interna também
+     encolhe; vale a maior fonte em que o nome inteiro cabe numa linha (0 = só a capa) */
+  const FONT_MIN = 7, FONT_MAX = 17;
+  const padOf = (w, h) => Math.max(3, Math.min(9, Math.min(w, h) / 9));
+  const sizesOf = (w, h) => {
+    const cap = Math.min(FONT_MAX, Math.max(FONT_MIN, Math.sqrt(Math.max(0, w) * Math.max(0, h)) / 6.5)), out = [];
+    for (let v = Math.floor(cap * 2) / 2; v >= FONT_MIN; v -= .5) out.push(v);
+    return out;
+  };
   const labelSize = (name, w, h) => {
-    for (const s of sizes){
-      const roomForLine = h - 18 - Math.max(10, s - 2) * 1.2 - 4 >= s * 1.05;   // one name line above the count
-      if (w - 20 > 0 && roomForLine && fitsOneLine(name, s, "Sora, sans-serif", 600, w - 20, "-.01em")) return s;
+    const pad = padOf(w, h);
+    for (const s of sizesOf(w, h)){
+      const roomForLine = h - 2 * pad - Math.max(FONT_MIN, s - 2) * 1.2 - 4 >= s * 1.05;   // one name line above the count
+      if (w - 2 * pad > 0 && roomForLine && fitsOneLine(name, s, "Sora, sans-serif", 600, w - 2 * pad, "-.01em")) return s;
     }
     return 0;
   };
   const labelSizes = new Map(laid.map(d => [d.k, labelSize(d.k, Math.max(0, d.w - 4), Math.max(0, d.h - 4))]));
   // once a band loses its name, every band with the same or fewer songs loses it too (no labels "skipping" around)
   const hiddenMax = Math.max(0, ...laid.filter(d => !labelSizes.get(d.k)).map(d => d.value));
+  // o número tem conta própria: onde o nome não cabe, o número ainda aparece sozinho (no maior tamanho que couber)
+  const numSize = (value, w, h) => {
+    const pad = padOf(w, h);
+    for (const s of sizesOf(w, h)){
+      if (w - 2 * pad > 0 && h - 2 * pad >= s * 1.1 && fitsOneLine(String(value), s, "Sora, sans-serif", 700, w - 2 * pad, "0")) return s;
+    }
+    return 0;
+  };
+  const numSizes = new Map(laid.map(d => [d.k, numSize(d.value, Math.max(0, d.w - 4), Math.max(0, d.h - 4))]));
+  const numHiddenMax = Math.max(0, ...laid.filter(d => !numSizes.get(d.k)).map(d => d.value));   // mesma regra dos nomes: sem "pular" número por aí
   for (const d of laid){
     seen.add(d.k);
     let el = TILES.get(d.k);
-    const fresh = !el;
+    let fresh = !el;
+    if (el && el.classList.contains("leaving")){
+      // bloco que estava saindo e voltou: nasce de novo no canto (sem voar de onde estava), igual a um bloco novo
+      el.style.transition = "none"; el.style.left = W + "px"; el.style.top = H + "px"; el.style.width = "0px"; el.style.height = "0px"; el.style.opacity = "0";
+      void el.offsetWidth; el.style.transition = "";
+      fresh = true;
+    }
     if (fresh){
       el = document.createElement("div"); el.className = "tile";
       el.innerHTML = `<i class="cov"></i><div class="lbl"><strong></strong><span></span></div>`;
@@ -597,10 +779,11 @@ function renderTree(){
       el.addEventListener("click", () => { if (!treeEl.closest(".tree-big")) toggle("band", d.k); });   // em tela cheia é só pra ver
       bindTip(el, () => tileTip(d.k));
       el.style.opacity = "0";
-      el.style.left = (d.x + d.w / 2) + "px"; el.style.top = (d.y + d.h / 2) + "px"; el.style.width = "0px"; el.style.height = "0px";
+      // blocos novos nascem pequenininhos no canto de baixo à direita do gráfico e crescem até o lugar deles
+      el.style.left = W + "px"; el.style.top = H + "px"; el.style.width = "0px"; el.style.height = "0px";
       treeEl.appendChild(el); TILES.set(d.k, el);
     }
-    el.classList.remove("leaving");
+    el.classList.remove("leaving"); clearTimeout(el._rm);   // voltou antes de sumir de vez
     const g2 = treeEl.classList.contains("flush") ? 0 : 2, x = d.x + g2, y = d.y + g2, w = Math.max(0, d.w - 2 * g2), h = Math.max(0, d.h - 2 * g2);
     const k = Math.sqrt(d.value / max);
     const sel = state.bands.has(d.k);
@@ -620,15 +803,23 @@ function renderTree(){
       el.classList.add("hascov");
     });
     const size = d.value > hiddenMax ? labelSizes.get(d.k) : 0;
-    lbl.style.opacity = size ? 1 : 0;
+    lbl.style.padding = padOf(Math.max(0, d.w - 4), Math.max(0, d.h - 4)) + "px";
+    const nSize = size ? Math.max(FONT_MIN, size - 2) : (d.value > numHiddenMax ? numSizes.get(d.k) : 0);
+    lbl.style.opacity = size || nSize ? 1 : 0;
+    lbl.style.justifyContent = size ? "" : "flex-end";   // só o número: fica no mesmo cantinho de baixo de sempre
     el.style.borderRadius = Math.max(3, Math.min(10, w / 4, h / 4)) + "px";
     const strongEl = lbl.querySelector("strong");
     strongEl.style.fontSize = size + "px";
-    lbl.querySelector("span").style.fontSize = Math.max(10, size - 2) + "px";
+    strongEl.style.display = size ? "" : "none";
+    lbl.querySelector("span").style.fontSize = (nSize || FONT_MIN) + "px";
     const apply = () => { el.style.opacity = ""; el.style.left = x + "px"; el.style.top = y + "px"; el.style.width = w + "px"; el.style.height = h + "px"; };
     fresh ? requestAnimationFrame(() => requestAnimationFrame(apply)) : apply();
   }
-  for (const [k, el] of TILES) if (!seen.has(k)){ el.classList.add("leaving"); el.style.pointerEvents = "none"; }
+  for (const [k, el] of TILES) if (!seen.has(k)){
+    el.classList.add("leaving"); el.style.pointerEvents = "none";
+    // depois de sumir (fade) o bloco é removido: se a banda voltar, ela nasce de novo no canto, em vez de voar de onde parou
+    if (!el._rm) el._rm = setTimeout(() => { if (el.classList.contains("leaving")){ el.remove(); TILES.delete(k); } el._rm = 0; }, 1200);
+  }
   for (const [k, el] of TILES) if (seen.has(k)) el.style.pointerEvents = "";
 }
 
@@ -643,20 +834,20 @@ function openTreeBig(){
   const home = treeEl.parentElement;
   const body = document.createElement("div"); body.className = "tree-big";
   const md = openModal({title: "", body, size: "full",
-    headerExtra: `<label class="chk"><input type="checkbox" class="tree-nonames"${treeEl.classList.contains("nolabels") ? " checked" : ""}><span>Esconder nomes</span></label>
-      <label class="chk"><input type="checkbox" id="tree-flush"><span>Sem bordas</span></label>
+    headerExtra: `${treeOptsHtml()}
       ${document.fullscreenEnabled ? `<button class="gbtn tree-exp" type="button" id="tree-super">Tela super cheia</button>` : ""}`,
-    onClose: () => { hideTip(); treeEl.classList.remove("flush"); moveTree(home); }});   // "sem bordas" é só da tela cheia
+    onClose: () => { hideTip(); moveTree(home); if (ctl) ctl.dispose(); document.removeEventListener("keydown", onKey); }});
   md.m.setAttribute("aria-label", "Músicas por banda/artista em tela cheia");
-  md.q("#tree-flush").addEventListener("change", e => {
-    treeEl.classList.add("notrans"); treeEl.classList.toggle("flush", e.target.checked); renderTree();
-    setTimeout(() => treeEl.classList.remove("notrans"), 60);
-  });
+  // animação (Animar/Pausar/Retomar e Cancelar) também aqui, ligada ao mesmo estado do card
+  const ctl = makeCardControls("tree", true); md.q(".mh-extra").appendChild(ctl.grp); md._ctl = ctl;
   /* "tela super cheia" = tela cheia do navegador (igual F11) só com o gráfico. Esc o próprio navegador
      trata; clicar em qualquer lugar também sai */
   const sup = md.q("#tree-super");
   if (sup) sup.addEventListener("click", () => { hideTip(); body.requestFullscreen().catch(() => toast("O navegador não deixou entrar em tela cheia.")); });
   body.addEventListener("click", () => { if (document.fullscreenElement === body) document.exitFullscreen(); });
+  // na "tela super cheia" não tem botões: a barra de espaço pausa/continua a animação
+  const onKey = e => { if (document.fullscreenElement === body && e.code === "Space"){ e.preventDefault(); const cc = CARDS.tree; cc.playing ? cardPause("tree") : cardStart("tree", cc.n != null ? Math.max(1, cc.n) : 1); } };
+  document.addEventListener("keydown", onKey); md._onKey = onKey;
   moveTree(body);
 }
 document.addEventListener("fullscreenchange", () => {
@@ -664,14 +855,27 @@ document.addEventListener("fullscreenchange", () => {
   hideTip(); moveTree(treeEl.parentElement);   // mesmo lugar, só recalcula pro tamanho novo (sem animação)
 });
 $("#tree-expand").addEventListener("click", openTreeBig);
-// uma opção só pro card e pra tela cheia: marcar em um marca no outro — e fica salva (vale depois do F5)
-const NONAMES_KEY = "catalogo-musical:tree-nonames";
-try { if (localStorage.getItem(NONAMES_KEY) === "1"){ treeEl.classList.add("nolabels"); document.querySelectorAll(".tree-nonames").forEach(cb => { cb.checked = true; }); } } catch (e) {}
+// opções do gráfico (nomes, números, sombra): valem pro card e pra tela cheia — marcar em um marca no outro — e ficam salvas (vale depois do F5)
+const TREE_OPTS = [
+  {opt: "nomes", cls: "nolabels", key: "catalogo-musical:tree-nonames", txt: "Esconder nomes"},
+  {opt: "numeros", cls: "nonums", key: "catalogo-musical:tree-nonums", txt: "Esconder números"},
+  {opt: "sombra", cls: "noshadow", key: "catalogo-musical:tree-noshadow", txt: "Esconder sombra"},
+  {opt: "bordas", cls: "flush", key: "catalogo-musical:tree-flush", txt: "Sem bordas"}
+];
+function treeOptsHtml(){
+  return TREE_OPTS.map(o => `<label class="chk"><input type="checkbox" class="tree-opt" data-opt="${o.opt}"${treeEl.classList.contains(o.cls) ? " checked" : ""}><span>${o.txt}</span></label>`).join("");
+}
+for (const o of TREE_OPTS){
+  try { if (localStorage.getItem(o.key) === "1") treeEl.classList.add(o.cls); } catch (e) {}
+  document.querySelectorAll(`.tree-opt[data-opt="${o.opt}"]`).forEach(cb => { cb.checked = treeEl.classList.contains(o.cls); });
+}
 document.addEventListener("change", e => {
-  if (!e.target.classList.contains("tree-nonames")) return;
-  try { localStorage.setItem(NONAMES_KEY, e.target.checked ? "1" : "0"); } catch (e2) {}
-  treeEl.classList.toggle("nolabels", e.target.checked);
-  document.querySelectorAll(".tree-nonames").forEach(cb => { cb.checked = e.target.checked; });
+  const cb = e.target, o = cb.classList && cb.classList.contains("tree-opt") && TREE_OPTS.find(x => x.opt === cb.dataset.opt);
+  if (!o) return;
+  try { localStorage.setItem(o.key, cb.checked ? "1" : "0"); } catch (e2) {}
+  treeEl.classList.toggle(o.cls, cb.checked);
+  document.querySelectorAll(`.tree-opt[data-opt="${o.opt}"]`).forEach(x => { x.checked = cb.checked; });
+  if (o.opt === "bordas"){ treeEl.classList.add("notrans"); renderTree(); setTimeout(() => treeEl.classList.remove("notrans"), 60); }   // muda o tamanho dos blocos
 });
 
 /* ---------------- ranked lists (albums & ranking) with FLIP reordering ---------------- */
@@ -703,7 +907,7 @@ function renderList(container, items, opts){
   });
   for (const el of keep.values()) el.remove();
   container.appendChild(frag);
-  const rm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const rm = tmBusy || matchMedia("(prefers-reduced-motion: reduce)").matches;
   for (const el of container.children){
     const fl = el.querySelector(".fl");
     if (el._new){
@@ -728,7 +932,7 @@ function renderList(container, items, opts){
 function albumTip(a){
   const R = rows(true, false).filter(r => r.album === a);
   const longest = R.reduce((m, r) => r.sec > m.sec ? r : m, R[0]);
-  const arts = [...new Set(R.map(r => r.artist))];
+  const arts = [...new Set(R.flatMap(bandsOfRow))];
   const yrs = [...new Set(R.map(r => r.year))].sort();
   return `<div class="eyebrow">Álbum · ${yrs.join(", ")}</div><div class="t">${esc(a)}</div>
     <div class="k"><span>${esc(arts.join(" · "))}</span></div><hr>
@@ -751,7 +955,7 @@ function rankTip(b){
   const g = [...groupBy(base, "artist")].map(([k, rs]) => [k, rs.length]).sort((x, y) => y[1] - x[1] || coll.compare(x[0], y[0]));
   const i = g.findIndex(([k]) => k === b), n = g[i][1];
   const cum = sum(g.slice(0, i + 1), x => x[1]);
-  const R = base.filter(r => r.artist === b);
+  const R = base.filter(r => hasBand(r, b));
   const by = modeOf(R, "year");
   const next = g[i - 1];
   return `<div class="eyebrow">Posição ${i + 1} de ${g.length}</div><div class="t">${esc(b)}</div>
@@ -887,27 +1091,308 @@ function render(){
   $("#content").style.display = empty ? "none" : "";
   $("#empty").classList.toggle("on", empty);
   if (empty){ hideTip(); return; }
-  renderKPIs(R); renderWave(R); renderYears(R); renderTree(); renderAlbums(); renderRank(); renderGenres(); renderProfile(R); renderEvolution(R);
+  renderKPIs(R);
+  for (const k of ["wave", "years", "tree", "albums", "rank", "genres", "profile"]) cardRender(k);   // cada card com o seu tempo (animação por card)
+  // o gráfico de evolução compara bandas/gêneros entre si: com banda, álbum ou gênero filtrado ele não faz sentido, então some (a máquina do tempo não esconde)
+  const evoOff = state.bands.size + state.albums.size + state.genres.size > 0;
+  $("#evo-card").style.display = evoOff ? "none" : "";
+  if (!evoOff) cardRender("evo");
   renderFilteredList(R);
+  $("#tm-note").textContent = state.upTo != null ? `Máquina do tempo ligada no Painel (até a #${state.upTo}): os insights usam a playlist inteira.` : "";
 }
+
+/* ---------------- máquina do tempo: o painel como a playlist era até a #n (ordem de adição) ---------------- */
+const TM_N = BY_PLAYLIST.length;
+const tm = {playing: false, paused: false, raf: 0, t0: 0, lastRender: 0, pos: TM_N, speed: 1, shown: TM_N};
+const TM_REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const TM_ICON = {play: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4a.6.6 0 0 0 .9.5l8.3-5.2a.6.6 0 0 0 0-1L5.4 2.3a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg>',
+  pause: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1" fill="currentColor"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1" fill="currentColor"/></svg>'};
+function tmSync(){
+  const n = state.upTo == null ? TM_N : state.upTo, r = $("#tm-range");
+  tm.pos = n; tm.shown = n;
+  r.value = n; r.style.setProperty("--p", (TM_N > 1 ? (n - 1) / (TM_N - 1) * 100 : 100) + "%");
+  const last = BY_PLAYLIST[n - 1];
+  timeChip();
+  $("#tm-label").innerHTML = `Até a <b>#${n}</b> de ${fmtInt(TM_N)} · ${pct(n, TM_N, 0)} da playlist`;
+  $("#tm-last").innerHTML = last ? `Última adicionada neste ponto: <b>#${last.n} ${esc(last.title)}</b> — ${esc(last.artist)}` : "";
+  $("#tm-now").style.display = state.upTo == null ? "none" : "";
+  // o conteúdo do botão só é trocado quando o estado muda (tmSync roda a cada quadro): reescrever o botão no meio de um clique fazia o clique se perder
+  const want = tm.playing ? "pause" : "play";
+  if (tm._icon !== want){
+    tm._icon = want;
+    $("#tm-play").innerHTML = TM_ICON[want];
+    $("#tm-play").setAttribute("aria-label", tm.playing ? "Pausar" : "Reproduzir a playlist crescendo");
+  }
+}
+/* animação POR CARD: cada gráfico tem o seu "Animar" e só ele roda a playlist crescendo (os outros cards ficam como estão).
+   O botão da máquina do tempo (barra de cima) anima TODOS os cards. Estados do card: parado ("Animar") → tocando ("Pausar") →
+   pausado ("Retomar" + "Cancelar", com o "Até a #n ×" no cabeçalho do site). Usa a velocidade escolhida na barra. Só um card anima por vez.
+   Pra desenhar um card com o tempo dele, trocamos state.upTo só durante o desenho dele (rows() já respeita isso). */
+const CARD_DEF = {
+  wave: () => { const R = rows(); renderHeroTotal(R); renderWave(R); },
+  years: () => renderYears(rows()), tree: () => renderTree(), albums: () => renderAlbums(), rank: () => renderRank(),
+  genres: () => renderGenres(), profile: () => renderProfile(rows()), evo: () => renderEvolution(rows())
+};
+const CARDS = {};
+for (const k in CARD_DEF) CARDS[k] = {name: k, playing: false, n: null, raf: 0, t0: 0, pos: 1, last: 0, uis: []};   // uis: conjuntos de botões (no card e, no gráfico de quadrados, também na tela cheia)
+function cardRender(name){
+  const c = CARDS[name];
+  if (c.n == null) return CARD_DEF[name]();
+  const saved = state.upTo; state.upTo = c.n;
+  try { CARD_DEF[name](); } finally { state.upTo = saved; }
+}
+function cardUI(name){
+  const c = CARDS[name], paused = !c.playing && c.n != null;
+  for (const u of c.uis){
+    // o botão principal nunca muda de lugar: Animar → Pausar → Retomar; o Cancelar aparece ao lado enquanto toca ou pausado
+    const html = c.playing ? `${TM_ICON.pause}<span>Pausar</span>` : `${TM_ICON.play}<span>${paused ? "Retomar" : "Animar"}</span>`;
+    if (u._html !== html){   // só reescreve o botão quando o estado muda (cardUI roda a cada quadro; trocar o conteúdo no meio de um clique perdia o clique)
+      u._html = html; u.play.innerHTML = html;
+      u.play.setAttribute("aria-label", c.playing ? "Pausar a animação deste gráfico" : paused ? "Retomar a animação deste gráfico" : "Animar só este gráfico");
+    }
+    u.restart.style.display = c.playing || paused ? "" : "none";   // "Cancelar" aparece ao lado do botão principal
+    if (u.chip){
+      u.chip.style.display = c.n != null ? "" : "none";
+      if (c.n != null){ const tx = `Até a #${c.n} ×`; if (u.chip.textContent !== tx) u.chip.textContent = tx; }
+    }
+  }
+  toolbarChip();
+}
+/* "Até a #n": em vez de repetir em cada card, aparece UMA vez no cabeçalho do site (a barra fixa que desce junto com a tela) */
+const CARD_LABEL = {wave: "Total", years: "Linha do tempo", tree: "Quadrados", albums: "Álbuns", rank: "Ranking", genres: "Gêneros", profile: "Perfil", evo: "Evolução"};
+function toolbarChip(){
+  const b = $("#tb-anim"); if (!b) return;
+  const c = Object.values(CARDS).find(x => x.n != null);
+  if (!c){ b.style.display = "none"; b.dataset.card = ""; return; }
+  b.style.display = ""; b.dataset.card = c.name;
+  const html = `<b>${CARD_LABEL[c.name]}</b><span>Até a #${c.n}</span><span class="x">×</span>`;
+  if (b._html !== html){ b._html = html; b.innerHTML = html; }
+}
+// cria um conjunto de botões (Animar/Pausar/Retomar, Cancelar, chip) ligado ao card; dispose() tira dele (ex.: ao fechar a tela cheia)
+/* VELOCIDADE UNIVERSAL: a da barra de cima, a de cada card e a da tela cheia são a mesma (tm.speed); mexer em uma muda todas */
+const SPEEDS = [0.125, 0.25, 0.5, 1, 2, 4], SPEED_SEGS = [];
+const speedTxt = s => (s === 0.125 ? "0,12" : String(s).replace(".", ",")) + "x";   // 0,125x aparece como "0,12x" (o valor continua 0,125)
+function syncSpeedSegs(){ for (const seg of SPEED_SEGS) seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.s === tm.speed)); }
+function setSpeed(v){ tm.speed = v; syncSpeedSegs(); }
+function makeSpeedSeg(){
+  const seg = document.createElement("span"); seg.className = "seg card-speed"; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Velocidade da animação (vale para o site todo)");
+  seg.innerHTML = SPEEDS.map(s => `<button type="button" data-s="${s}" aria-pressed="${s === tm.speed}">${speedTxt(s)}</button>`).join("");
+  seg.addEventListener("click", e => { const b = e.target.closest("button"); if (b) setSpeed(+b.dataset.s); });
+  SPEED_SEGS.push(seg);
+  return seg;
+}
+function makeCardControls(name, withChip = false, withSpeed = true){
+  const mk = (cls, txt) => { const b = document.createElement("button"); b.type = "button"; b.className = "gbtn anim-btn " + cls; if (txt) b.textContent = txt; return b; };
+  const grp = document.createElement("span"); grp.className = "anim-grp";
+  const u = {play: mk("anim-play"), restart: mk("anim-restart", "Cancelar"), chip: withChip ? mk("anim-chip") : null};
+  u.restart.title = "Cancelar a animação e ir direto para o final";
+  u.restart.style.display = "none";
+  if (u.chip){ u.chip.title = "Voltar este gráfico para a playlist inteira"; u.chip.style.display = "none"; }
+  u.play.addEventListener("click", () => { const c = CARDS[name]; if (c.playing) cardPause(name); else cardStart(name, c.n != null ? Math.max(1, c.n) : 1); });
+  u.restart.addEventListener("click", () => cardCancel(name));   // não recomeça: só cancela e vai pro final
+  if (u.chip) u.chip.addEventListener("click", () => cardReset(name));
+  grp.append(u.play, u.restart); if (u.chip) grp.append(u.chip);
+  const speed = withSpeed ? makeSpeedSeg() : null; if (speed) grp.append(speed);
+  CARDS[name].uis.push(u); cardUI(name);
+  return {grp, dispose: () => { const arr = CARDS[name].uis, i = arr.indexOf(u); if (i >= 0) arr.splice(i, 1); if (speed){ const k = SPEED_SEGS.indexOf(speed); if (k >= 0) SPEED_SEGS.splice(k, 1); } }};
+}
+const anyCardPlaying = () => Object.values(CARDS).some(c => c.playing);
+function cardSettle(){   // ao pausar: os quadrados terminam a troca em 0,35 s e o resto do painel volta ao normal
+  releaseTiles(); treeEl.classList.add("settle"); clearTimeout(cardSettle.t); cardSettle.t = setTimeout(() => treeEl.classList.remove("settle"), 700);
+  if (!tm.playing){ tmBusy = false; treeEl.classList.remove("flow"); evoPanels(); }
+}
+function cardPause(name){
+  const c = CARDS[name]; c.playing = false; cancelAnimationFrame(c.raf);
+  if (!anyCardPlaying()) cardSettle();
+  cardUI(name);
+}
+$("#tb-anim").addEventListener("click", () => { const k = $("#tb-anim").dataset.card; if (k) cardReset(k); });
+/* "Cancelar": para a animação e manda o card direto pro final (playlist inteira); o ajuste pro melhor layout sai na mesma velocidade lenta da animação */
+function cardCancel(name){
+  const c = CARDS[name]; if (c.n == null && !c.playing) return;
+  c.playing = false; cancelAnimationFrame(c.raf); c.n = null;
+  if (!anyCardPlaying() && !tm.playing){ holdTiles(); tmBusy = false; evoPanels(); }
+  cardUI(name); cardRender(name);
+}
+function cardReset(name){
+  const c = CARDS[name]; if (c.n == null && !c.playing) return;
+  c.playing = false; cancelAnimationFrame(c.raf); c.n = null;
+  if (!anyCardPlaying() && !tm.playing){ tmBusy = false; treeEl.classList.remove("flow"); }
+  cardUI(name); cardRender(name);
+  if (name === "evo") evoPanels();
+}
+function cardsResetAll(){ for (const k in CARDS) cardReset(k); }
+function cardFrame(name, ts){
+  const c = CARDS[name]; if (!c.playing) return;
+  const dt = Math.min(100, ts - c.t0); c.t0 = ts;
+  const end = state.upTo == null ? TM_N : state.upTo;
+  c.pos += (TM_N / 20) * tm.speed * dt / 1000;
+  const n = Math.min(end, Math.floor(c.pos));
+  if (n !== c.n && (ts - c.last >= 90 || n >= end)){ c.n = n; c.last = ts; cardRender(name); cardUI(name); }
+  if (n >= end){   // terminou: o card volta pra playlist inteira e o gráfico se ajusta pro melhor layout na mesma velocidade lenta da animação
+    c.playing = false; c.n = null; cardUI(name);
+    if (!anyCardPlaying() && !tm.playing){ holdTiles(); tmBusy = false; evoPanels(); }
+    cardRender(name); return;
+  }
+  c.raf = requestAnimationFrame(ts2 => cardFrame(name, ts2));
+}
+function cardStart(name, from){
+  for (const k in CARDS) if (k !== name) cardReset(k);   // só um card anima por vez
+  if (tm.playing){ tmStop(); }
+  tm.paused = false; tmSync();
+  const c = CARDS[name];
+  c.n = from; c.pos = from; c.playing = true; c.t0 = performance.now(); c.last = 0;
+  releaseTiles(); tmBusy = true;
+  cardUI(name); cardRender(name);
+  c.raf = requestAnimationFrame(ts => cardFrame(name, ts));
+}
+// fileira de controles do card (onde ficam os outros botões/opções): a do gráfico de quadrados, a da onda, ou uma nova embaixo do texto de ajuda
+function cardToolsHost(host){
+  if (host.classList.contains("wave-cap")) return host;
+  const own = host.querySelector(".tree-tools"); if (own) return own;
+  let tools = host.querySelector(":scope > .card-tools");
+  if (!tools){ tools = document.createElement("div"); tools.className = "card-tools"; host.appendChild(tools); }
+  return tools;
+}
+(function addCardButtons(){
+  if (TM_N < 2 || TM_REDUCE) return;
+  const nameOf = art => art.id === "evo-card" ? "evo" : art.querySelector("#years") ? "years" : art.querySelector("#tree") ? "tree" : art.querySelector("#albums") ? "albums"
+    : art.querySelector("#rank") ? "rank" : art.querySelector("#genres") ? "genres" : art.querySelector("#profile") ? "profile" : null;
+  const targets = [...document.querySelectorAll("article.chart:not(#filtered-list-card) > header")].map(h => [h, nameOf(h.parentElement)]);
+  const wave = document.querySelector(".hero .wave-cap"); if (wave) targets.push([wave, "wave"]);
+  for (const [host, name] of targets){
+    if (!name) continue;
+    cardToolsHost(host).appendChild(makeCardControls(name, false, name !== "wave").grp);   // os botões entram na mesma fileira de controles do card, como qualquer outro
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) for (const k in CARDS) if (CARDS[k].playing) cardPause(k); });
+})();
+/* chip "Tempo · Até a #n ×": fica na linha de filtros (em cima do player) enquanto ela está visível; quando a tela desce e a linha sai de vista,
+   ele sobe para o cabeçalho colado (barra fixa; no celular, etiqueta flutuante). Só troca o texto quando o número muda (não pisca) */
+const ROW_TIME = (() => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.type = "button"; b.id = "row-time"; b.style.display = "none"; b.title = "Voltar o painel para a playlist inteira";
+  b.addEventListener("click", () => tmCancel());
+  return b;
+})();
+function rowTimeInView(){
+  const r = ROW_TIME.getBoundingClientRect(), tb = document.querySelector(".toolbar");
+  const lim = innerWidth >= 900 && tb ? tb.getBoundingClientRect().bottom : 0;   // a barra fixa cobre o topo da tela nas telas largas
+  return r.height > 0 && r.bottom > lim + 2 && r.top < innerHeight;
+}
+function timeChip(){
+  const hdr = $("#tb-time"); if (!hdr) return;
+  const on = state.upTo != null;
+  const html = on ? `<b>Tempo</b><span>Até a #${state.upTo}</span><span class="x">×</span>` : "";
+  ROW_TIME.style.display = on ? "" : "none";
+  if (on && ROW_TIME._html !== html){ ROW_TIME._html = html; ROW_TIME.innerHTML = html; }
+  const showHdr = on && !rowTimeInView();
+  hdr.style.display = showHdr ? "" : "none";
+  if (showHdr && hdr._html !== html){ hdr._html = html; hdr.innerHTML = html; }
+}
+addEventListener("scroll", () => { if (state.upTo != null) requestAnimationFrame(timeChip); }, {passive: true});
+addEventListener("resize", () => { if (state.upTo != null) timeChip(); });
+// cancela a animação (se estiver tocando) e volta o painel direto pro final, com o ajuste lento do layout
+function tmCancel(){
+  tm.paused = false; tm.playing = false; cancelAnimationFrame(tm.raf);
+  holdTiles(); tmBusy = false; tmGo(TM_N); evoPanels();
+}
+$("#tb-time").addEventListener("click", tmCancel);
+function tmGo(n){
+  tm.paused = false;
+  n = Math.min(TM_N, Math.max(1, Math.round(n)));
+  state.upTo = n >= TM_N ? null : n;
+  tmSync(); render();
+}
+function tmStop(natural = false){
+  const was = tm.playing;
+  tm.playing = false; cancelAnimationFrame(tm.raf);
+  if (tmBusy && natural){
+    // a animação acabou sozinha: o gráfico se ajusta pro melhor layout NA MESMA velocidade lenta da animação
+    holdTiles(); tmBusy = false; tmSync(); render(); evoPanels();
+  } else if (tmBusy){
+    // pausou: o último desenho sai SEM animações (números e listas param na hora) e os quadrados terminam a troca em 0,35 s
+    releaseTiles(); treeEl.classList.add("settle"); clearTimeout(tmStop.t); tmStop.t = setTimeout(() => treeEl.classList.remove("settle"), 700);
+    tmSync(); render();
+    tmBusy = false; treeEl.classList.remove("flow"); evoPanels();
+  } else tmSync();
+  return was;
+}
+function tmFrame(ts){
+  if (!tm.playing) return;
+  const dt = Math.min(100, ts - tm.t0); tm.t0 = ts;
+  tm.pos += (TM_N / 20) * tm.speed * dt / 1000;   // 1x percorre a playlist inteira em ~20 s
+  const n = Math.min(TM_N, Math.floor(tm.pos));
+  if (n !== tm.shown && (ts - tm.lastRender >= 90 || n >= TM_N)){
+    tm.shown = n; tm.lastRender = ts;
+    state.upTo = n >= TM_N ? null : n;
+    const keep = tm.pos; tmSync(); tm.pos = keep; tm.shown = n;
+    render();
+  }
+  if (n >= TM_N){ tmStop(true); return; }
+  tm.raf = requestAnimationFrame(tmFrame);
+}
+function tmPlay(){
+  if (TM_N < 2) return;
+  if (tm.playing){ tmStop(); tm.paused = true; tmSync(); return; }   // pausou: o botão da barra volta a ser o play (retoma de onde parou)
+  tm.paused = false;
+  cardsResetAll();   // o botão de cima anima TODOS os cards
+  if (state.upTo == null){ state.upTo = 1; tm.pos = 1; }
+  releaseTiles();
+  tmBusy = true; tm.playing = true; tm.t0 = performance.now(); tm.lastRender = 0;
+  tmSync(); render();
+  tm.raf = requestAnimationFrame(tmFrame);
+}
+(function initTimeMachine(){
+  const box = $("#tm"), r = $("#tm-range");
+  if (TM_N < 2){ box.hidden = true; return; }
+  r.max = TM_N;
+  if (TM_REDUCE){ $("#tm-play").style.display = "none"; $("#tm-speed").style.display = "none"; }
+  $("#tm-play").addEventListener("click", tmPlay);
+  $("#tm-now").addEventListener("click", () => { tmStop(); tmGo(TM_N); });
+  $("#tm-speed").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setSpeed(+b.dataset.s); });
+  SPEED_SEGS.push($("#tm-speed"));
+  let drag = false;
+  r.addEventListener("pointerdown", () => { drag = true; tmBusy = true; });
+  const endDrag = () => { if (drag){ drag = false; if (!tm.playing){ tmBusy = false; render(); } } };
+  addEventListener("pointerup", endDrag); addEventListener("pointercancel", endDrag);
+  r.addEventListener("input", () => {
+    if (tm.playing){ tm.playing = false; cancelAnimationFrame(tm.raf); tmBusy = drag; }
+    tmGo(+r.value);
+  });
+  r.addEventListener("keydown", e => { if (e.key === " "){ e.preventDefault(); tmPlay(); } });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && tm.playing) tmStop(); });
+  tmSync();
+})();
 
 /* ---------------- chart 7: evolução por banda/gênero (linhas acumuladas pela ordem de adição; banda = artista principal) ---------------- */
 // as 8 primeiras linhas usam as cores categóricas validadas (versão escura), em ordem fixa; da 9ª em diante
 // (dá pra marcar todas) as cores são geradas espalhando o matiz. Cada linha mantém a cor enquanto está marcada
 const EVO_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
-const EVO_DEFAULT = 8, EVO_TOPS = [1, 3, 5, 8, 10, 25, 50, 100, 250, 500, 750, 1000];
+const EVO_DEFAULT = 10, EVO_TOPS = [1, 3, 5, 8, 10, 25, 50, 100, 250, 500, 750, 1000];
 const evoCol = s => s < EVO_COLORS.length ? EVO_COLORS[s] : `hsl(${Math.round(((s - EVO_COLORS.length) * 137.5 + 20) % 360)}, 62%, 62%)`;
-const evo = {mode: "band", sel: {band: null, genre: null}, slot: {band: new Map(), genre: new Map()}, list: [], map: new Map(), R: [], N: 0};
+const evo = {mode: "band", dyn: {band: null, genre: null}, sel: {band: null, genre: null}, slot: {band: new Map(), genre: new Map()}, list: [], map: new Map(), R: [], N: 0};
 const evoName = k => evo.mode === "genre" ? capFirst(k) : k;
 function evoBuild(R){
   const sorted = [...R].sort((a, b) => a.n - b.n), idx = new Map();
   sorted.forEach((t, i) => {
-    const keys = evo.mode === "band" ? (t.artist === NI ? [] : [splitArtistsRaw(t.artist)[0] || t.artist]) : (t.ge || []);
+    const keys = evo.mode === "band" ? (t.artist === NI ? [] : (splitArtistsRaw(t.artist).length ? splitArtistsRaw(t.artist) : [t.artist])) : (t.ge || []);
     for (const k of keys) (idx.get(k) || idx.set(k, []).get(k)).push(i);
   });
   evo.R = sorted; evo.N = sorted.length;
+  // com a máquina do tempo o eixo continua com o tamanho total (as linhas crescem da esquerda pra direita)
+  evo.full = state.upTo == null ? sorted : rows(true, true, true, false).sort((a, b) => a.n - b.n);
+  evo.axisN = evo.full.length;
   evo.list = [...idx].map(([k, ix]) => ({k, ix, c: ix.length})).sort((a, b) => b.c - a.c || coll.compare(a.k, b.k));
   evo.map = new Map(evo.list.map(s => [s.k, s]));
+  evoSel(); evoApplyDyn();
+}
+/* "Top N" é dinâmico: as linhas mostradas são as N maiores NO MOMENTO (na máquina do tempo mudam conforme o gráfico
+   avança), e não as N maiores do final. Escolher/tirar uma linha à mão, ou clicar em "Fixar top", congela a escolha */
+function evoApplyDyn(){
+  const m = evo.mode, n = evo.dyn[m]; if (!n || !evo.sel[m]) return;
+  const want = evo.list.slice(0, n).map(s => s.k), wantSet = new Set(want);
+  for (const k of [...evo.sel[m]]) if (!wantSet.has(k)) evoDel(k);
+  for (const k of want) if (!evo.sel[m].has(k)) evoAdd(k);
 }
 function evoAdd(k){
   const m = evo.mode, used = new Set();
@@ -916,7 +1401,7 @@ function evoAdd(k){
   evo.sel[m].add(k); evo.slot[m].set(k, s); return true;
 }
 function evoDel(k){ evo.sel[evo.mode].delete(k); evo.slot[evo.mode].delete(k); }
-function evoTop(n){ const m = evo.mode; evo.sel[m] = new Set(); evo.slot[m] = new Map(); evo.list.slice(0, n).forEach(s => evoAdd(s.k)); }
+function evoTop(n){ const m = evo.mode; evo.sel[m] = new Set(); evo.slot[m] = new Map(); evo.dyn[m] = n; evo.list.slice(0, n).forEach(s => evoAdd(s.k)); }
 function evoReset(){ evoTop(EVO_DEFAULT); }
 function evoSel(){ if (!evo.sel[evo.mode]) evoReset(); return evo.sel[evo.mode]; }
 const evoColor = k => evoCol(evo.slot[evo.mode].get(k));
@@ -960,18 +1445,28 @@ function evoPanels(){
     ...(total ? [`<button type="button" data-n="all" aria-pressed="${isTop(total)}">Todas · ${total}</button>`] : [])].join("");
 }
 function evoToggle(k){
+  evo.dyn[evo.mode] = null;   // escolha manual: deixa de acompanhar o top
   if (evoSel().has(k)) evoDel(k);
   else evoAdd(k);
   evoPanels(); drawEvo();
 }
+const evoPin = (() => {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "gbtn"; b.hidden = true; b.textContent = "Fixar top"; b.title = "Congela as linhas que estão no gráfico agora, mesmo com a máquina do tempo andando";
+  b.addEventListener("click", () => { evo.dyn[evo.mode] = null; b.hidden = true; evoPanels(); toast("Top fixado: as linhas não mudam mais com o tempo."); });
+  const row = $("#evo-tops"); if (row) row.insertAdjacentElement("afterend", b);
+  return b;
+})();
 function drawEvo(){
   const box = $("#evo"); if (!box) return;
+  evoPin.hidden = !(evo.dyn[evo.mode] && state.upTo != null);   // só faz sentido com a máquina do tempo no meio do caminho
   const W = box.clientWidth, N = evo.N;
   if (!evo.list.length){ box.innerHTML = `<p class="none">${evo.mode === "genre" ? "Ainda não há gêneros para mostrar. Use \"Atualizar dados\" para buscá-los." : "Sem dados para este recorte."}</p>`; return; }
   if (!W) return;
   const shown = [...evoSel()].filter(k => evo.map.has(k)).sort((a, b) => evo.slot[evo.mode].get(a) - evo.slot[evo.mode].get(b));
-  const H = 300, L = 38, Rm = 16, Tp = 14, Bt = 26;
-  const X = i => L + (N <= 1 ? 0 : i / (N - 1)) * (W - L - Rm);
+  const H = 300, L = 38, Rm = Math.round(Math.min(84, Math.max(30, W * 0.16))), Tp = 14, Bt = 26;   // margem da direita comporta o rótulo da ponta da linha
+  const NA = Math.max(N, evo.axisN || N);
+  const X = i => L + (NA <= 1 ? 0 : i / (NA - 1)) * (W - L - Rm);
   const cum = shown.map(k => { const ix = evo.map.get(k).ix, a = new Int32Array(N); let p = 0, c = 0; for (let i = 0; i < N; i++){ if (p < ix.length && ix[p] === i){ c++; p++; } a[i] = c; } return a; });
   const mx = Math.max(1, ...cum.map(a => a[N - 1]));
   const raw = mx / 4, pow = Math.pow(10, Math.floor(Math.log10(raw))), step = Math.max(1, [1, 2, 5, 10].map(m => m * pow).find(s => s >= raw));
@@ -979,7 +1474,7 @@ function drawEvo(){
   const Y = v => Tp + (1 - v / top) * (H - Tp - Bt);
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução acumulada de faixas por ${evo.mode === "band" ? "banda" : "gênero"}, pela ordem de adição">`;
   for (let v = 0; v <= top; v += step) svg += `<line x1="${L}" x2="${W - Rm}" y1="${Y(v)}" y2="${Y(v)}" stroke="rgba(110,231,183,.08)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
-  [0, .25, .5, .75, 1].forEach((f, j, arr) => { const i = Math.round(f * (N - 1)); svg += `<text x="${X(i)}" y="${H - 6}" text-anchor="${j === 0 ? "start" : j === arr.length - 1 ? "end" : "middle"}">#${evo.R[i].n}</text>`; });
+  [0, .25, .5, .75, 1].forEach((f, j, arr) => { const i = Math.round(f * (NA - 1)); svg += `<text x="${X(i)}" y="${H - 6}" text-anchor="${j === 0 ? "start" : j === arr.length - 1 ? "end" : "middle"}">#${(evo.full[i] || evo.R[Math.min(i, N - 1)]).n}</text>`; });
   const every = Math.max(1, Math.ceil(N / 500));
   cum.forEach((a, j) => {
     const pts = []; for (let i = 0; i < N; i += every) pts.push(i); if (pts[pts.length - 1] !== N - 1) pts.push(N - 1);
@@ -987,13 +1482,26 @@ function drawEvo(){
     svg += `<path d="M${pts.map(i => `${X(i).toFixed(1)},${Y(a[i]).toFixed(1)}`).join("L")}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
     svg += `<circle cx="${X(N - 1)}" cy="${Y(a[N - 1])}" r="4" fill="${col}" stroke="#071a14" stroke-width="2"/>`;
   });
+  /* rótulo na ponta de cada linha, na cor dela: o
+     nome — inteiro se for uma palavra só, ou só o primeiro nome se for composto — o tempo todo, inclusive na máquina do tempo. Rótulos muito próximos se afastam */
+  const maxCh = Math.max(1, Math.floor((Rm - 16) / 6.6));
+  const ends = shown.map((k, j) => {
+    const nm = String(evoName(k)).trim(), first = nm.split(/\s+/)[0] || nm;
+    // o rótulo é sempre o primeiro nome da banda, escrito normal, do começo ao fim da animação
+    let txt = first;
+    if (txt.length > maxCh) txt = txt.slice(0, Math.max(1, maxCh - 1)) + "…";
+    return {txt, y: Y(cum[j][N - 1]), col: evoCol(evo.slot[evo.mode].get(k))};
+  }).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 12) ends[i].y = ends[i - 1].y + 12;
+  const lastY = H - Bt - 2; for (let i = ends.length - 1; i >= 0; i--) { if (ends[i].y > lastY) ends[i].y = lastY; if (i && ends[i].y - ends[i - 1].y < 12) ends[i - 1].y = ends[i].y - 12; }
+  ends.forEach(e => { svg += `<text class="evo-end" x="${X(N - 1) + 9}" y="${(e.y + 4).toFixed(1)}" style="fill:${e.col}">${esc(e.txt)}</text>`; });
   svg += `<g id="evo-hot" style="display:none"><line y1="${Tp}" y2="${H - Bt}" stroke="rgba(240,253,247,.35)" stroke-dasharray="3 3"/>${cum.map((a, j) => `<circle r="4.5" fill="${evoCol(evo.slot[evo.mode].get(shown[j]))}" stroke="#071a14" stroke-width="2"/>`).join("")}</g>`;
   svg += `<rect id="evo-hit" x="${L}" y="0" width="${W - L - Rm}" height="${H - Bt}" fill="transparent"/></svg>`;
   box.innerHTML = svg;
   const s = box.querySelector("svg"), hot = s.querySelector("#evo-hot"), line = hot.querySelector("line"), dots = [...hot.querySelectorAll("circle")];
   const at = e => {
     const b = s.getBoundingClientRect(), x = (e.clientX - b.left) / b.width * W;
-    const i = Math.min(N - 1, Math.max(0, Math.round((x - L) / (W - L - Rm) * (N - 1))));
+    const i = Math.min(N - 1, Math.max(0, Math.round((x - L) / (W - L - Rm) * (NA - 1))));
     hot.style.display = "";
     line.setAttribute("x1", X(i)); line.setAttribute("x2", X(i));
     dots.forEach((d, j) => { d.setAttribute("cx", X(i)); d.setAttribute("cy", Y(cum[j][i])); });
@@ -1005,14 +1513,14 @@ function drawEvo(){
   s.addEventListener("pointermove", at);
   s.addEventListener("pointerleave", () => { hot.style.display = "none"; hideTip(); });
 }
-function renderEvolution(R){ evoBuild(R); evoPanels(); drawEvo(); }
+function renderEvolution(R){ evoBuild(R); if (!tmBusy) evoPanels(); drawEvo(); }
 $("#evo-mode").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.dataset.m === evo.mode) return; evo.mode = b.dataset.m; evoBuild(rows()); evoPanels(); drawEvo(); });
-$("#evo-tops").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; evoTop(b.dataset.n === "all" ? evo.list.length : +b.dataset.n); evoPanels(); drawEvo(); });
-$("#evo-none").addEventListener("click", () => { evo.sel[evo.mode] = new Set(); evo.slot[evo.mode] = new Map(); evoPanels(); drawEvo(); });
+$("#evo-tops").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; evoTop(b.dataset.n === "all" ? Infinity : +b.dataset.n); evoPanels(); drawEvo(); });
+$("#evo-none").addEventListener("click", () => { evo.dyn[evo.mode] = null; evo.sel[evo.mode] = new Set(); evo.slot[evo.mode] = new Map(); evoPanels(); drawEvo(); });
 $("#evo-opts").addEventListener("click", e => { const b = e.target.closest(".evo-opt"); if (b) evoToggle(b.dataset.k); });
 $("#evo-q").addEventListener("input", evoPanels);
 $("#evo-singles").addEventListener("click", openEvoSingles);
-$("#evo-singles-x").addEventListener("click", () => { evo.list.filter(s => s.c === 1).forEach(s => { if (evoSel().has(s.k)) evoDel(s.k); }); evoPanels(); drawEvo(); });
+$("#evo-singles-x").addEventListener("click", () => { evo.dyn[evo.mode] = null; evo.list.filter(s => s.c === 1).forEach(s => { if (evoSel().has(s.k)) evoDel(s.k); }); evoPanels(); drawEvo(); });
 
 /* ---------------- tabs ---------------- */
 const tabs = [...document.querySelectorAll(".tabs button")];
@@ -1023,6 +1531,7 @@ function showTab(id){
   placePill(); hideTip();
   try { history.replaceState(null, "", id === "insights" ? "#insights" : "#"); } catch (e) {}
   if (id === "insights") animateInsights(); else requestAnimationFrame(() => { renderTree(); renderYears(rows()); drawEvo(); });
+  dispatchEvent(new Event("fx:refresh"));
 }
 tabs.forEach(t => t.addEventListener("click", () => showTab(t.getAttribute("aria-controls"))));
 addEventListener("hashchange", () => showTab(location.hash === "#insights" ? "insights" : "painel"));
@@ -1086,10 +1595,9 @@ const IS = (() => {
   }
   S.runsSorted = [...S.runs].sort((a, b) => b.length - a.length || a[0].n - b[0].n);
   S.collabsOf = name => {
-    /* cada faixa conta só pro artista principal (ver S.art acima); "colaborador" é quem aparece
-       como convidado numa faixa em que este artista é o principal */
+    /* "colaborador" é quem divide uma faixa com este artista e conta como artista (ver SOLO no topo) */
     const nameLC = name.toLowerCase(), others = new Set();
-    for (const t of T){ const parts = splitArtistsAll(t.artist.toLowerCase()); if (parts.length > 1 && parts[0] === nameLC) parts.slice(1).forEach(p => others.add(p)); }
+    for (const t of T){ const parts = splitArtists(t.artist); if (parts.length > 1 && parts.includes(nameLC)) parts.forEach(p => { if (p !== nameLC) others.add(p); }); }
     return S.art.filter(a => others.has(a.k.toLowerCase()));
   };
   S.journey = NN >= 30;
@@ -1161,7 +1669,7 @@ const V = {
     }).join("") + `<div class="sx"><span>#1</span><span>capítulos 1–${IS.chap.length || 1}</span><span>#${NN}</span></div>`;
   },
   cells(win, a1, a2){
-    const col = t => t.artist === a1 ? "#F0FDF7" : t.artist === a2 ? "#10B981" : "rgba(110,231,183,.14)";
+    const col = t => hasBand(t, a1) ? "#F0FDF7" : hasBand(t, a2) ? "#10B981" : "rgba(110,231,183,.14)";
     return `<div class="cells">${win.map(t => `<i style="background:${col(t)}" title="#${t.n} ${esc(t.title)} — ${esc(t.artist)}"></i>`).join("")}</div>
       <div class="lg"><span><i style="background:#F0FDF7"></i>${esc(a1)}</span>${a2 ? `<span><i style="background:#10B981"></i>${esc(a2)}</span>` : ""}<span><i style="background:rgba(110,231,183,.14)"></i>outros</span><span class="r">primeiras ${win.length} adições</span></div>`;
   },
@@ -1184,6 +1692,11 @@ const V = {
 const cleanTitle = s => s.replace(/\s+-\s+(\d{4}\s+)?(remaster(ed)?|remix|live|ao vivo|demo|bonus track|single version|radio edit|mono|stereo).*$/i, "").replace(/\s+\((\d{4}\s+)?(remaster(ed)?|live|ao vivo)[^)]*\)$/i, "").trim();
 
 /* ---------- rules ---------- */
+/* (definidos aqui em cima porque as regras de insights abaixo já usam coverIgnored ao carregar a página) */
+const DUPIGN_KEY = "catalogo-musical:dups-ignored";
+const DUPIGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(DUPIGN_KEY) || "[]")); } catch (e) { return new Set(); } })();
+const saveDupIgn = () => { try { localStorage.setItem(DUPIGN_KEY, JSON.stringify([...DUPIGN])); } catch (e) {} };
+const coverIgnored = key => DUPIGN.has("c|" + normC(key));
 const RULES = [];
 const rule = fn => RULES.push(fn);
 
@@ -1287,13 +1800,13 @@ rule(() => {
 // PLAYLIST · who opened the playlist
 rule(() => {
   if (!IS.journey) return null;
-  const run = IS.runs[0], a0 = run[0].artist, k = run.length, art = IS.artMap.get(a0);
+  const run = IS.runs[0], a0 = bandsOfRow(run[0])[0], k = run.length, art = IS.artMap.get(a0);
   const later = art.c - k, last = art.rs[art.rs.length - 1].n;
   const win = BY_PLAYLIST.slice(0, Math.min(60, NN));
   const g = [...groupBy(win, "artist")].map(([x, rs]) => [x, rs.length]).sort((a, b) => b[1] - a[1]);
   const second = (g.find(([x]) => x !== a0) || [])[0];
   if (k < 4){
-    const w20 = BY_PLAYLIST.slice(0, 20), na = new Set(w20.map(t => t.artist)).size;
+    const w20 = BY_PLAYLIST.slice(0, 20), na = new Set(w20.flatMap(bandsOfRow)).size;
     return {kind: "pl", theme: 1, score: 55, title: "A playlist começou plural", body: `<p>As primeiras ${w20.length} faixas já reuniam ${B(`${na} artistas`)}, sem um dono da abertura.</p>`, viz: V.cells(win, g[0][0], g[1] && g[1][0]), kick: [nf(na), `artistas nas primeiras ${w20.length} adições`]};
   }
   const gone = later <= k / 2;
@@ -1307,14 +1820,14 @@ rule(() => {
 rule(() => {
   if (!IS.journey) return null;
   const a1 = IS.art[0], last = a1.rs[a1.rs.length - 1].n, tail = NN - last;
-  const myRun = IS.runsSorted.find(r => r[0].artist === a1.k), isBiggest = myRun && IS.runsSorted[0] === myRun;
+  const myRun = IS.runsSorted.find(r => hasBand(r[0], a1.k)), isBiggest = myRun && IS.runsSorted[0] === myRun;
   if (tail >= Math.max(15, NN * .15)){
     return {kind: "pl", theme: 1, score: 82,
       title: pickV("faded", ["O líder do catálogo é passado na playlist", "O maior artista do catálogo parou de crescer"]),
       body: `<p>${myRun && myRun.length >= 5 ? `${esc(a1.k)} tem ${isBiggest ? "a maior maratona da lista" : `uma maratona de ${myRun.length}`} (${B(`${myRun.length} seguidas, #${myRun[0].n} a #${myRun[myRun.length - 1].n}`)}) e depois some.` : `${esc(a1.k)} lidera o total, mas a última faixa entrou na ${B("#" + last)}.`}</p>`,
       viz: V.strips([a1.k]), kick: ["0", `faixas de ${a1.k} nas últimas ${nf(tail)} adições`]};
   }
-  const lastCh = CHI[CHI.length - 1], x = lastCh.seg.filter(t => t.artist === a1.k).length;
+  const lastCh = CHI[CHI.length - 1], x = lastCh.seg.filter(t => hasBand(t, a1.k)).length;
   if (lastCh.top[0] === a1.k) return {kind: "pl", theme: 1, score: 78, title: `${a1.k} lidera o catálogo e também o agora`,
     body: `<p>O maior artista do catálogo continua dominando as adições recentes: é o artista mais presente no último capítulo.</p>`, viz: V.strips([a1.k]), kick: [nf(x), `das últimas ${lastCh.seg.length} adições são de ${a1.k}`]};
   return null;
@@ -1333,7 +1846,7 @@ rule(() => {
   SLOW = c.a.k;
   const turn = c.a.rs[c.early] ? c.a.rs[c.early].n : cut;
   const wait = turn - c.first, waitTxt = wait >= 50 ? `mais de ${Math.floor(wait / 50) * 50}` : nf(wait);
-  const run = IS.runsSorted.find(r => r[0].artist === c.a.k && r[0].n > cut * .9);
+  const run = IS.runsSorted.find(r => hasBand(r[0], c.a.k) && r[0].n > cut * .9);
   const col = IS.collabsOf(c.a.k).flatMap(x => x.rs).filter(t => t.n > cut).map(t => "#" + t.n);
   return {kind: "pl", theme: 2, score: 76,
     title: `${c.a.k} levou ${waitTxt} adições para engrenar`,
@@ -1363,7 +1876,7 @@ rule(() => {
   if (NN < 36) return null;
   const bl = blocks(12);
   const cands = IS.art.filter(a => a.c >= 6).map(a => {
-    const cov = bl.filter(seg => seg.some(t => t.artist === a.k)).length, span = a.rs[a.rs.length - 1].n - a.rs[0].n;
+    const cov = bl.filter(seg => seg.some(t => hasBand(t, a.k))).length, span = a.rs[a.rs.length - 1].n - a.rs[0].n;
     let gap = 0, gi = 0; for (let i = 1; i < a.rs.length; i++){ const g = a.rs[i].n - a.rs[i - 1].n; if (g > gap){ gap = g; gi = i; } }
     return {a, cov, span, gap, back: a.rs.slice(gi).length};
   }).filter(x => x.span >= NN * .6).sort((x, y) => y.cov - x.cov || y.span - x.span).slice(0, 3);
@@ -1428,7 +1941,7 @@ rule(() => {
 rule(() => {
   if (!IS.journey) return null;
   const g = groupBy(T.map(t => ({...t, key: cleanTitle(t.title).toLowerCase()})).filter(t => t.key.length > 2), "key");
-  const pairs = [...g.values()].filter(rs => new Set(rs.map(r => r.artist)).size > 1).map(rs => {
+  const pairs = [...g.values()].filter(rs => new Set(rs.map(r => r.artist)).size > 1 && !coverIgnored(cleanTitle(rs[0].title))).map(rs => {
     const s = [...rs].sort((a, b) => a.n - b.n), a = s[0], b = s.find(x => x.artist !== a.artist);
     return {title: cleanTitle(a.title), a, b, older: a.year !== NI && b.year !== NI && a.year <= b.year};
   });
@@ -1618,7 +2131,7 @@ function renderJourney(){
   }));
   const BL = blocks(NN >= 36 ? 12 : 6);
   const top = IS.art.slice(0, 10).map(a => a.k);
-  const grid = top.map(a => BL.map(seg => seg.filter(r => r.artist === a)));
+  const grid = top.map(a => BL.map(seg => seg.filter(r => hasBand(r, a))));
   const mx = Math.max(1, ...grid.flat().map(x => x.length));
   let html = "";
   top.forEach((a, ai) => {
@@ -1703,6 +2216,7 @@ $("#tech-toggle").addEventListener("click", () => {
   techOn = !techOn;
   try { localStorage.setItem(TECH_KEY, techOn ? "1" : "0"); } catch (e) {}
   renderCards(); renderDisc(); renderTechBar(); animateInsights();
+  dispatchEvent(new Event("fx:refresh"));
 });
 (function buildInsights(){
   try { renderHero(); renderJourney(); renderCards(); renderDisc(); renderTechBar(); renderNote(); }
@@ -2336,8 +2850,8 @@ function genreTargets(list){
   const m = new Map();
   for (const r of list){
     const artist = (r.artist || "").trim(); if (!artist || artist === NI) continue;
-    const parts = splitArtists(artist), raw = splitArtistsRaw(artist), aid = (r.meta && r.meta.aid) || [];
-    parts.forEach((p, i) => { if (!hasGenre(p) && !m.has(p)) m.set(p, {key: p, name: raw[i] || p, id: parts.length === aid.length ? aid[i] : null}); });
+    const all = splitArtistsAll(artist), idx = countedIdx(all), aid = (r.meta && r.meta.aid) || [];
+    idx.forEach(i => { const p = all[i].toLowerCase(); if (!hasGenre(p) && !m.has(p)) m.set(p, {key: p, name: all[i], id: all.length === aid.length ? aid[i] : null}); });
   }
   return [...m.values()];
 }
@@ -3130,6 +3644,8 @@ function openExport(){
 }
 
 /* ---------- duplicadas e covers: títulos parecidos (sem versão/remaster) agrupados por artista principal ---------- */
+/* o usuário pode marcar um caso como "não é cover" / "não é repetida": fica salvo no navegador (ids "c|título" e
+   "d|título|artista") e o caso sai das listas, da contagem do botão e da análise de covers; dá pra desfazer em "Ignoradas" */
 function similarTitles(){
   const g = new Map();
   for (const t of BY_PLAYLIST){
@@ -3137,29 +3653,68 @@ function similarTitles(){
     if (!g.has(key)) g.set(key, []);
     g.get(key).push(t);
   }
-  const dups = [], covers = [];
+  const dups = [], covers = [], ignored = [];
+  const put = (item) => (DUPIGN.has(item.id) ? ignored : item.kind === "d" ? dups : covers).push(item);
   for (const [key, rs] of g){
     if (rs.length < 2) continue;
     const mains = new Map();
     for (const t of rs){ const m = splitArtists(t.artist)[0]; if (!mains.has(m)) mains.set(m, []); mains.get(m).push(t); }
-    for (const [, list] of mains) if (list.length > 1) dups.push({title: cleanTitle(list[0].title), rs: list});
-    if (mains.size > 1) covers.push({title: cleanTitle(rs[0].title), rs});
+    for (const [m, list] of mains) if (list.length > 1) put({kind: "d", id: `d|${key}|${m}`, title: cleanTitle(list[0].title), rs: list});
+    if (mains.size > 1) put({kind: "c", id: `c|${key}`, title: cleanTitle(rs[0].title), rs});
   }
   const by = (a, b) => b.rs.length - a.rs.length || coll.compare(a.title, b.title);
-  return {dups: dups.sort(by), covers: covers.sort(by)};
+  return {dups: dups.sort(by), covers: covers.sort(by), ignored: ignored.sort(by)};
 }
+const syncDupsBtn = () => { const s = similarTitles(); $("#dt-dups").hidden = !s.dups.length && !s.covers.length && !s.ignored.length; };
 function openDups(){
-  const {dups, covers} = similarTitles();
-  let tab = dups.length || !covers.length ? "dups" : "covers";
+  let sim = similarTitles();
+  let tab = sim.dups.length || !sim.covers.length ? "dups" : "covers";
+  if (tab === "covers" && !sim.covers.length) tab = "ignored";
   const body = document.createElement("div");
-  const seg = `<div class="seg" role="group" aria-label="Tipo"><button type="button" data-t="dups">Duplicadas (${dups.length})</button><button type="button" data-t="covers">Covers (${covers.length})</button></div>`;
+  const seg = `<div class="seg" role="group" aria-label="Tipo"><button type="button" data-t="dups"></button><button type="button" data-t="covers"></button><button type="button" data-t="ignored"></button></div>`;
   const md = openModal({title: "Duplicadas e covers", sub: "Títulos iguais ou parecidos (ignorando remaster, live, remix…)", body, headerExtra: seg, size: "lg"});
   const draw = () => {
-    md.m.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === tab));
-    const list = tab === "dups" ? dups : covers;
-    body.innerHTML = `<p class="mdesc">${tab === "dups" ? "Mesmo título e mesmo artista principal: provavelmente a mesma música adicionada duas vezes (ou em versões diferentes). Para apagar, use o botão <strong>Músicas</strong>." : "Mesmo título gravado por artistas principais diferentes: covers, ou apenas músicas com o mesmo nome."}</p>` +
-      (list.length ? list.map(x => `<div class="eyebrow" style="margin:14px 0 6px">${esc(x.title)} · ${faixas(x.rs.length)}</div>${songTable(x.rs)}`).join("") : `<p class="muted">Nenhum caso encontrado.</p>`);
+    const lab = {dups: `Duplicadas (${sim.dups.length})`, covers: `Covers (${sim.covers.length})`, ignored: `Ignoradas (${sim.ignored.length})`};
+    md.m.querySelectorAll(".seg button").forEach(b => { b.textContent = lab[b.dataset.t]; b.setAttribute("aria-pressed", b.dataset.t === tab); });
+    const list = sim[tab];
+    const desc = {
+      dups: "Mesmo título e mesmo artista principal: provavelmente a mesma música adicionada duas vezes (ou em versões diferentes). Para apagar, use o botão <strong>Músicas</strong>. Se não for repetida de verdade, clique em <strong>Não é repetida</strong>.",
+      covers: "Mesmo título gravado por artistas principais diferentes: covers, ou apenas músicas com o mesmo nome. Se forem músicas diferentes, clique em <strong>Não é cover</strong>.",
+      ignored: "Casos que você marcou como \"não é cover\" ou \"não é repetida\". Clique em <strong>Desfazer</strong> para voltarem às listas."
+    }[tab];
+    const btn = x => tab === "ignored" ? `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="undo">Desfazer</button>`
+      : `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="ign">${x.kind === "c" ? "Não é cover" : "Não é repetida"}</button>`;
+    const tag = x => tab === "ignored" ? ` · <span style="text-transform:none;letter-spacing:0">${x.kind === "c" ? "não é cover" : "não é repetida"}</span>` : "";
+    body.innerHTML = `<p class="mdesc">${desc}</p>` +
+      (list.length ? list.map(x => `<div class="eyebrow dup-head" style="margin:14px 0 6px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span>${esc(x.title)} · ${faixas(x.rs.length)}${tag(x)}</span>${btn(x)}</div>${songTable(x.rs)}`).join("") : `<p class="muted">Nenhum caso ${tab === "ignored" ? "ignorado" : "encontrado"}.</p>`);
   };
+  const yr = r => r.year === NI ? "ano desconhecido" : r.year;
+  const who = r => `<strong>“${esc(cleanTitle(r.title))}”</strong> de <strong>${esc(r.artist)}</strong> (${yr(r)})`;
+  // pergunta antes de marcar: no cover, a faixa de lançamento mais nova é a "cover" e a mais antiga é a original
+  async function confirmIgnore(item){
+    if (item.kind === "c"){
+      const byAge = [...item.rs].sort((a, b) => (b.year === NI ? -1 : a.year === NI ? 1 : b.year - a.year) || b.n - a.n);
+      const nova = byAge[0], orig = [...byAge].reverse().find(r => splitArtists(r.artist)[0] !== splitArtists(nova.artist)[0]) || byAge[byAge.length - 1];
+      const versoes = new Set(item.rs.map(r => splitArtists(r.artist)[0])).size;
+      return confirmModal({title: "Não é um cover?", ok: "Sim, marcar", cancel: "Cancelar",
+        html: `<p>Deseja marcar ${who(nova)} como <strong>não sendo um cover</strong> de ${who(orig)}?</p>
+          <p class="muted" style="margin-top:10px">${versoes > 2 ? `Vale para as ${versoes} versões deste título. ` : ""}O caso sai da lista de covers e você pode desfazer em “Ignoradas”.</p>`});
+    }
+    const a = item.rs[0];
+    return confirmModal({title: "Não é repetida?", ok: "Sim, marcar", cancel: "Cancelar",
+      html: `<p>Deseja marcar as ${item.rs.length} faixas <strong>“${esc(item.title)}”</strong> de <strong>${esc(a.artist)}</strong> como <strong>não repetidas</strong>?</p>
+        <p class="muted" style="margin-top:10px">O caso sai da lista de duplicadas e você pode desfazer em “Ignoradas”.</p>`});
+  }
+  body.addEventListener("click", async e => {
+    const b = e.target.closest(".dup-act"); if (!b) return;
+    if (b.dataset.a === "ign"){
+      const item = [...sim.dups, ...sim.covers].find(x => x.id === b.dataset.id);
+      if (!item || !(await confirmIgnore(item))) return;
+      DUPIGN.add(b.dataset.id);
+    } else DUPIGN.delete(b.dataset.id);
+    saveDupIgn(); sim = similarTitles(); syncDupsBtn(); draw();
+    toast(b.dataset.a === "ign" ? "Marcado. Ele foi para \"Ignoradas\" (a análise de covers atualiza ao recarregar a página)." : "Voltou para as listas.");
+  });
   md.m.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.t; draw(); }));
   draw();
 }
@@ -3172,7 +3727,7 @@ $("#dt-table").addEventListener("click", () => openTable());
 $("#dt-import").addEventListener("click", () => openImport());
 $("#dt-dups").innerHTML = `${ICON.list}<span>Duplicadas e covers</span>`;
 $("#dt-dups").addEventListener("click", openDups);
-{ const s = similarTitles(); $("#dt-dups").hidden = !s.dups.length && !s.covers.length; }
+syncDupsBtn();
 $("#dt-export").addEventListener("click", openExport);
 $("#dt-update").innerHTML = `${ICON.sync}<span>Atualizar dados</span>`;
 $("#dt-update").addEventListener("click", openDataUpdate);

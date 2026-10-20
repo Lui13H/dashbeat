@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 VERSION_FILE = ROOT / "version.txt"
-HTML_FILES = [ROOT / "painel_musical.html"]
+HTML_FILES = [ROOT / "painel_musical.html", ROOT / "index.html"]
 ASSET = re.compile(r'((?:href|src)="(?:css|js)/[^"?]+\.(?:css|js))(?:\?v=[^"]*)?(")')
 
 

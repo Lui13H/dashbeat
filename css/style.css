@@ -113,6 +113,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 .chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid rgba(110,231,183,.28);background:rgba(16,185,129,.12);color:var(--glow);
   font:600 12.5px/1.25 var(--body);padding:6px 8px 6px 12px;border-radius:999px;cursor:pointer;animation:pop .35s var(--ease)}
 .chip span{min-width:0}
+@media (max-width:640px){.chips{flex:1 1 100%}.chip{white-space:nowrap}}
 .chip b{font-weight:600;color:var(--ink-3);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-right:2px}
 .chip:hover{background:rgba(16,185,129,.2)}
 .chip .x{flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.25);font-size:12px;line-height:1}
@@ -168,9 +169,33 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 .years.tight .yc.peak .v{opacity:1}
 
 /* treemap */
-.tree{position:absolute;inset:0}
+/* velocidade das trocas de posição/tamanho dos quadrados: --tile-dur (maior = mais lento). Parado: 2 s; tocando a máquina do tempo: 1,4 s (as atualizações vêm a cada ~0,1 s, então o movimento continua contínuo) */
+.tree{position:absolute;inset:0;overflow:hidden;--tile-dur:2s;--tile-ease:cubic-bezier(.45,.05,.2,1)}
+.tree.flow{--tile-dur:1.4s;--tile-ease:cubic-bezier(.3,.5,.3,1)}
+.tree.settle{--tile-dur:.35s}
+/* os botões de animação são filhos diretos da fileira de controles do card (display:contents), então quebram de linha como qualquer outro botão */
+.anim-grp{display:contents}
+.anim-chip{color:var(--glow)}
+.card-speed{margin-bottom:0;order:-1}
+.card-speed button{padding:6px 9px;font-size:12px}
+@media (max-width:640px){.card-speed{display:none}}   /* no celular não cabe: a velocidade fica só na barra de cima */
+/* "Até a #n" no cabeçalho do site: na barra fixa (telas largas) ele fica junto das abas; no celular, onde a barra não é fixa, vira uma etiqueta flutuante no topo da tela */
+.tb-chip{flex:none}
+.tb-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media (max-width:899px){
+  .tb-chips{position:fixed;top:10px;left:12px;z-index:90;max-width:calc(100vw - 24px)}
+  .tb-chips .chip{background:rgba(4,16,12,.88);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 10px 24px -12px #000}
+}
+/* fileira de controles do card: embaixo do título, largura toda. O botão principal (Animar/Pausar/Retomar) é SEMPRE o primeiro da fileira,
+   então não sai do lugar quando Reiniciar e o chip aparecem ao lado dele; as opções (esconder nomes etc.) vêm depois */
+.chart header{flex-wrap:wrap}
+.chart header .card-tools,.chart header .hint-btn{flex:0 0 100%;order:5;max-width:none !important;justify-content:flex-start;text-align:left}
+.card-tools,.chart header .tree-tools{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-start;gap:8px 10px;min-width:0}
+.card-tools .anim-play,.tree-tools .anim-play,.mh-extra .anim-play{order:-3}
+.card-tools .anim-restart,.tree-tools .anim-restart,.mh-extra .anim-restart{order:-2}
+.card-tools .anim-chip,.tree-tools .anim-chip,.mh-extra .anim-chip{order:-1}
 .tile{position:absolute;border-radius:10px;overflow:hidden;cursor:pointer;
-  transition:left .8s var(--ease), top .8s var(--ease), width .8s var(--ease), height .8s var(--ease), opacity .5s, background .5s, box-shadow .4s, filter .4s;
+  transition:left var(--tile-dur) var(--tile-ease), top var(--tile-dur) var(--tile-ease), width var(--tile-dur) var(--tile-ease), height var(--tile-dur) var(--tile-ease), opacity .9s, background .9s, box-shadow .4s, filter .4s;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
 .tile:hover{filter:brightness(1.18)}
 .tile .lbl{position:absolute;inset:0;padding:9px 10px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;
@@ -448,10 +473,16 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .tree-big{position:relative;flex:1;min-height:0}
 .tree-big:fullscreen{background:#030B08;cursor:pointer}
 .tree-big:fullscreen .tile{cursor:pointer}
-.tree.nolabels .lbl{display:none}
+/* opções do gráfico de bandas (cada uma liga/desliga sozinha): nomes, números e a sombra escura sobre as capas */
+.tree.nolabels .lbl strong{visibility:hidden}
+.tree.nonums .lbl span{visibility:hidden}
 .tree .cov::after{transition:opacity .3s}
-.tree.nolabels .cov::after{opacity:0}
-.hint-btn{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.tree.noshadow .cov::after{opacity:0}
+/* sem sombra : nome e número ficam opacos, com um contorno finíssimo (quase imperceptível) pra continuarem legíveis */
+.tree.noshadow .lbl{text-shadow:0 0 1px #000, 0 0 1px #000, 0 0 1.5px #000, 0 0 2px rgba(0,0,0,.55) !important}
+.tree.noshadow .lbl span{opacity:1;-webkit-text-stroke:.6px #000;paint-order:stroke fill;
+  text-shadow:1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 2px #000 !important}
+.hint-btn{display:flex;align-items:center;justify-content:flex-end;max-width:none !important}
 .tree-exp{padding:6px 11px;font-size:12px;border-radius:10px}
 .tree-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
 .modal.m-full .mh-extra{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
@@ -509,7 +540,32 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .evo{position:relative;width:100%;height:300px}
 .evo svg{display:block;width:100%;height:100%;overflow:visible;touch-action:none}
 .evo svg text{fill:var(--ink-3);font:11px var(--body)}
+.evo svg text.evo-end{font:700 12px var(--body);paint-order:stroke fill;stroke:#071a14;stroke-width:3px;stroke-linejoin:round}
 .evo .none{color:var(--ink-3);font-size:13px;padding:40px 0;text-align:center}
+.tm{display:flex;align-items:center;gap:16px 20px;flex-wrap:wrap;padding:14px 20px;margin:0 0 22px}
+.tm[hidden]{display:none}
+.tm-play{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line-2);background:linear-gradient(135deg,var(--glow),var(--emerald));color:#022C22;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 24px -10px rgba(16,185,129,.8);transition:transform .2s}
+.tm-play:hover{transform:scale(1.06)}
+.tm-play svg{display:block}
+.tm-lead{display:flex;align-items:center;gap:10px;flex:none}
+.tm-main{flex:1 1 320px;min-width:0}
+.tm-top{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.tm-label{font:600 13px var(--body);color:var(--ink)}
+.tm-label b{font-family:var(--display);color:var(--glow)}
+.tm-ctrl{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;margin-top:10px}
+.tm-last{flex:1 1 240px;min-width:0;font-size:12.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tm-last b{color:var(--ink-2);font-weight:600}
+.tm-side{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tm-side .seg{margin-bottom:0}
+.tm-note{color:var(--glow)}
+#tm-range{-webkit-appearance:none;appearance:none;display:block;width:100%;height:22px;margin:0;background:transparent;cursor:pointer;--p:100%}
+#tm-range:focus-visible{outline:2px solid var(--mint);outline-offset:4px;border-radius:8px}
+#tm-range::-webkit-slider-runnable-track{height:6px;border-radius:6px;background:linear-gradient(90deg,var(--emerald) var(--p),rgba(110,231,183,.14) var(--p))}
+#tm-range::-moz-range-track{height:6px;border-radius:6px;background:rgba(110,231,183,.14)}
+#tm-range::-moz-range-progress{height:6px;border-radius:6px;background:var(--emerald)}
+#tm-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;margin-top:-6px;border-radius:50%;background:var(--glow);border:2px solid #04100C;box-shadow:0 0 0 1px var(--mint),0 0 14px rgba(110,231,183,.6)}
+#tm-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--glow);border:2px solid #04100C;box-shadow:0 0 0 1px var(--mint),0 0 14px rgba(110,231,183,.6)}
+@media (max-width:640px){.tm-side{width:100%}.tm-last{flex-basis:100%}}
 .ins-bar{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;margin:0 0 14px}
 .ins-bar span{color:var(--ink-3);font-size:12.5px}
 .ins-bar .dbtn[aria-pressed="true"]{color:var(--glow);border-color:rgba(110,231,183,.4);background:rgba(110,231,183,.12)}
@@ -642,7 +698,7 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
   .minis{grid-template-columns:minmax(0,1fr)}
   .kpi{min-height:0}
   .chart{min-height:400px}
-  .chart .hint{display:none}
+  .chart .hint:not(.hint-btn){display:none}   /* o texto de ajuda some no celular, mas a fileira de controles do gráfico (hint-btn) continua */
   .facts{grid-template-columns:minmax(0,1fr)}
   .chapters{grid-template-columns:repeat(2,minmax(0,1fr))}
   .heat .hn{font-size:10.5px;padding-right:6px}
@@ -653,3 +709,7 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
 }
+
+/* botão "Animar" de cada gráfico */
+.anim-btn{padding:6px 11px;font-size:12px;border-radius:10px;flex:none}
+.anim-btn svg{width:13px;height:13px}
