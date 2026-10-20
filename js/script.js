@@ -69,13 +69,15 @@ function albRelation(ta, tb){   // "auto" = mesmo álbum (só muda a edição) �
 }
 const albArtKey = a => { a = String(a || "").trim(); return a ? (splitArtists(a)[0] || a.toLowerCase()) : ""; };
 function analyzeAlbums(raw){
-  const byArt = new Map(), map = new Map(), groups = [], doubts = [], rejected = [];
+  const byArt = new Map(), map = new Map(), dates = new Map(), groups = [], doubts = [], rejected = [];
   for (const r of raw){
     const alb = String(r[3] || "").trim(); if (!alb) continue;
-    const key = albArtKey(r[2]), e = byArt.get(key) || byArt.set(key, {name: String(r[2] || "").trim(), albs: new Map()}).get(key);
+    const key = albArtKey(r[2]), e = byArt.get(key) || byArt.set(key, {name: String(r[2] || "").trim(), albs: new Map(), dmin: new Map()}).get(key);
     e.albs.set(alb, (e.albs.get(alb) || 0) + 1);
+    const d = String(r[5] || "").trim();
+    if (/^\d{4}/.test(d)){ const cur = e.dmin.get(alb); if (!cur || d < cur) e.dmin.set(alb, d); }
   }
-  for (const [art, {name: artName, albs}] of byArt){
+  for (const [art, {name: artName, albs, dmin}] of byArt){
     const names = [...albs.keys()]; if (names.length < 2) continue;
     const core = new Map(names.map(n => [n, albCore(n)])), parent = new Map(names.map(n => [n, n]));
     const find = x => { while (parent.get(x) !== x){ parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
@@ -97,11 +99,14 @@ function analyzeAlbums(raw){
       if (list.length < 2) continue;
       const canon = [...list].sort((x, y) => x.length - y.length || albs.get(y) - albs.get(x) || x.localeCompare(y))[0];   // o nome mais curto prevalece
       for (const n of list) map.set(art + "|" + n, canon);
+      // a data do álbum unificado é a MAIS ANTIGA entre as edições (a original, não a do relançamento)
+      const oldest = list.map(n => dmin.get(n)).filter(Boolean).sort()[0] || "";
+      if (oldest) for (const n of list) dates.set(art + "|" + n, oldest);
       const ids = used.filter(e => list.includes(e.a) && list.includes(e.b));
-      groups.push({art, artName, canon, variants: list.map(n => ({name: n, count: albs.get(n)})).sort((x, y) => x.name.length - y.name.length || x.name.localeCompare(y.name)), ids: ids.map(e => e.id), confirmed: ids.some(e => e.rel.kind !== "auto")});
+      groups.push({art, artName, canon, oldest, variants: list.map(n => ({name: n, count: albs.get(n)})).sort((x, y) => x.name.length - y.name.length || x.name.localeCompare(y.name)), ids: ids.map(e => e.id), confirmed: ids.some(e => e.rel.kind !== "auto")});
     }
   }
-  return {map, groups, doubts, rejected};
+  return {map, dates, groups, doubts, rejected};
 }
 const ALBUM_INFO = analyzeAlbums(RAW);
 const albumCanon = (artist, album) => { const raw = String(album || "").trim(); return raw ? (ALBUM_INFO.map.get(albArtKey(artist) + "|" + raw) || raw) : NI; };
@@ -155,9 +160,10 @@ const bandsOfRow = r => r.bands || [r.artist];
 const hasBand = (r, name) => { const k = String(name).toLowerCase(); return bandsOfRow(r).some(b => b.toLowerCase() === k); };
 const T = RAW.map(([n, title, artist, album, sec, date, meta]) => {
   const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
+  const od = ALBUM_INFO.dates.get(albArtKey(artist) + "|" + String(album || "").trim()), dateUse = od || date || "";   // álbum unificado: vale a data mais antiga
   // gs = gênero do Spotify (null = falta buscar) · ge = gênero exibido/calculado (Spotify ou, na falta, Apple)
   return {n, title, artist: a, bands: bandsOf(a), album: albumCanon(artist, album), albumRaw: (album || "").trim() || NI,
-    sec: sec, date: date || "", year: date ? +date.slice(0, 4) : NI, m, gs, ge, ...extraProps(m, ge)};
+    sec: sec, date: dateUse, dateRaw: date || "", year: dateUse ? +dateUse.slice(0, 4) : NI, m, gs, ge, ...extraProps(m, ge)};
 });
 const ALL_BANDS = [...new Set(T.flatMap(t => t.bands))].sort(niLast);
 const ALL_ALBUMS = [...new Set(T.map(t => t.album))].sort(niLast);
@@ -303,6 +309,12 @@ function toggle(kind, v){
   if (!rows().length){ set.delete(v); toast(`Sem faixas de ${v} até a #${state.upTo} da máquina do tempo`); }
   render();
 }
+$("#tree-mode").addEventListener("click", e => {
+  const b = e.target.closest("button[data-m]"); if (!b) return;
+  treePref = b.dataset.m;
+  if (treePref === "bandas") { state.bands.clear(); state.years.clear(); }   // voltar para as bandas: sai do leque (banda/ano escolhidos)
+  render();
+});
 function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.upTo = null; tmSync(); render(); }
 const activeFilters = () => state.bands.size + state.albums.size + state.genres.size + state.years.size;
 // "Limpar filtros" de cada card: tira banda, álbum, gênero e ano (a máquina do tempo tem o próprio botão de cancelar)
@@ -524,7 +536,9 @@ function layoutYears(){
 const treeEl = $("#tree");
 const TILES = new Map();
 let TREE_MODE = "artist";   // o gráfico de quadrados mostra bandas; com um ano (linha do tempo) ou uma banda (ranking, filtro, o próprio gráfico) escolhidos ele mostra álbuns ("album")
-const treeByAlbum = () => state.years.size > 0 || state.bands.size > 0;
+/* aba do card: Bandas (padrão) ou Álbuns, escolhida à mão; um ano ou uma banda escolhidos também abrem a visão de álbuns (o leque) */
+let treePref = "bandas";   // sempre abre em Bandas; a escolha vale só enquanto a página está aberta
+const treeByAlbum = () => treePref === "albuns" || state.years.size > 0 || state.bands.size > 0;
 /* o squarify clássico decide linha por linha e às vezes estica um bloco grande pra poupar os pequenos.
    Aqui testamos todos os jeitos de montar as 3 primeiras linhas (1 a 6 blocos cada, o resto no clássico)
    e ficamos com o que deixa os MAIORES mais quadrados (peso = área²). 216 tentativas, ~3ms. */
@@ -831,6 +845,7 @@ function renderTree(){
     TILES.clear(); TREE_STRUCT = null; TREE_PREV = null; TREE_FINAL = null;
   }
   const ttl = $("#tree-title"); if (ttl) ttl.textContent = byAlbum ? "Músicas por álbum" : "Músicas por banda/artista";
+  document.querySelectorAll("#tree-mode button").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.m === "albuns") === byAlbum)));
   const base = byAlbum ? rows(true, false) : rows(false, true);   // o filtro do próprio tipo de quadrado não esconde os outros quadrados
   const g = groupBy(base, keyName);
   const items = [...g].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
@@ -2427,7 +2442,7 @@ const ICON = {
 const pad2 = n => String(n).padStart(2, "0");
 const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
-const currentRows = () => BY_PLAYLIST.map(t => { const r = [t.n, t.title, t.artist === NI ? "" : t.artist, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.date]; if (t.m) r.push(t.m); return r; });
+const currentRows = () => BY_PLAYLIST.map(t => { const r = [t.n, t.title, t.artist === NI ? "" : t.artist, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.dateRaw]; if (t.m) r.push(t.m); return r; });
 
 /* ---------- modal system ---------- */
 const modalStack = [];
@@ -3574,7 +3589,7 @@ const ownKey = (title, artist) => (title || "").trim().toLowerCase() + "|" + (sp
 // faixas que já estão na playlist e carregam o próprio ID, no mesmo formato do cache de faixas
 function ownTracksById(){
   const o = {};
-  for (const t of BY_PLAYLIST) if (t.m && t.m.id) o[t.m.id] = {title: t.title, artist: t.artist === NI ? "" : t.artist, album: t.albumRaw === NI ? "" : t.albumRaw, sec: t.sec, date: t.date, meta: t.m};
+  for (const t of BY_PLAYLIST) if (t.m && t.m.id) o[t.m.id] = {title: t.title, artist: t.artist === NI ? "" : t.artist, album: t.albumRaw === NI ? "" : t.albumRaw, sec: t.sec, date: t.dateRaw, meta: t.m};
   return o;
 }
 /* id → música da playlist. 1º pelo ID guardado na música (meta.id); 2º, pras antigas sem ID, pelo cache de faixas
@@ -3597,7 +3612,7 @@ function matchLinkIds(ids){
 function rowOf(t, n, id, cache){
   const c = id && cache[id], base = {...(c && c.meta || {}), ...(t.m || {})};
   const m = id && Object.keys(base).length ? {...base, id} : t.m;
-  const r = [n, t.title, t.artist === NI ? "" : t.artist, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.date];
+  const r = [n, t.title, t.artist === NI ? "" : t.artist, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.dateRaw];
   if (m) r.push(m);
   return r;
 }
@@ -3866,13 +3881,13 @@ function openDups(){
     const lab = {auto: `Unificados (${ai.groups.length})`, doubt: `Em dúvida (${ai.doubts.length})`, sep: `Separados por você (${ai.rejected.length})`}, keys = ["auto", "doubt", "sep"];
     md.m.querySelectorAll('.seg[data-g="tab"] button').forEach((b, i) => { b.dataset.t = keys[i]; b.textContent = lab[keys[i]]; b.setAttribute("aria-pressed", keys[i] === atab); });
     const desc = {
-      auto: "Álbuns que o site juntou sozinho: mesmo artista e mesmo nome, mudando só a edição (remaster, deluxe, bonus…). O nome que fica é o <strong>mais curto</strong>. Se algum não for o mesmo álbum, clique em <strong>Não é o mesmo</strong>.",
+      auto: "Álbuns que o site juntou sozinho: mesmo artista e mesmo nome, mudando só a edição (remaster, deluxe, bonus…). O nome que fica é o <strong>mais curto</strong> e a data, a <strong>mais antiga</strong>. Se algum não for o mesmo álbum, clique em <strong>Não é o mesmo</strong>.",
       doubt: "Parecem ser o mesmo álbum, mas o site não tem certeza. <strong>É o mesmo</strong> junta no painel; <strong>São diferentes</strong> mantém separados e não pergunta de novo.",
       sep: "Pares que você disse serem álbuns diferentes. <strong>Desfazer</strong> volta a pergunta (ou a junção automática)."
     }[atab];
     const pair = e => `<strong>${esc(e.a)}</strong> <em>${faixas(e.ca)}</em> <span class="alb-x">×</span> <strong>${esc(e.b)}</strong> <em>${faixas(e.cb)}</em> <span class="alb-art">${esc(e.artName || "")}</span>`;
     let html = `<p class="mdesc">${desc}</p>`;
-    if (atab === "auto") html += ai.groups.length ? ai.groups.map(g => albRow(`<div><strong>${esc(g.canon)}</strong> <span class="alb-art">${esc(g.artName || "")}${g.confirmed ? " · confirmado por você" : ""}</span></div><div class="alb-vars">${chips(g.variants)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-split" data-id="${esc(g.ids.join("§"))}">Não é o mesmo</button>`)).join("") : `<p class="mdesc">Nenhum álbum foi juntado.</p>`;
+    if (atab === "auto") html += ai.groups.length ? ai.groups.map(g => albRow(`<div><strong>${esc(g.canon)}</strong> <span class="alb-art">${esc(g.artName || "")}${g.oldest ? " · data mais antiga: " + esc(g.oldest) : ""}${g.confirmed ? " · confirmado por você" : ""}</span></div><div class="alb-vars">${chips(g.variants)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-split" data-id="${esc(g.ids.join("§"))}">Não é o mesmo</button>`)).join("") : `<p class="mdesc">Nenhum álbum foi juntado.</p>`;
     else if (atab === "doubt") html += ai.doubts.length ? ai.doubts.map(e => albRow(`<div>${pair(e)}</div><div class="alb-why">${esc(e.rel.why)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-yes" data-id="${esc(e.id)}">É o mesmo</button><button class="gbtn dup-act" type="button" data-a="alb-no" data-id="${esc(e.id)}">São diferentes</button>`)).join("") : `<p class="mdesc">Nenhuma dúvida: o site não encontrou álbuns parecidos para perguntar.</p>`;
     else html += ai.rejected.length ? ai.rejected.map(e => albRow(`<div>${pair(e)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-undo" data-id="${esc(e.id)}">Desfazer</button>`)).join("") : `<p class="mdesc">Você ainda não separou nenhum par.</p>`;
     body.innerHTML = html;
