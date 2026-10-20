@@ -711,15 +711,19 @@ function tileTip(b){
 }
 /* capas via iTunes Search (público, sem login). A Apple aceita ~20 pedidos/min, então a fila
    vai devagar e tudo fica guardado no navegador — inclusive "sem capa" (null), pra não repetir */
-const COVER_KEY = "catalogo-musical:covers:v2";   // v2 descarta os "sem capa" gravados antes de existir o fallback por discografia
+const COVER_KEY = "catalogo-musical:covers:v3";   // v3 descarta as capas da Apple guardadas pelo escolhedor antigo (edição Deluxe ou EP no lugar do álbum); as do Spotify ficam
 const COVER_MISS_TTL = 7 * 24 * 3600 * 1000;       // "sem capa" expira: a Apple pode passar a ter o álbum
 const COVERS = (() => {
   try { localStorage.removeItem("catalogo-musical:covers"); } catch (e) {}
   let c = {}; try { c = JSON.parse(localStorage.getItem(COVER_KEY) || "null") || {}; } catch (e) {}
+  try {   // migra do v2 só as capas do Spotify (a edição exata que a pessoa tem); as da Apple são buscadas de novo, agora com o escolhedor corrigido
+    const old = JSON.parse(localStorage.getItem("catalogo-musical:covers:v2") || "null");
+    if (old){ for (const k in old) if (!(k in c) && typeof old[k] === "string" && /scdn\.co/.test(old[k])) c[k] = old[k]; localStorage.setItem(COVER_KEY, JSON.stringify(c)); localStorage.removeItem("catalogo-musical:covers:v2"); }
+  } catch (e) {}
   for (const k in c) if (c[k] && typeof c[k] === "object" && Date.now() - c[k].miss > COVER_MISS_TTL) delete c[k];
   return c;
 })();
-const coverOf = k => typeof COVERS[k] === "string" ? COVERS[k] : null;
+const coverOf = k => typeof COVERS[k] === "string" ? COVERS[k] : coverAlias(k);
 const saveCovers = () => { try { localStorage.setItem(COVER_KEY, JSON.stringify(COVERS)); } catch (e) {} };
 const spotifyCover = imgs => { const u = imgs && imgs[0] && imgs[0].url; return u && /^https:\/\/[^"'()\s]+$/.test(u) ? u : null; };   // [0] é a maior (640px)
 /* a capa do Spotify é exatamente a edição que a pessoa tem na playlist (a Apple às vezes só
@@ -736,12 +740,32 @@ function rememberSpotifyCovers(rows){
 const coverQueue = [], coverWaiting = new Map();
 let coverBusy = false;
 const normC = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s*[([].*?[)\]]/g, "").replace(/\s+-\s+.*$/, "").replace(/[^a-z0-9]+/g, " ").trim();
-function pickCover(results, artist, album){
-  const a = normC(artist), al = normC(album);
+/* pontos: 5 = nome igual · 4 = mesmo álbum sem marca de edição · 3 = mesmo álbum numa edição (deluxe, remaster…) · 2 = nome parecido.
+   Antes o texto entre parênteses era ignorado ("Vol. 3: (The Subliminal Verses)" virava "vol 3" e a edição Deluxe ganhava da padrão) e um
+   "Slipknot - EP" valia como o álbum "Slipknot". Só aceita a partir de `min` pontos. */
+function pickCover(results, artist, album, min = 2){
+  const a = normC(artist), alRaw = String(album).toLowerCase().trim(), alCore = albCore(album).join(" "), alN = normC(album);
+  const wantsEp = /\b(ep|single)\b/i.test(album), wantsLive = /\b(live|ao vivo)\b/i.test(album);
   const sameArtist = results.filter(r => { const ra = normC(r.artistName || ""); return ra && (ra.includes(a) || a.includes(ra)); });
-  const score = r => { const c = normC(r.collectionName || ""); return c === al ? 3 : c.includes(al) || al.includes(c) ? 2 : 0; };
-  const best = sameArtist.map(r => [r, score(r)]).filter(x => x[1]).sort((x, y) => y[1] - x[1])[0];
+  const score = r => {
+    const name = r.collectionName || "", low = name.toLowerCase().trim();
+    if (!wantsEp && /\s-\s(ep|single)$/i.test(name)) return 0;
+    if (low === alRaw) return 5;
+    const core = albCore(name).join(" "), hasEd = albTokens(name).join(" ") !== core;
+    if (core === alCore) return hasEd ? 3 : 4;
+    if (!wantsLive && /\b(live|ao vivo)\b/i.test(name)) return 0;
+    const c = normC(name);
+    return c && alN && (c === alN || c.includes(alN) || alN.includes(c)) ? 2 : 0;
+  };
+  const best = sameArtist.map(r => [r, score(r)]).filter(x => x[1] >= min).sort((x, y) => y[1] - x[1])[0];
   return best ? artUrl(best[0]) : null;
+}
+/* álbuns unificados: a capa pode ter sido guardada com o nome de uma das edições ("Symbolic (Remastered Version)") */
+function coverAlias(key){
+  const i = key.indexOf("|"); if (i < 0) return null;
+  const artist = key.slice(0, i), album = key.slice(i + 1), g = ALBUM_INFO.groups.find(x => x.canon === album && x.art === albArtKey(artist));
+  if (g) for (const v of g.variants){ const k2 = artist + "|" + v.name; if (typeof COVERS[k2] === "string") return COVERS[k2]; }
+  return null;
 }
 function artUrl(r){
   const url = r && r.artworkUrl100 ? r.artworkUrl100.replace(/\/\d+x\d+bb\./, "/600x600bb.") : null;
@@ -758,7 +782,7 @@ async function itunes(path){
    e pulamos coletâneas/ao vivo/singles pra cair num disco "de verdade" */
 async function fetchCover(artist, album){
   const main = splitArtistsRaw(artist)[0];
-  let url = pickCover(await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(main + " " + album)}`), main, album);
+  let url = pickCover(await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(main + " " + album)}`), main, album, 3);   // na busca rápida só vale o mesmo álbum; o resto vai pra discografia
   if (url) return url;
   await coverSleep(3200);
   const who = (await itunes(`search?entity=musicArtist&limit=5&term=${encodeURIComponent(main)}`)).find(r => normC(r.artistName || "") === normC(main));
@@ -772,6 +796,8 @@ async function fetchCover(artist, album){
 }
 function getCover(artist, album, cb){
   const key = artist + "|" + album;
+  const alias = typeof COVERS[key] === "string" ? null : coverAlias(key);
+  if (alias){ cb(alias); return; }
   if (key in COVERS){ cb(coverOf(key)); return; }
   if (!coverWaiting.has(key)){ coverWaiting.set(key, []); coverQueue.push([key, artist, album]); }
   coverWaiting.get(key).push(cb);
@@ -826,6 +852,7 @@ async function pumpCovers(){
   }
   coverBusy = false;
 }
+/* a foto de uma banda é a capa do álbum com MAIS músicas dela na playlist (álbuns unificados contam juntos; empate: o que entrou primeiro) */
 function topAlbumOf(rs){
   const c = new Map();
   for (const t of rs) if (t.album !== NI) c.set(t.album, (c.get(t.album) || 0) + 1);
