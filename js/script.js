@@ -2200,7 +2200,7 @@ function openPlaylistLinkHelp(){
     body: `<p class="mdesc">Se ela não aparece no topo da lista de músicas da playlist:</p>
       <ol class="mdesc" style="padding-left:18px;display:flex;flex-direction:column;gap:10px;margin:10px 0 0">
         <li>Clique nos <strong>3 tracinhos</strong> (☰) ao lado da lupa de pesquisar.</li>
-        <li>Procure <strong>"Adicionada em"</strong> e clique nela até ficar com a <strong>seta pra cima</strong>.</li>
+        <li>Escolha <strong>"Adicionado recentemente"</strong> e clique de novo nele até a <strong>setinha ficar para cima</strong>.</li>
       </ol>`,
     size: "sm"
   }));
@@ -2365,8 +2365,23 @@ function pickTrack(items, title, artist){
   const ok = (items || []).filter(it => it && (it.artists || []).some(a => arts.includes(normC(a.name || ""))));
   return ok.find(it => normC(cleanTitle(it.name || "")) === nt) || ok.find(it => { const n = normC(cleanTitle(it.name || "")); return n && (n.includes(nt) || nt.includes(n)); }) || null;
 }
+/* música que já tem os dados do Spotify mas não guardou o ID da faixa (importada antes de o site guardar o link):
+   o ID é o que faz um link colado bater com ela depois (ex.: "Consertar ordem da playlist") */
+const needsLink = t => !!t.m && t.m.x !== undefined && !t.m.id && t.artist !== NI && !!t.title;
+const needsUpdate = t => (!t.m && t.artist !== NI && !!t.title) || needsLink(t);
+// ID já conhecido pelo cache de faixas (título + artista principal): recupera sem gastar busca
+function cachedIdFor(t, idx){ return idx.get(ownKey(t.title, t.artist)) || null; }
+function cacheKeyIndex(){
+  const idx = new Map();
+  for (const [id, c] of Object.entries(loadTrackCache())){ const k = ownKey(c.title, c.artist); if (!idx.has(k)) idx.set(k, id); }
+  return idx;
+}
 function openDataUpdate(){
-  const tracks = BY_PLAYLIST.filter(t => !t.m && t.artist !== NI && t.title);
+  const tracks = BY_PLAYLIST.filter(needsUpdate);
+  // as que já têm dados e o cache sabe o ID: só recuperar o link (grátis). O resto vai pro Spotify: pelo ID quando existe, senão pelo nome
+  const keyIdx = cacheKeyIndex(), free = new Map();
+  for (const t of tracks) if (needsLink(t)){ const id = cachedIdFor(t, keyIdx); if (id) free.set(t.n, id); }
+  const todo = tracks.filter(t => !free.has(t.n));
   const genreArts = () => genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m})));
   const ga = genreArts().length;
   if (!tracks.length && !ga){ toast("Todas as músicas já estão com os dados completos."); return; }
@@ -2376,12 +2391,13 @@ function openDataUpdate(){
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-go autofocus>Atualizar dados</button>`;
   const md = openModal({title: "Atualizar dados das músicas", body, foot, size: "sm"});
-  const total = () => tracks.length + (useGenre ? ga : 0);
+  const total = () => todo.length + (useGenre ? ga : 0);
   const drawConfirm = () => {
     body.innerHTML = `<div class="confirm">
       <p>Vamos buscar no Spotify o que falta nas suas músicas (explícita, single ou álbum, popularidade${ga ? " e gênero" : ""}).</p>
       <div class="du-rows">
-        ${tracks.length ? `<div><b>${nf(tracks.length)}</b><span>música${tracks.length > 1 ? "s" : ""} sem dados · <strong>1 busca por música</strong></span></div>` : ""}
+        ${todo.length ? `<div><b>${nf(todo.length)}</b><span>música${todo.length > 1 ? "s" : ""} sem dados ou sem o link guardado · <strong>1 busca por música</strong> (pelo link quando existe, senão pelo nome)</span></div>` : ""}
+        ${free.size ? `<div><b>${nf(free.size)}</b><span>música${free.size > 1 ? "s" : ""} com o link recuperado do que já foi buscado · <strong>sem gastar busca</strong></span></div>` : ""}
         ${ga ? `<label class="chk"><input type="checkbox" id="du-genre" ${useGenre ? "checked" : ""}><span><b>${nf(ga)}</b> artista${ga > 1 ? "s" : ""} sem gênero · <strong>1 busca por artista</strong></span></label>` : ""}
       </div>
       <p>Total: <strong id="du-total">${nf(total())} busca${total() === 1 ? "" : "s"}</strong>. Cada uma conta no limite do Spotify, igual a importar uma música.</p>
@@ -2400,13 +2416,15 @@ function openDataUpdate(){
     else openSpotifyAppHelp({returning: hasSpotifyApp(), onDone: (id, secret) => run(id, secret)});
   };
   async function run(id, secret){
-    let stop = false, found = 0, nf_ = 0, gDone = 0, limited = false;
+    let stop = false, found = 0, nf_ = 0, gDone = 0, limited = false, healed = 0;
     const metaByN = new Map();
     body.innerHTML = `<div class="confirm"><p id="du-st">Conectando ao Spotify…</p><p class="muted" id="du-eta" style="margin-top:4px;min-height:1.4em"></p><div class="ht" style="margin-top:12px"><i id="du-bar" style="width:0%"></i></div><p class="muted" style="margin-top:12px">Pode parar quando quiser: o que já veio fica salvo.</p></div>`;
     foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-stop>Parar e salvar</button>`;
     foot.querySelector("[data-stop]").onclick = () => { stop = true; foot.querySelector("[data-stop]").disabled = true; foot.querySelector("[data-stop]").textContent = "Parando…"; };
     const st = body.querySelector("#du-st"), bar = body.querySelector("#du-bar");
-    const all = total(), t0 = performance.now();
+    const all = Math.max(1, total()), t0 = performance.now();
+    // recupera de graça o ID das que o cache já conhece (os dados delas ficam como estão)
+    for (const t of tracks) if (free.has(t.n)){ const meta = {...t.m, id: free.get(t.n)}; metaByN.set(t.n, meta); t.m = meta; healed++; }
     /* estimativa pela média real de cada busca até aqui (já contando as pausas do Spotify),
        então se ajusta sozinha se o Spotify começar a segurar */
     // a cada busca recalcula "quando termina"; entre uma busca e outra o relógio só desce de segundo em segundo
@@ -2443,18 +2461,29 @@ function openDataUpdate(){
       }
     };
     try {
-      const token = await spotifyToken(id, secret);
-      for (let i = 0; i < tracks.length && !stop; i++){
-        const t = tracks[i];
-        const q = `track:${cleanTitle(t.title)} artist:${splitArtistsRaw(t.artist)[0]}`;
-        show(`Buscando música ${i + 1} de ${tracks.length}: ${t.title}`, i);
-        const j = await spotifyGetJSON(`https://api.spotify.com/v1/search?type=track&limit=5&q=${encodeURIComponent(q)}`, token, (_, att) => pause(`música ${i + 1} de ${tracks.length}`, att, i));
-        const it = pickTrack(j && j.tracks && j.tracks.items, t.title, t.artist);
+      const token = (todo.length || useGenre) ? await spotifyToken(id, secret) : null;
+      for (let i = 0; i < todo.length && !stop; i++){
+        const t = todo[i];
+        show(`Buscando música ${i + 1} de ${todo.length}: ${t.title}`, i);
+        let it = null;
+        const wait = (_, att) => pause(`música ${i + 1} de ${todo.length}`, att, i);
+        if (t.m && t.m.id){
+          // 1º o link (ID da faixa): vem exatamente a música certa, sem adivinhar
+          it = await spotifyGetJSON(`https://api.spotify.com/v1/tracks/${t.m.id}`, token, wait);
+        } else {
+          // sem link guardado: procura pelo nome e já guarda o ID da que achar
+          const q = `track:${cleanTitle(t.title)} artist:${splitArtistsRaw(t.artist)[0]}`;
+          const j = await spotifyGetJSON(`https://api.spotify.com/v1/search?type=track&limit=5&q=${encodeURIComponent(q)}`, token, wait);
+          it = pickTrack(j && j.tracks && j.tracks.items, t.title, t.artist);
+        }
         if (it){
-          const meta = spotifyMeta(it, it.album); metaByN.set(t.n, meta); t.m = meta; found++;
+          const nm = spotifyMeta(it, it.album);
+          const meta = hasMeta(t) ? {...nm, ...t.m, id: nm.id || t.m.id} : nm;   // quem já tinha dados mantém os seus e só ganha o link
+          metaByN.set(t.n, meta); t.m = meta; found++;
           const cv = spotifyCover(it.album && it.album.images);
           if (cv && it.album && normC(it.album.name || "") === normC(t.album)) rememberSpotifyCovers([{artist: t.artist, album: t.album, cover: cv}]);
-        } else { metaByN.set(t.n, {nf: 1}); t.m = {nf: 1}; nf_++; }
+        } else if (!hasMeta(t)){ metaByN.set(t.n, {nf: 1}); t.m = {nf: 1}; nf_++; }
+        else nf_++;   // já tinha dados: continua como está, só não achou o link
         if (metaByN.size % 20 === 0) save();
       }
       save();
@@ -2480,7 +2509,8 @@ function openDataUpdate(){
       else if (!e.stopped){ clearInterval(tick); show(e.message, 0); foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Fechar</button>`; foot.querySelector("[data-c]").onclick = () => md.close(); return; }
     }
     const parts = [];
-    if (found) parts.push(`${faixas(found)} com dados novos`);
+    if (found) parts.push(`${faixas(found)} com dados novos ou link guardado`);
+    if (healed) parts.push(`${faixas(healed)} com o link recuperado sem gastar busca`);
     if (nf_) parts.push(`${nf_} não encontrada${nf_ > 1 ? "s" : ""} no Spotify`);
     if (gDone) parts.push(`gênero de ${gDone} artista${gDone > 1 ? "s" : ""}`);
     setFlash(`${parts.join(" · ") || "Nada novo"}${limited ? " · o Spotify pediu pausa: continue depois em Atualizar dados" : stop ? " · parado por você" : ""}`);
@@ -2529,7 +2559,7 @@ function openImport(prefillText = null){
   const existing = new Set(BY_PLAYLIST.map(t => (t.title + "|" + t.artist).toLowerCase()));
   /* busca por links: fechar esta tela no meio PAUSA (não cancela). Ao reabrir, os links voltam e um modal pergunta
      se continua; "Agora não" deixa pendente: o botão vira "Continuar busca" e "Cancelar busca" aparece ao lado */
-  let fetchCtl = null, pendingResume = false, lastStop = null;
+  let fetchCtl = null, pendingResume = false, lastStop = null, preNeed = null;
   function syncFetchUI(){
     q("#im-cancel-fetch").style.display = fetchCtl || pendingResume ? "" : "none";
     ta.readOnly = !!fetchCtl;
@@ -2555,7 +2585,7 @@ function openImport(prefillText = null){
     const spOn = q("#sp-fields").style.display !== "none";
     if (!parsed || !parsed.rows.length){
       go.style.display = "";
-      if (spOn){ go.disabled = false; go.textContent = "Buscar dados no Spotify"; go.classList.remove("danger"); }
+      if (spOn){ go.disabled = false; go.textContent = preNeed === 0 ? "Conferir com a playlist" : "Buscar dados no Spotify"; go.classList.remove("danger"); }
       else { go.disabled = true; go.textContent = mode === "add" ? "Adicionar" : "Substituir playlist"; go.classList.toggle("danger", mode === "replace"); }
       q("#im-prev").innerHTML = parsed && parsed.error
         ? `<div class="pv bad">${esc(parsed.error)}${parsed.playlistBlocked ? ` <button type="button" class="lnk" id="im-pl-help" style="padding:0;font:inherit;vertical-align:baseline">Veja como</button>` : ""}</div>`
@@ -2574,7 +2604,8 @@ function openImport(prefillText = null){
     const n = fresh.length;
     const arts = new Set(parsed.rows.map(r => r.artist || NI)).size;
     go.disabled = n === 0 && !hitIds.size; go.classList.toggle("danger", mode === "replace");
-    go.textContent = mode === "add" ? (hitIds.size ? `Reordenar${n ? ` e adicionar ${faixas(n)}` : ""}…` : `Adicionar ${faixas(n)}`) : `Substituir por ${faixas(n)}…`;
+    const same = mode === "add" && hitIds.size > 0 && pairLinks(parsed.rows, q("#im-dup").checked).sameOrder;   // tudo já está na playlist, na mesma ordem
+    go.textContent = mode === "add" ? (same ? "Conferir com a playlist" : hitIds.size ? `Reordenar${n ? ` e adicionar ${faixas(n)}` : ""}…` : `Adicionar ${faixas(n)}`) : `Substituir por ${faixas(n)}…`;
     q("#im-prev").innerHTML = `<div class="pv ok"><b>${faixas(parsed.rows.length)}</b> reconhecidas · ${arts} artistas${hitIds.size ? ` · <b>${hitIds.size}</b> já ${hitIds.size > 1 ? "estão" : "está"} na playlist e ${hitIds.size > 1 ? "serão reordenadas" : "será reordenada"} pela ordem dos links` : ""}${dup.length ? ` · <b>${dup.length}</b> já estão na playlist e serão ignoradas` : ""}${parsed.warnings.length ? ` · <span class="warn">${parsed.warnings.length} aviso${parsed.warnings.length > 1 ? "s" : ""}</span>` : ""}</div>
       ${parsed.warnings.length ? `<details class="warns"><summary>Ver avisos</summary><ul>${parsed.warnings.slice(0, 30).map(w => `<li>Linha ${w.line}: ${esc(w.msg)}</li>`).join("")}${parsed.warnings.length > 30 ? `<li>+ ${parsed.warnings.length - 30} avisos</li>` : ""}</ul></details>` : ""}
       ${dup.length ? `<details class="warns"><summary>Ver as ${dup.length} já existentes (ignoradas)</summary><ul>${dup.slice(0, 30).map(r => `<li>${esc(r.title)} — ${esc(r.artist || NI)}</li>`).join("")}${dup.length > 30 ? `<li>+ ${dup.length - 30} faixas</li>` : ""}</ul></details>` : ""}
@@ -2583,14 +2614,22 @@ function openImport(prefillText = null){
       ${fresh.slice(0, 8).map(r => `<tr>${songCells(songView(r))}</tr>`).join("")}</tbody></table>
       ${fresh.length > 8 ? `<div class="more">+ ${fresh.length - 8} faixas</div>` : ""}</div>`;
   }
-  function setSpotifyMode(on, n, an){
+  function setSpotifyMode(on, n, an, ids){
     q("#sp-fields").style.display = on ? "" : "none";
+    preNeed = null;
     if (!on) return;
     const parts = [];
     if (an) parts.push(`${an} álbu${an > 1 ? "ns" : "m"}`);
     if (n) parts.push(faixas(n));
     const single = n === 1 && !an;
-    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.${single ? ` <button type="button" class="lnk" id="sp-whole-pl" style="padding:0;font:inherit;vertical-align:baseline">Quer adicionar a playlist inteira?</button>` : ""}`;
+    // quantos desses links o site já conhece (ID guardado ou cache): esses não gastam busca
+    let known = "";
+    if (ids && ids.length && !an){
+      const own = ownTracksById(), cache = loadTrackCache(), k = ids.filter(id => own[id] || cache[id]).length;
+      preNeed = ids.length - k;
+      known = ` <strong>${k}</strong> já ${k === 1 ? "é conhecida" : "são conhecidas"} (não ${k === 1 ? "gasta" : "gastam"} busca)${preNeed ? ` · <strong>${preNeed}</strong> ${preNeed === 1 ? "precisa" : "precisam"} ser buscada${preNeed > 1 ? "s" : ""} no Spotify` : " · nenhuma precisa de busca: é só conferir com a playlist"}.`;
+    }
+    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.${known}${single ? ` <button type="button" class="lnk" id="sp-whole-pl" style="padding:0;font:inherit;vertical-align:baseline">Quer adicionar a playlist inteira?</button>` : ""}`;
     if (single) q("#sp-whole-pl").addEventListener("click", openPlaylistLinkHelp);
   }
   const fromText = () => {
@@ -2605,7 +2644,7 @@ function openImport(prefillText = null){
       return update();
     }
     const lines = t.split(/\r?\n/).filter(l => l.trim());
-    if ((ids.length || albIds.length) && (ids.length + albIds.length) / lines.length >= 0.5){ parsed = null; setSpotifyMode(true, ids.length, albIds.length); return update(); }
+    if ((ids.length || albIds.length) && (ids.length + albIds.length) / lines.length >= 0.5){ parsed = null; setSpotifyMode(true, ids.length, albIds.length, ids); return update(); }
     setSpotifyMode(false);
     try {
       parsed = cellsToRows(textToCells(t));
@@ -2761,37 +2800,48 @@ function openImport(prefillText = null){
     const toRow = (r, n) => r.meta ? [n, r.title, r.artist, r.album, r.sec, r.date, r.meta] : [n, r.title, r.artist, r.album, r.sec, r.date];
     if (mode === "add"){
       const skip = q("#im-dup").checked;
-      const seen = new Set(existing), fresh = [], seq = [];
       const ordered = parsed.rows.every(r => r.n != null) ? [...parsed.rows].sort((a, b) => a.n - b.n) : parsed.rows;
-      // links que já batem com músicas salvas (pelo ID) não são adicionadas de novo: a música é reposicionada na ordem dos links
-      const idRows = ordered.filter(r => r.id), mt = idRows.length ? matchLinkIds(idRows.map(r => r.id)) : {matched: [], missing: BY_PLAYLIST};
-      const hit = new Map(mt.matched.map(m => [m.id, m.t]));
-      for (const r of ordered){
-        if (r.id && hit.has(r.id)){ seq.push({id: r.id, t: hit.get(r.id)}); continue; }
-        const k = (r.title + "|" + (r.artist || NI)).toLowerCase(); if (skip && seen.has(k)) continue; seen.add(k); fresh.push(r); seq.push({r});
+      // links que já batem com músicas salvas (pelo ID, ou título + artista) não são adicionadas de novo: a música é reposicionada na ordem dos links
+      const pr = pairLinks(ordered, skip), hit = pr.hit, missing = pr.onlyPlaylist;
+      const seen = new Set(existing), fresh = [], dropped = new Set();
+      for (const r of pr.onlyLinks){ const k = (r.title + "|" + (r.artist || NI)).toLowerCase(); if (skip && seen.has(k)){ dropped.add(r); continue; } seen.add(k); fresh.push(r); }
+      const seq = pr.seq.filter(s => s.t || !dropped.has(s.r));
+      if (pr.hasIds && !fresh.length && !missing.length && seq.every((s, i) => s.t && s.t.n === i + 1)){
+        return infoModal("Nada a fazer: já está tudo na playlist", `<p>As <strong>${faixas(seq.length)}</strong> dos links já estão na playlist, <strong>na mesma ordem</strong>. Nenhuma busca foi gasta e nada foi alterado.</p>
+          <p class="muted">Se achava que faltava alguma, confira se ela estava mesmo na lista que você copiou do Spotify.</p>`);
       }
       if (!fresh.length && !hit.size) return toast("Todas as faixas já estão na playlist.");
       const total = NN + fresh.length;
-      const ok = await confirmModal({title: hit.size ? "Reordenar e adicionar?" : `Adicionar ${faixas(fresh.length)}?`, ok: hit.size ? "Confirmar" : "Adicionar",
+      const diff = hit.size ? `${dlist(fresh, "Só nos links (serão adicionadas)", lkRow)}${dlist(missing, "Estão na playlist mas NÃO vieram nos links", plRow)}
+        ${missing.length ? `<label class="chk" style="margin-top:8px"><input type="checkbox" id="im-rm-missing"><span>Remover da playlist ${missing.length === 1 ? "a música que não veio" : `as ${missing.length} músicas que não vieram`} nos links</span></label>` : ""}` : "";
+      const pending = confirmModal({title: hit.size ? "Reordenar e adicionar?" : `Adicionar ${faixas(fresh.length)}?`, ok: hit.size ? "Confirmar" : "Adicionar",
         html: hit.size
-          ? `<p><strong>${faixas(hit.size)}</strong> dos links já ${hit.size > 1 ? "estão" : "está"} na playlist e ${hit.size > 1 ? "vão" : "vai"} ser <strong>reordenada${hit.size > 1 ? "s" : ""} pela ordem em que você colou</strong> (sem gastar nenhuma busca no Spotify).</p>
-            ${fresh.length ? `<p>${faixas(fresh.length)} nova${fresh.length > 1 ? "s" : ""} ${fresh.length > 1 ? "entram" : "entra"} na mesma sequência. O que não estava nos links fica no começo, na ordem atual.</p>` : ""}
-            <p>A playlist fica com <strong>${faixas(total)}</strong>.</p>`
+          ? `<p>Comparando os links com a playlist: <strong>${faixas(hit.size)}</strong> ${hit.size > 1 ? "são as mesmas" : "é a mesma"} (${hit.size > 1 ? "vão" : "vai"} ser <strong>reordenada${hit.size > 1 ? "s" : ""} pela ordem em que você colou</strong>, sem gastar busca), <strong>${fresh.length}</strong> ${fresh.length === 1 ? "só está" : "só estão"} nos links e <strong>${missing.length}</strong> ${missing.length === 1 ? "só está" : "só estão"} na playlist.</p>
+            ${diff}
+            <p class="muted">O que só está na playlist fica no começo, na ordem atual, a não ser que você marque para remover.</p>`
           : `<p>As faixas entram no fim da playlist, da <strong>#${NN + 1}</strong> à <strong>#${NN + fresh.length}</strong>, e o painel será recalculado com ${faixas(NN + fresh.length)}.</p>`});
+      const rmCb = document.querySelector("#im-rm-missing");
+      const ok = await pending;
       if (!ok) return;
+      const dropMissing = !!(rmCb && rmCb.checked);
       ssSet("verify", "1");
       if (hit.size){
         const cache = loadTrackCache(), out = []; let n = 0;
-        for (const t of mt.missing) out.push(rowOf(t, ++n, null, cache));
+        if (!dropMissing) for (const t of missing) out.push(rowOf(t, ++n, null, cache));
         for (const s of seq) out.push(s.t ? rowOf(s.t, ++n, s.id, cache) : toRow(s.r, ++n));
-        return commitRows(out, `${faixas(hit.size)} reordenada${hit.size > 1 ? "s" : ""}${fresh.length ? ` · ${faixas(fresh.length)} adicionada${fresh.length > 1 ? "s" : ""}` : ""} · playlist com ${faixas(total)}`);
+        return commitRows(applyOrderPlan(out, Infinity), `${faixas(hit.size)} reordenada${hit.size > 1 ? "s" : ""}${fresh.length ? ` · ${faixas(fresh.length)} adicionada${fresh.length > 1 ? "s" : ""}` : ""}${dropMissing && missing.length ? ` · ${faixas(missing.length)} removida${missing.length > 1 ? "s" : ""}` : ""} · playlist com ${faixas(out.length)}`);
       }
       commitRows(applyOrderPlan([...currentRows(), ...fresh.map((r, i) => toRow(r, NN + i + 1))], NN), `${faixas(fresh.length)} adicionada${fresh.length > 1 ? "s" : ""} · playlist com ${faixas(NN + fresh.length)}`);
     } else {
       const rows = parsed.rows.every(r => r.n != null) && new Set(parsed.rows.map(r => r.n)).size === parsed.rows.length ? parsed.rows.map(r => toRow(r, r.n)) : parsed.rows.map((r, i) => toRow(r, i + 1));
       const arts = new Set(parsed.rows.map(r => r.artist || NI)).size;
+      const pr = pairLinks(parsed.rows, true);
+      if (pr.sameOrder){
+        return infoModal("Nada a substituir: a playlist já é essa", `<p>As <strong>${faixas(pr.seq.length)}</strong> dos links já estão na playlist, <strong>na mesma ordem</strong>. Nenhuma busca foi gasta e nada foi alterado.</p>`);
+      }
+      const diffTxt = pr.hasIds ? `<p>Comparando com a playlist atual: <strong>${faixas(pr.hit.size)}</strong> ${pr.hit.size === 1 ? "é a mesma" : "são as mesmas"}, <strong>${pr.onlyLinks.length}</strong> ${pr.onlyLinks.length === 1 ? "só está" : "só estão"} nos links e <strong>${pr.onlyPlaylist.length}</strong> ${pr.onlyPlaylist.length === 1 ? "só está" : "só estão"} na playlist atual (${pr.onlyPlaylist.length === 1 ? "será apagada" : "serão apagadas"}).</p>${dlist(pr.onlyLinks, "Só nos links (novas)", lkRow)}${dlist(pr.onlyPlaylist, "Só na playlist atual (serão apagadas)", plRow)}` : "";
       const ok = await confirmModal({title: "Substituir a playlist inteira?", danger: true, ok: "Apagar e substituir",
-        html: `<div class="cmp"><div><span>Atual</span><b>${faixas(NN)}</b><em>${IS.art.length} artistas</em></div><i>→</i><div><span>Nova</span><b>${faixas(rows.length)}</b><em>${arts} artistas</em></div></div>
+        html: `${diffTxt}<div class="cmp"><div><span>Atual</span><b>${faixas(NN)}</b><em>${IS.art.length} artistas</em></div><i>→</i><div><span>Nova</span><b>${faixas(rows.length)}</b><em>${arts} artistas</em></div></div>
           <p>Todas as músicas atuais serão <strong>apagadas</strong> e substituídas pela lista nova. Painel, gráficos e insights serão gerados do zero.</p>
           <p class="muted">Não dá para desfazer. Se quiser guardar a lista atual, exporte antes.</p>`,
         extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
@@ -2804,6 +2854,26 @@ function openImport(prefillText = null){
 }
 
 /* ---------- ordem da playlist: bater links com as músicas já salvas (nenhuma requisição ao Spotify) ---------- */
+/* compara os links colados com a playlist: iguais (batem pelo ID, ou pelo título + artista principal), só nos links, só na playlist */
+function pairLinks(rows, useKey){
+  const idRows = rows.filter(r => r.id);
+  const mt = idRows.length ? matchLinkIds(idRows.map(r => r.id)) : {matched: [], missing: BY_PLAYLIST};
+  const hit = new Map(mt.matched.map(m => [m.id, m.t])), free = new Map();
+  for (const t of mt.missing){ const k = ownKey(t.title, t.artist); (free.get(k) || free.set(k, []).get(k)).push(t); }
+  const onlyLinks = [], seq = [];
+  for (const r of rows){
+    if (r.id && hit.has(r.id)){ seq.push({id: r.id, t: hit.get(r.id), r}); continue; }
+    if (useKey && r.id){ const arr = free.get(ownKey(r.title, r.artist)); if (arr && arr.length){ const t = arr.shift(); hit.set(r.id, t); seq.push({id: r.id, t, r}); continue; } }
+    onlyLinks.push(r); seq.push({r});
+  }
+  const usedN = new Set([...hit.values()].map(t => t.n));
+  const onlyPlaylist = BY_PLAYLIST.filter(t => !usedN.has(t.n));
+  const sameOrder = !!idRows.length && !onlyLinks.length && !onlyPlaylist.length && seq.every((s, i) => s.t && s.t.n === i + 1);
+  return {hit, seq, onlyLinks, onlyPlaylist, sameOrder, hasIds: idRows.length > 0};
+}
+const dlist = (arr, label, f) => arr.length ? `<details class="warns"><summary>${label} (${arr.length})</summary><ul>${arr.slice(0, 40).map(x => `<li>${esc(f(x))}</li>`).join("")}${arr.length > 40 ? `<li>+ ${arr.length - 40} faixas</li>` : ""}</ul></details>` : "";
+const lkRow = r => `${r.title} — ${r.artist || NI}`, plRow = t => `#${t.n} ${t.title} — ${t.artist}`;
+const infoModal = (title, html) => confirmModal({title, html, ok: "Entendi", cancel: "Fechar"});
 const ownKey = (title, artist) => (title || "").trim().toLowerCase() + "|" + (splitArtists(artist || "")[0] || "");
 // faixas que já estão na playlist e carregam o próprio ID, no mesmo formato do cache de faixas
 function ownTracksById(){
@@ -2855,7 +2925,7 @@ function openFixOrder(){
   body.innerHTML = `<div class="ordnote"><div class="ordcaps">ATENÇÃO: AS MÚSICAS PRECISAM ESTAR NA ORDEM DE ADIÇÃO — DA PRIMEIRA MÚSICA ADICIONADA À PLAYLIST (#1) ATÉ A ÚLTIMA (#${NN}). SE VIEREM NA ORDEM ERRADA, A PLAYLIST VAI FICAR ERRADA DE NOVO.</div></div>
     <ol class="ordsteps">
       <li>Abra a playlist no <strong>Spotify do PC</strong>.</li>
-      <li>No topo da coluna com a data de adição, clique em <strong>"Adicionada em"</strong> até as <strong>MAIS ANTIGAS ficarem NO TOPO</strong> (seta para cima). Se não aparecer, clique nos <strong>3 tracinhos</strong> (☰) ao lado da lupa e escolha "Adicionada em".</li>
+      <li>No topo da coluna com a data de adição, clique em <strong>"Adicionada em"</strong> até as <strong>MAIS ANTIGAS ficarem NO TOPO</strong> (seta para cima). Se não aparecer, clique nos <strong>3 tracinhos</strong> (☰) ao lado da lupa, escolha <strong>"Adicionado recentemente"</strong> e clique de novo nele até a <strong>setinha ficar para cima</strong>.</li>
       <li>Aperte <strong>Ctrl+A</strong> e depois <strong>Ctrl+C</strong>: o Spotify copia o <strong>link de cada música</strong>.</li>
       <li>Volte aqui e cole no campo abaixo (<strong>Ctrl+V</strong>).</li>
     </ol>
@@ -2871,7 +2941,27 @@ function openFixOrder(){
   go.addEventListener("click", async () => {
     const list = ids(); if (!list.length) return;
     const mt = matchLinkIds(list), cache = loadTrackCache();
-    if (!mt.matched.length){ st.classList.add("err"); st.textContent = "Nenhum link bate com as músicas salvas. Isso acontece com músicas que entraram sem link do Spotify (lista colada): nesse caso use Adicionar músicas → Substituir playlist."; return; }
+    if (!mt.matched.length){
+      // as músicas salvas antes do site guardar o link do Spotify não têm ID: dá pra descobrir quais são buscando os links UMA vez
+      const ok = await confirmModal({title: "Os links ainda não batem com as músicas salvas", ok: "Buscar e reordenar", cancel: "Agora não",
+        html: `<p>O site só passou a <strong>guardar o link de cada música agora</strong>. As ${nf(NN)} músicas que já estavam salvas ainda não têm o link guardado, então não dá para bater sem consultar o Spotify.</p>
+          <p>Posso buscar esses <strong>${list.length} link${list.length > 1 ? "s" : ""}</strong> no Spotify <strong>uma única vez</strong> (1 busca por música) para descobrir quais são, e reordenar a playlist na ordem em que você colou. A busca pode ser pausada e retomada.</p>
+          <p class="muted">Depois disso o link fica salvo junto com cada música e esse conserto nunca mais gasta busca.</p>`});
+      if (!ok) return;
+      ssSet("plan", JSON.stringify(list));
+      md.close();
+      return openImport(linksText(list));
+    }
+    // mandou a mesma ordem que já está salva: ou a playlist já estava certa, ou a ordem dos links está errada de novo
+    if (!mt.missing.length && mt.matched.every((m, i) => m.t.n === i + 1)){
+      const f = mt.fresh.length;
+      const again = await confirmModal({title: "Essa é a mesma ordem que já está salva", ok: f ? "Buscar e adicionar" : "Entendi", cancel: f ? "Fechar" : "Voltar",
+        html: `<p>Os links que você colou estão <strong>exatamente na mesma ordem</strong> da playlist atual. Então uma de duas: <strong>a ordem já está certa</strong>, ou você <strong>mandou a ordem errada de novo</strong>.</p>
+          <p>Confira no Spotify se as <strong>MAIS ANTIGAS estão NO TOPO</strong> (a primeira adicionada em cima, a última embaixo) e cole de novo se precisar.</p>
+          ${f ? `<p>${f === 1 ? "1 link não está" : `${f} links não estão`} na playlist: se quiser, o site busca ${f === 1 ? "essa música" : "essas músicas"} e ${f === 1 ? "a adiciona" : "as adiciona"}.</p>` : ""}`});
+      if (f && again){ md.close(); askFetchFresh({ids: mt.fresh, plan: list}); }
+      return;
+    }
     const rows = []; let n = 0;
     for (const t of mt.missing) rows.push(rowOf(t, ++n, null, cache));
     for (const {id, t} of mt.matched) rows.push(rowOf(t, ++n, id, cache));
@@ -3007,11 +3097,11 @@ function zipStore(files){
 function exportXlsx(){
   const x = s => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const col = i => String.fromCharCode(65 + i);
-  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento", "gêneros", "popularidade", "explícita", "tipo_lançamento"];
+  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento", "gêneros", "popularidade", "explícita", "tipo_lançamento", "link_spotify"];
   const rows = currentRows();
   const extra = r => {
     const m = r[6] || {}, gs = shownGenres((r[2] || "").trim() || NI);
-    return [gs ? gs.join(", ") : "", typeof m.p === "number" ? m.p : "", m.x === undefined ? "" : m.x ? "Sim" : "Não", TYPE_PT[m.ty] || ""];
+    return [gs ? gs.join(", ") : "", typeof m.p === "number" ? m.p : "", m.x === undefined ? "" : m.x ? "Sim" : "Não", TYPE_PT[m.ty] || "", m.id ? `https://open.spotify.com/track/${m.id}` : ""];
   };
   const cell = (v, r, i, s) => typeof v === "number" ? `<c r="${col(i)}${r}"${s ? ` s="${s}"` : ""}><v>${v}</v></c>` : `<c r="${col(i)}${r}" t="inlineStr"${s ? ` s="${s}"` : ""}><is><t xml:space="preserve">${x(v)}</t></is></c>`;
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -3089,7 +3179,7 @@ $("#dt-update").addEventListener("click", openDataUpdate);
 // mesma conta do openDataUpdate: música sem dados do Spotify ou artista sem gênero pesquisado
 // playlist de exemplo (nada salvo no navegador): baixar ou completar dados não faz sentido
 $("#dt-export").hidden = !STORE;
-$("#dt-update").hidden = !STORE || !BY_PLAYLIST.some(t => !t.m && t.artist !== NI && t.title) && !genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m}))).length;
+$("#dt-update").hidden = !STORE || !BY_PLAYLIST.some(needsUpdate) && !genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m}))).length;
 $("#foot-src").textContent = STORE ? `Lista editada neste navegador · ${faixas(NN)} · ${new Date(STORE.updated || Date.now()).toLocaleDateString("pt-BR")}` : `Fonte: lista de ${faixas(NN)} fornecida · sem dados externos`;
 if (STORE) $("#srcline").textContent += " · lista editada";
 
