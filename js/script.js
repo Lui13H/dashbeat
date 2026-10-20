@@ -765,14 +765,15 @@ function renderTree(){
   for (const d of laid){
     seen.add(d.k);
     let el = TILES.get(d.k);
-    let fresh = !el;
+    const create = !el;
+    let fresh = create;
     if (el && el.classList.contains("leaving")){
       // bloco que estava saindo e voltou: nasce de novo no canto (sem voar de onde estava), igual a um bloco novo
       el.style.transition = "none"; el.style.left = W + "px"; el.style.top = H + "px"; el.style.width = "0px"; el.style.height = "0px"; el.style.opacity = "0";
       void el.offsetWidth; el.style.transition = "";
       fresh = true;
     }
-    if (fresh){
+    if (create){
       el = document.createElement("div"); el.className = "tile";
       el.innerHTML = `<i class="cov"></i><div class="lbl"><strong></strong><span></span></div>`;
       el.querySelector("strong").textContent = d.k;
@@ -818,7 +819,7 @@ function renderTree(){
   for (const [k, el] of TILES) if (!seen.has(k)){
     el.classList.add("leaving"); el.style.pointerEvents = "none";
     // depois de sumir (fade) o bloco é removido: se a banda voltar, ela nasce de novo no canto, em vez de voar de onde parou
-    if (!el._rm) el._rm = setTimeout(() => { if (el.classList.contains("leaving")){ el.remove(); TILES.delete(k); } el._rm = 0; }, 1200);
+    if (!el._rm) el._rm = setTimeout(() => { if (el.classList.contains("leaving") && TILES.get(k) === el){ el.remove(); TILES.delete(k); } el._rm = 0; }, 1200);
   }
   for (const [k, el] of TILES) if (seen.has(k)) el.style.pointerEvents = "";
 }
@@ -830,51 +831,75 @@ function moveTree(to){
   to.appendChild(treeEl);
   setTimeout(() => { renderTree(); setTimeout(() => treeEl.classList.remove("notrans"), 60); }, 30);
 }
+/* "Tela cheia" = tela cheia do navegador (igual F11) só com o gráfico, sem modal. Esc o próprio navegador trata;
+   clicar em qualquer lugar também sai; a barra de espaço pausa/continua a animação */
+let treeFull = null;   // {body, home, onKey} enquanto o gráfico está em tela cheia
 function openTreeBig(){
+  if (treeFull) return;
   const home = treeEl.parentElement;
-  const body = document.createElement("div"); body.className = "tree-big";
-  const md = openModal({title: "", body, size: "full",
-    headerExtra: `${treeOptsHtml()}
-      ${document.fullscreenEnabled ? `<button class="gbtn tree-exp" type="button" id="tree-super">Tela super cheia</button>` : ""}`,
-    onClose: () => { hideTip(); moveTree(home); if (ctl) ctl.dispose(); document.removeEventListener("keydown", onKey); }});
-  md.m.setAttribute("aria-label", "Músicas por banda/artista em tela cheia");
-  // animação (Animar/Pausar/Retomar e Cancelar) também aqui, ligada ao mesmo estado do card
-  const ctl = makeCardControls("tree", true); md.q(".mh-extra").appendChild(ctl.grp); md._ctl = ctl;
-  /* "tela super cheia" = tela cheia do navegador (igual F11) só com o gráfico. Esc o próprio navegador
-     trata; clicar em qualquer lugar também sai */
-  const sup = md.q("#tree-super");
-  if (sup) sup.addEventListener("click", () => { hideTip(); body.requestFullscreen().catch(() => toast("O navegador não deixou entrar em tela cheia.")); });
+  const body = document.createElement("div"); body.className = "tree-big tree-full";
+  const onKey = e => { if (e.code === "Space"){ e.preventDefault(); const cc = CARDS.tree; cc.playing ? cardPause("tree") : cardStart("tree", cc.n != null ? Math.max(1, cc.n) : 1); } };
   body.addEventListener("click", () => { if (document.fullscreenElement === body) document.exitFullscreen(); });
-  // na "tela super cheia" não tem botões: a barra de espaço pausa/continua a animação
-  const onKey = e => { if (document.fullscreenElement === body && e.code === "Space"){ e.preventDefault(); const cc = CARDS.tree; cc.playing ? cardPause("tree") : cardStart("tree", cc.n != null ? Math.max(1, cc.n) : 1); } };
-  document.addEventListener("keydown", onKey); md._onKey = onKey;
-  moveTree(body);
+  document.body.appendChild(body);
+  hideTip();
+  body.requestFullscreen().then(() => {
+    treeFull = {body, home, onKey};
+    document.addEventListener("keydown", onKey);
+    moveTree(body);
+    toast("Espaço pausa/continua a animação · Esc ou um clique sai");
+  }).catch(() => { body.remove(); toast("O navegador não deixou entrar em tela cheia."); });
 }
 document.addEventListener("fullscreenchange", () => {
-  if (!treeEl.closest(".tree-big")) return;
-  hideTip(); moveTree(treeEl.parentElement);   // mesmo lugar, só recalcula pro tamanho novo (sem animação)
+  if (!treeFull) return;
+  if (document.fullscreenElement === treeFull.body){ hideTip(); moveTree(treeFull.body); return; }   // recalcula pro tamanho novo (sem animação)
+  const {body, home, onKey} = treeFull; treeFull = null;
+  hideTip(); document.removeEventListener("keydown", onKey);
+  moveTree(home); body.remove();
 });
 $("#tree-expand").addEventListener("click", openTreeBig);
-// opções do gráfico (nomes, números, sombra): valem pro card e pra tela cheia — marcar em um marca no outro — e ficam salvas (vale depois do F5)
+// opções do gráfico (nomes, números, sombra, bordas, animação): caixa marcada = recurso ligado; valem pro card e pra tela cheia — e ficam salvas (vale depois do F5)
 const TREE_OPTS = [
-  {opt: "nomes", cls: "nolabels", key: "catalogo-musical:tree-nonames", txt: "Esconder nomes"},
-  {opt: "numeros", cls: "nonums", key: "catalogo-musical:tree-nonums", txt: "Esconder números"},
-  {opt: "sombra", cls: "noshadow", key: "catalogo-musical:tree-noshadow", txt: "Esconder sombra"},
-  {opt: "bordas", cls: "flush", key: "catalogo-musical:tree-flush", txt: "Sem bordas"}
+  {opt: "nomes", cls: "nolabels", key: "catalogo-musical:tree-nonames", txt: "Mostrar nomes"},
+  {opt: "numeros", cls: "nonums", key: "catalogo-musical:tree-nonums", txt: "Mostrar números"},
+  {opt: "sombra", cls: "noshadow", key: "catalogo-musical:tree-noshadow", txt: "Mostrar sombra"},
+  {opt: "bordas", cls: "flush", key: "catalogo-musical:tree-flush", txt: "Bordas redondas"},
+  {opt: "semanim", cls: "noanim", key: "catalogo-musical:tree-noanim", txt: "Animar a troca de lugar"}
 ];
 function treeOptsHtml(){
-  return TREE_OPTS.map(o => `<label class="chk"><input type="checkbox" class="tree-opt" data-opt="${o.opt}"${treeEl.classList.contains(o.cls) ? " checked" : ""}><span>${o.txt}</span></label>`).join("");
+  const boxes = TREE_OPTS.map(o => `<label class="chk"><input type="checkbox" class="tree-opt" data-opt="${o.opt}"${treeEl.classList.contains(o.cls) ? "" : " checked"}><span>${o.txt}</span></label>`).join("");
+  return `<span class="sty"><button class="gbtn sty-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Opções de estilo do gráfico">Estilo <svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="sty-pop">${boxes}</div></span>`;
 }
+$("#tree-style-slot").outerHTML = treeOptsHtml();
+const closeStyle = () => document.querySelectorAll(".sty.open").forEach(s => { s.classList.remove("open"); s.querySelector(".sty-btn").setAttribute("aria-expanded", "false"); });
+document.addEventListener("click", e => {
+  const btn = e.target.closest && e.target.closest(".sty-btn");
+  if (btn){
+    const s = btn.closest(".sty"), open = !s.classList.contains("open");
+    closeStyle();
+    if (open){ s.classList.add("open"); btn.setAttribute("aria-expanded", "true"); }
+  } else if (!(e.target.closest && e.target.closest(".sty-pop"))) closeStyle();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeStyle(); });
 for (const o of TREE_OPTS){
   try { if (localStorage.getItem(o.key) === "1") treeEl.classList.add(o.cls); } catch (e) {}
-  document.querySelectorAll(`.tree-opt[data-opt="${o.opt}"]`).forEach(cb => { cb.checked = treeEl.classList.contains(o.cls); });
+  document.querySelectorAll(`.tree-opt[data-opt="${o.opt}"]`).forEach(cb => { cb.checked = !treeEl.classList.contains(o.cls); });
 }
+function setTreeOpt(o, off){   // a caixa marcada = recurso LIGADO; a classe (nolabels, noshadow...) é o estado "desligado"
+  try { localStorage.setItem(o.key, off ? "1" : "0"); } catch (e2) {}
+  treeEl.classList.toggle(o.cls, off);
+  document.querySelectorAll(`.tree-opt[data-opt="${o.opt}"]`).forEach(x => { x.checked = !off; });
+}
+let shadowAuto = false;   // a sombra foi desligada sozinha (nomes e números desmarcados): volta sozinha quando um deles é marcado de novo
 document.addEventListener("change", e => {
   const cb = e.target, o = cb.classList && cb.classList.contains("tree-opt") && TREE_OPTS.find(x => x.opt === cb.dataset.opt);
   if (!o) return;
-  try { localStorage.setItem(o.key, cb.checked ? "1" : "0"); } catch (e2) {}
-  treeEl.classList.toggle(o.cls, cb.checked);
-  document.querySelectorAll(`.tree-opt[data-opt="${o.opt}"]`).forEach(x => { x.checked = cb.checked; });
+  setTreeOpt(o, !cb.checked);
+  if (o.opt === "sombra") shadowAuto = false;
+  else if (o.opt === "nomes" || o.opt === "numeros"){
+    const shadow = TREE_OPTS.find(x => x.opt === "sombra"), both = treeEl.classList.contains("nolabels") && treeEl.classList.contains("nonums");
+    if (both && !treeEl.classList.contains(shadow.cls)){ setTreeOpt(shadow, true); shadowAuto = true; }
+    else if (!both && shadowAuto){ setTreeOpt(shadow, false); shadowAuto = false; }
+  }
   if (o.opt === "bordas"){ treeEl.classList.add("notrans"); renderTree(); setTimeout(() => treeEl.classList.remove("notrans"), 60); }   // muda o tamanho dos blocos
 });
 
@@ -3581,9 +3606,11 @@ function download(name, blob){
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
+// nome dos arquivos baixados: 358-msc_DD-MM-AA (quantidade de músicas + data de hoje com ano de 2 dígitos)
+const exportName = () => { const d = new Date(); return `${NN}-msc_${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${pad2(d.getFullYear() % 100)}`; };
 function exportTxt(){
   const txt = currentRows().map(r => [r[0], r[1], r[2], r[3], durTxt(r[4]), r[5], ...(r[6] ? [JSON.stringify(r[6])] : [])].map(v => String(v ?? "").replace(/[\t\r\n]+/g, " ")).join("\t")).join("\n") + "\n";
-  download(`playlist-${today()}.txt`, new Blob([txt], {type: "text/plain;charset=utf-8"}));
+  download(`${exportName()}.txt`, new Blob([txt], {type: "text/plain;charset=utf-8"}));
   toast(`Lista exportada em texto · ${faixas(NN)}`);
 }
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -3631,7 +3658,7 @@ function exportXlsx(){
     {name: "xl/styles.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF064E3B"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`},
     {name: "xl/worksheets/sheet1.xml", data: sheet}
   ];
-  download(`playlist-${today()}.xlsx`, zipStore(files));
+  download(`${exportName()}.xlsx`, zipStore(files));
   toast(`Planilha exportada · ${faixas(NN)}`);
 }
 function openExport(){
