@@ -2662,7 +2662,7 @@ function copyText(text){
 function openSpotifyAppHelp({id = "", secret = "", onDone, returning = false} = {}){
   /* o Spotify exige uma Redirect URI no cadastro do app, mas o fluxo Client Credentials nunca a usa */
   const redirect = location.protocol === "https:" ? location.origin + "/callback" : "http://127.0.0.1:8080/callback";
-  const vals = {name: "Painel Musical", desc: "Busca dados das faixas para o meu painel de playlist", redirect};
+  const vals = {name: "Dashbeat", desc: "Busca dados das faixas para o meu painel de playlist", redirect};
   const copyRow = (label, key) => `<div class="wz-copy"><span>${label}</span><code>${esc(vals[key])}</code><button class="gbtn" type="button" data-copy="${key}">Copiar</button></div>`;
   const steps = [
     {t: "Entre no painel do Spotify", h: `<p class="mdesc">Abra o painel de desenvolvedor em outra aba e faça login com a <strong>sua conta Spotify</strong> (a mesma que você usa pra ouvir música). Se for o primeiro acesso, aceite os termos de desenvolvedor.</p>

@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catálogo Musical — Dashboard de Playlist do Spotify</title>
+    <title>Dashbeat — Dashboard de Playlist do Spotify</title>
+    <link rel="icon" type="image/png" href="img/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -11,19 +15,19 @@
                 extend: {
                     colors: {
                         spotify: {
-                            DEFAULT: '#1DB954',
-                            dark: '#1aa34a',
-                            light: '#1ed760'
+                            DEFAULT: '#10B981',
+                            dark: '#047857',
+                            light: '#6EE7B7'
                         },
                         base: {
-                            100: '#121212', /* Fundo principal */
-                            200: '#181818', /* Fundo de cards */
-                            300: '#282828', /* Fundo de hover/bordas */
-                            400: '#b3b3b3'  /* Texto secundário */
+                            100: '#030605', /* Fundo principal */
+                            200: '#0a1c16', /* Fundo de cards */
+                            300: '#173a2d', /* Fundo de hover/bordas */
+                            400: '#A9C9BC'  /* Texto secundário */
                         }
                     },
                     fontFamily: {
-                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                        sans: ['Manrope', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
                         mono: ['"Courier New"', 'Courier', 'monospace']
                     }
                 }
@@ -31,20 +35,30 @@
         }
     </script>
     <style>
+        /* mesmo clima do painel: fundo verde-floresta com brilhos suaves e títulos em Sora */
+        body.bg-base-100 {
+            background:
+                radial-gradient(1100px 700px at 8% -10%, rgba(16,185,129,.22), transparent 60%),
+                radial-gradient(900px 700px at 105% 10%, rgba(5,95,70,.30), transparent 60%),
+                radial-gradient(1200px 900px at 50% 120%, rgba(6,78,59,.35), transparent 60%),
+                linear-gradient(180deg, #04100C 0%, #030605 55%, #020504 100%);
+            background-attachment: fixed;
+        }
+        h1, h2, h3 { font-family: 'Sora', 'Manrope', system-ui, sans-serif; }
         /* Custom scrollbar for webkit */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #121212;
+            background: #030605;
         }
         ::-webkit-scrollbar-thumb {
-            background: #282828;
+            background: #173a2d;
             border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #1DB954;
+            background: #10B981;
         }
         .tab-content {
             display: none;
@@ -72,7 +86,8 @@
 <body data-fx="guide" class="bg-base-100 text-white font-sans antialiased min-h-screen flex flex-col selection:bg-spotify selection:text-white">
 
     <!-- Header / Hero -->
-    <header class="pt-16 pb-12 px-6 text-center max-w-4xl mx-auto w-full">
+    <header class="pt-10 pb-12 px-6 text-center max-w-4xl mx-auto w-full">
+        <img src="img/banner-transparente.png" alt="Dashbeat — Sinta a batida. Revele o impacto." width="1098" height="717" class="mx-auto w-full max-w-lg mb-4">
         <div class="inline-block bg-spotify/10 text-spotify px-4 py-1.5 rounded-full text-sm font-semibold mb-6 tracking-wide uppercase">
             Guia Interativo
         </div>
@@ -118,10 +133,10 @@
                 </button>
 
                 <div id="details-premium" class="hidden">
-                    <div class="bg-blue-900/20 border-l-4 border-blue-500 p-5 rounded-r-lg mb-8">
+                    <div class="bg-spotify/10 border-l-4 border-spotify p-5 rounded-r-lg mb-8">
                         <div class="flex items-start">
-                            <span class="text-blue-400 text-xl mr-3">ℹ️</span>
-                            <p class="text-blue-100 leading-relaxed">
+                            <span class="text-spotify-light text-xl mr-3">ℹ️</span>
+                            <p class="text-white/90 leading-relaxed">
                                 <strong>Aviso:</strong> Este método é mais rápido e o resultado da análise sai mais profissional, sendo gerado automaticamente por uma ferramenta dedicada.
                             </p>
                         </div>
@@ -392,7 +407,7 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
     </main>
 
     <footer class="text-center py-8 text-base-400 text-sm border-t border-base-300 mt-auto">
-        <p>Desenvolvido para análise inteligente de Playlists Musicais.</p>
+        <p><strong class="text-white">Dashbeat</strong> — Sinta a batida. Revele o impacto.</p>
     </footer>
 
     <script>
