@@ -268,11 +268,6 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;font-size:12px;color:var(--ink-2)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
-.recs{padding:clamp(22px,2.6vw,32px);margin-top:20px}
-.recs ol{margin:14px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;counter-reset:r}
-.recs li{counter-increment:r;display:flex;flex-direction:column;position:relative;padding:18px 18px 18px 60px;border-radius:16px;background:rgba(0,0,0,.2);border:1px solid var(--line);color:var(--ink-2)}
-.recs li::before{content:counter(r,decimal-leading-zero);position:absolute;left:18px;top:16px;font:700 18px var(--display);color:var(--mint)}
-.recs li strong{display:block;color:var(--ink);font-family:var(--display);font-weight:600;font-size:15.5px;margin-bottom:4px}
 .note{margin-top:20px;color:var(--ink-3);font-size:12px}
 
 footer{margin-top:40px;color:var(--ink-3);font-size:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -483,6 +478,10 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .sp-status.err{color:#FCA5A5}
 .genres .row .nm{text-transform:capitalize}
 .dbtn[hidden]{display:none}
+#insights[data-view="simple"] [data-ins="tech"],#insights[data-view="tech"] [data-ins="simple"]{display:none!important}
+.ins-bar{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+.ins-bar span{color:var(--ink-3);font-size:12.5px}
+.ins-bar .dbtn[aria-pressed="true"]{color:var(--glow);border-color:rgba(110,231,183,.4);background:rgba(110,231,183,.12)}
 .tb th,.tb td{white-space:nowrap}
 .tb td.tt{white-space:normal;min-width:180px}
 .tb td.gn,.ptab td.gn{max-width:220px;overflow:hidden;text-overflow:ellipsis;text-transform:capitalize}
@@ -606,7 +605,6 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 @media (max-width: 900px){
   .grid,.ins-grid{grid-template-columns:minmax(0,1fr)}
   .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .recs ol{grid-template-columns:minmax(0,1fr)}
   .jgrid{grid-template-columns:minmax(0,1fr)}
 }
 @media (max-width: 480px){

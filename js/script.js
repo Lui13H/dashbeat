@@ -20,8 +20,12 @@ const STORE = readStore();
 const RAW = STORE ? STORE.rows : DEFAULT_RAW;
 const NI = "Não identificado";
 const coll = new Intl.Collator("pt-BR", {sensitivity: "base", numeric: true});
-const splitArtists = s => s.toLowerCase().split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/).map(x => x.trim()).filter(Boolean);
-const splitArtistsRaw = s => s.split(/\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/i).map(x => x.trim()).filter(Boolean);
+/* numa faixa com vários artistas (feat., parceria) só o primeiro — o principal — conta nas estatísticas;
+   splitArtistsAll devolve todos, só pra saber se a faixa é uma parceria */
+const ARTIST_SEP = /\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/i;
+const splitArtistsAll = s => s.split(ARTIST_SEP).map(x => x.trim()).filter(Boolean);
+const splitArtists = s => splitArtistsAll(s.toLowerCase()).slice(0, 1);
+const splitArtistsRaw = s => splitArtistsAll(s).slice(0, 1);
 /* gênero é do artista (não da faixa) no Spotify: um mapa nome-do-artista (minúsculo) → gêneros,
    guardado à parte da playlist porque vale pra qualquer lista. [] = pesquisado e sem gênero */
 const GENRE_KEY = "catalogo-musical:genres";
@@ -923,9 +927,8 @@ const NOW_Y = new Date().getFullYear();
 const IS = (() => {
   const S = {N: NN};
   S.art = (() => {
-    /* uma faixa com vários artistas (ex.: "A, B") conta para A e para B, não para a dupla
-       como um artista só — por isso agrupamos pelos nomes já separados (splitArtists),
-       guardando a grafia mais comum de cada nome para exibição */
+    /* uma faixa com vários artistas (ex.: "A, B") conta só para o principal (A) — splitArtists
+       já devolve só o primeiro nome —, guardando a grafia mais comum para exibição */
     const m = new Map();
     for (const t of T){
       const parts = splitArtists(t.artist), raw = splitArtistsRaw(t.artist);
@@ -960,10 +963,10 @@ const IS = (() => {
   }
   S.runsSorted = [...S.runs].sort((a, b) => b.length - a.length || a[0].n - b[0].n);
   S.collabsOf = name => {
-    /* como cada faixa já é atribuída a todos os artistas que a compõem (ver S.art acima),
-       "colaborador" agora é quem aparece junto em pelo menos uma faixa com vários artistas */
+    /* cada faixa conta só pro artista principal (ver S.art acima); "colaborador" é quem aparece
+       como convidado numa faixa em que este artista é o principal */
     const nameLC = name.toLowerCase(), others = new Set();
-    for (const t of T){ const parts = splitArtists(t.artist); if (parts.length > 1 && parts.includes(nameLC)) parts.forEach(p => { if (p !== nameLC) others.add(p); }); }
+    for (const t of T){ const parts = splitArtistsAll(t.artist.toLowerCase()); if (parts.length > 1 && parts[0] === nameLC) parts.slice(1).forEach(p => others.add(p)); }
     return S.art.filter(a => others.has(a.k.toLowerCase()));
   };
   S.journey = NN >= 30;
@@ -1124,7 +1127,7 @@ rule(() => {
   const t5 = top(5), singles = IS.art.filter(a => a.c === 1).length, hhi = sum(c, x => (x / NN) ** 2);
   const seg = [[c[0], "#F0FDF7", "Líder"], [t5 - c[0], "#34D399", "2º ao 5º"], [top(10) - t5, "#047857", "6º ao 10º"], [NN - top(10), "rgba(110,231,183,.16)", `Demais ${Math.max(0, IS.art.length - 10)}`]];
   const f5 = t5 / NN;
-  return {kind: "cat", theme: 4, score: 70, wide: true,
+  return {tech: true, kind: "cat", theme: 4, score: 70, wide: true,
     title: f5 >= .5 ? "Metade do catálogo está em cinco artistas" : f5 >= .35 ? "Cinco artistas respondem por mais de um terço do catálogo" : "Um catálogo pulverizado entre muitos artistas",
     body: `<ul><li>${B(`Top 1 = ${pc1(top(1), NN)} · Top 3 = ${pc1(top(3), NN)}${IS.art.length >= 10 ? ` · Top 10 = ${pc1(top(10), NN)}` : ""}`)} das faixas.</li>
       ${singles ? `<li>${B(`${singles} dos ${IS.art.length} artistas têm uma faixa só.`)} Na prática, o peso do catálogo equivale a cerca de ${Math.round(1 / hhi)} artistas de mesmo tamanho (índice de concentração de ${Math.round(hhi * 10000)} pontos).</li>` : ""}</ul>`,
@@ -1151,7 +1154,7 @@ rule(() => {
   const xs = withDur.map(t => t.n), ys = withDur.map(t => t.sec), mx = sum(xs, x => x) / xs.length, my = avg;
   const r = sum(xs.map((x, i) => (x - mx) * (ys[i] - my)), v => v) / Math.sqrt(sum(xs, x => (x - mx) ** 2) * sum(ys, y => (y - my) ** 2) || 1);
   const ratio = hi.sec / lo.sec, rs = r.toLocaleString("pt-BR", {maximumFractionDigits: 2, minimumFractionDigits: 2});
-  return {kind: "both", theme: 5, score: 50,
+  return {tech: true, kind: "both", theme: 5, score: 50,
     title: Math.abs(r) < .1 ? "O gosto mudou de banda, não de formato" : r > 0 ? "As faixas ficaram mais longas com o tempo" : "As faixas ficaram mais curtas com o tempo",
     body: `<p>${Math.abs(r) < .1 ? `Os extremos são distantes, mas a duração média não acompanha a ordem de entrada (correlação de ${rs}).` : `A duração acompanha a ordem de entrada (correlação de ${rs}): as adições ${r > 0 ? "recentes são mais longas" : "recentes são mais curtas"}.`}</p>`,
     viz: V.dur([[cleanTitle(hi.title), hi.artist, hi.sec], ["Média do catálogo", faixas(withDur.length), avg], [cleanTitle(lo.title), lo.artist, lo.sec]], hi.sec),
@@ -1226,7 +1229,7 @@ rule(() => {
   }).filter(x => x.w <= NN * .35).sort((x, y) => (y.need / y.w) - (x.need / x.w));
   const c = cands[0]; if (!c) return null;
   const stopped = IS.art.filter(a => a.c >= 6 && !skip.has(a.k) && a.k !== c.a.k && a.rs[a.rs.length - 1].n <= NN * .7).slice(0, 3);
-  return {kind: "pl", theme: 2, score: 72,
+  return {tech: true, kind: "pl", theme: 2, score: 72,
     title: stopped.length >= 2 ? pickV("waves", ["Cada fase teve um dono, e as ondas não voltam", "Paixões em ondas: intensas e passageiras"]) : `${c.a.k} foi uma febre concentrada`,
     body: `<p>${esc(c.a.k)} ${pickV("wv" + c.a.k, ["foi uma febre concentrada.", "chegou como uma onda."])}${stopped.length ? ` ${stopped.map((a, i) => `${esc(a.k)} parou na #${a.rs[a.rs.length - 1].n}`).join(", ")}.` : ""}</p>`,
     viz: V.strips([c.a.k]), kick: [`${c.need}/${c.a.c}`, `faixas de ${c.a.k} entraram entre #${c.from} e #${c.to}`]};
@@ -1277,7 +1280,7 @@ rule(() => {
   const ar = [...IS.albRuns].filter(r => r.length >= 5).sort((a, b) => b.length - a.length).slice(0, 4);
   const albTxt = ar.length ? (() => { const g = []; for (const r of ar){ const last = g[g.length - 1]; if (last && last.n === r.length) last.names.push(r[0].album); else g.push({n: r.length, names: [r[0].album]}); } return g.map(x => `${listPt(x.names.map(esc))} (${x.n}${x.names.length > 1 ? " cada" : " seguidas"})`).join(", "); })() : "";
   const top = IS.runsSorted.slice(0, 5); if (!top.length || top[0].length < 3) return null;
-  return {kind: "pl", theme: 3, score: f >= .25 ? 68 : 48,
+  return {tech: true, kind: "pl", theme: 3, score: f >= .25 ? 68 : 48,
     title: f >= .3 ? "Você adiciona em blocos, não em singles" : f >= .15 ? "Maratonas pontuais no meio de faixas soltas" : "Você monta a playlist música a música",
     body: `<p>${ar.length ? `Álbuns entram quase inteiros de uma vez: ${albTxt}.` : `As maiores sequências seguidas são curtas: ${top[0].length} faixas no máximo.`}</p>`,
     viz: V.runs(top, "maiores sequências seguidas do mesmo artista"), kick: [pc0(inBig, NN), `das faixas entraram em sequências de 5+ do mesmo artista`]};
@@ -1288,10 +1291,10 @@ rule(() => {
   if (!IS.journey) return null;
   const seen = new Set(), firstAt = []; for (const t of BY_PLAYLIST){ if (!seen.has(t.artist)){ seen.add(t.artist); firstAt.push(t); } }
   const total = seen.size, half = firstAt[Math.ceil(total / 2) - 1], cut = Math.round(NN * 2 / 3);
-  const fresh = firstAt.filter(t => t.n > cut), col = fresh.filter(t => splitArtists(t.artist).length > 1);
+  const fresh = firstAt.filter(t => t.n > cut), col = fresh.filter(t => splitArtistsAll(t.artist).length > 1);
   const best = [...CHI].sort((a, b) => b.arts - a.arts)[0], slow = fresh.length <= Math.max(2, total * .2);
   const colOwner = col.length ? (splitArtists(col[0].artist).map(p => IS.art.find(a => a.k.toLowerCase() === p)).find(Boolean) || {}).k : null;
-  return {kind: "pl", theme: 4, score: 66,
+  return {tech: true, kind: "pl", theme: 4, score: 66,
     title: slow ? "A descoberta desacelerou" : "A playlist segue descobrindo artistas",
     body: `<p>Metade dos ${total} artistas já tinha aparecido até a #${half.n}. O capítulo ${best.i + 1} reuniu ${best.arts} artistas em ${best.seg.length} faixas.</p>`,
     viz: V.disc(), mvClass: "disc",
@@ -1308,7 +1311,7 @@ rule(() => {
   });
   if (!pairs.length) return null;
   const k = pairs.filter(p => p.older).length, m = pairs.length;
-  return {kind: "pl", theme: 5, score: 58 + Math.min(m, 4) * 3,
+  return {tech: true, kind: "pl", theme: 5, score: 58 + Math.min(m, 4) * 3,
     title: k === m ? "A versão mais antiga sempre chega primeiro" : k === 0 ? "A gravação mais nova sempre chegou primeiro" : "Títulos repetidos, ordens diferentes",
     body: `<p>${m === 1 ? "Um título aparece" : `${m} títulos aparecem`} gravado${m > 1 ? "s" : ""} por dois artistas, e ${k === m ? "a gravação mais antiga sempre entrou antes" : k === 0 ? "a gravação mais recente entrou antes" : `em ${k} de ${m} casos a gravação mais antiga entrou antes`}.</p>`,
     viz: V.pairs(pairs.slice(0, 4)), kick: [`${k} de ${m}`, `versões mais antigas entraram primeiro na playlist`]};
@@ -1406,8 +1409,16 @@ rule(() => {
 });
 
 /* ---------- selection, ordering and row packing ---------- */
+/* a aba Insights tem duas visões: simples (resumo e cards principais) e técnica (jornada,
+   cards avançados, metodologia). Cada bloco leva data-ins="simple|tech" no HTML, cada card leva tech: true;
+   o botão do topo alterna e a escolha fica salva neste navegador */
+const TECH_KEY = "catalogo-musical:tech-insights";
+let techOn = false; try { techOn = localStorage.getItem(TECH_KEY) === "1"; } catch (e) {}
+let techCount = 0;
 function buildCards(){
   let cards = RULES.map(fn => { try { return fn(); } catch (e) { console.warn("regra ignorada", e); return null; } }).filter(Boolean);
+  techCount = cards.filter(c => c.tech).length;
+  cards = cards.filter(c => !!c.tech === techOn);
   // os cards dos dados extras (gênero, explícita…) sempre entram, por cima dos 14 clássicos de maior nota
   cards.sort((a, b) => b.score - a.score);
   cards = [...cards.filter(c => !c.extra).slice(0, 14), ...cards.filter(c => c.extra)];
@@ -1466,39 +1477,6 @@ function renderHero(){
   $("#ins-hero").innerHTML = `<div class="eyebrow">Leitura executiva · catálogo${IS.journey ? " e playlist" : ""}</div><h2>${h2}</h2>
     <p>${nf(N)} faixas, ${nf(IS.art.length)} artistas e ${nf(IS.alb.length)} álbuns, somando ${fmtLong(tot)} de música.${IS.journey ? ` A coluna "número" é a ordem de entrada na playlist: a #1 foi a primeira faixa adicionada e a #${nf(N)}, a mais recente.` : ""} Todos os números vêm exclusivamente da lista.</p>
     <div class="facts">${facts.join("")}</div>`;
-}
-
-/* ---------- recommendations ---------- */
-function renderRecs(){
-  const N = NN, out = [];
-  const a1 = IS.art[0], a2 = IS.art[1];
-  const cat = [], pl = [];
-  if (IS.journey){
-    const w = Math.min(60, Math.floor(N / 6)), lastW = BY_PLAYLIST.slice(-w), g = [...groupBy(lastW, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]);
-    if (g[0] && g[0][0] !== a1.k) pl.push(["Ler o gosto atual pelas últimas adições", `O total ainda favorece ${a1.k}, mas as ${w} adições mais recentes têm ${g[0][1]} de ${g[0][0]}${g[1] ? ` e ${g[1][1]} de ${g[1][0]}` : ""}. Para seleções e recomendações, o recorte recente vale mais que o acumulado.`]);
-    const seen = new Set(), firstAt = []; for (const t of BY_PLAYLIST){ if (!seen.has(t.artist)){ seen.add(t.artist); firstAt.push(t); } }
-    const cut = Math.round(N * 2 / 3), fresh = firstAt.filter(t => t.n > cut).length, best = [...CHI].sort((a, b) => b.arts - a.arts)[0];
-    if (fresh <= Math.max(2, seen.size * .2)) pl.push(["Reabrir o modo descoberta", `${fresh === 0 ? "Nenhum artista novo apareceu" : `Foram só ${fresh} artista${fresh > 1 ? "s" : ""} novo${fresh > 1 ? "s" : ""}`} nas últimas ${nf(N - cut)} adições, contra ${best.arts} artistas no capítulo ${best.i + 1}. Reservar espaço para nomes novos evita que a playlist vire monocultura.`]);
-    if (N >= 36){ const bl = blocks(12); const loyal = IS.art.filter(a => a.c >= 6 && a.rs[a.rs.length - 1].n - a.rs[0].n >= N * .6).sort((x, y) => bl.filter(s => s.some(t => t.artist === y.k)).length - bl.filter(s => s.some(t => t.artist === x.k)).length).slice(0, 3);
-      if (loyal.length >= 2) pl.push(["Usar os fiéis como âncora", `${listPt(loyal.map(a => a.k))} sobreviveram a todas as fases. São a espinha dorsal para seleções e transições entre estilos.`]); }
-    const big = sum(IS.runs.filter(r => r.length >= 5), r => r.length);
-    if (big / N >= .25) pl.push(["Descobrir do jeito que já funciona", `${pc0(big, N)} das faixas entraram em maratonas do mesmo artista. Ao testar um nome novo, comece por um álbum inteiro, não por um single solto.`]);
-  }
-  if (a2 && (a1.c + a2.c) / N >= .25){ const mid = IS.art.slice(2, 5); cat.push(["Reduzir a dependência", `${a1.k} e ${a2.k} somam ${nf(a1.c + a2.c)} faixas (${pc1(a1.c + a2.c, N)}).${mid.length ? ` O meio do ranking (${mid.map(a => `${a.k} ${a.c}`).join(", ")}) é o melhor lugar para diluir o risco.` : ""}`]); }
-  if (IS.dated.length && IS.maxY - IS.minY >= 8){ const thr = Math.min(IS.maxY, NOW_Y) - 6, rec = IS.dated.filter(t => t.year >= thr); if (rec.length / N < .15){ const who = [...groupBy(rec, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]).slice(0, 3); cat.push(["Renovar com lançamentos recentes", `Só ${faixas(rec.length)} (${pc0(rec.length, N)}) foram lançadas de ${thr} em diante${who.length ? `, e ${sum(who, x => x[1])} delas são de ${listPt(who.map(x => x[0]))}` : ""}.`]); } }
-  const singles = IS.art.filter(a => a.c === 1).length;
-  if (singles >= 5) cat.push(["Aprofundar a cauda longa", `Há ${singles} artistas com uma faixa só. Testar 2 ou 3 faixas a mais dos que já têm aderência antes de buscar nomes novos.`]);
-  const jan1 = T.filter(t => /-01-01$/.test(t.date)).length, missing = T.filter(t => t.artist === NI || t.album === NI || t.year === NI).length;
-  if (jan1 / N >= .05 || missing){
-    const bits = [];
-    if (jan1 / N >= .05) bits.push(`${faixas(jan1)} estão datadas em 1º de janeiro, o que indica que só o ano é conhecido`);
-    if (missing) bits.push(`${faixas(missing)} têm algum campo "Não identificado"`);
-    cat.push(["Corrigir a base de dados", bits.join("; ").replace(/^./, c => c.toUpperCase()) + ". Padronizar antes de análises mais finas."]);
-  }
-  for (let i = 0; i < Math.max(cat.length, pl.length); i++){ if (pl[i]) out.push(pl[i]); if (cat[i]) out.push(cat[i]); }
-  const list = out.slice(0, 8); if (list.length % 2 && list.length > 1) list.pop();
-  $("#recs").innerHTML = list.map(([t, d]) => `<li><strong>${esc(t)}</strong>${esc(d)}</li>`).join("");
-  $("#recs-card").style.display = list.length ? "" : "none";
 }
 
 /* ---------- journey visuals ---------- */
@@ -1591,8 +1569,20 @@ function renderDisc(){
 function renderNote(){
   $("#ins-note").textContent = `${IS.journey ? `Ordem de entrada = coluna "número" da lista (#1 é a mais antiga na playlist). Capítulos = 6 blocos de ~${Math.round(NN / 6)} adições; trechos = ${NN >= 36 ? 12 : 6} blocos de ~${Math.round(NN / (NN >= 36 ? 12 : 6))}. ` : ""}Cada faixa conta uma vez para o artista exatamente como está escrito na lista. Índice de concentração = soma dos quadrados das participações (HHI). Os textos desta aba são gerados por regras a partir dos dados atuais e mudam quando a lista muda.`;
 }
+function renderTechBar(){
+  const b = $("#tech-toggle");
+  b.setAttribute("aria-pressed", techOn);
+  b.textContent = techOn ? "Ver insights simples" : "Ver insights técnicos";
+  $("#insights").dataset.view = techOn ? "tech" : "simple";
+  $("#tech-hint").textContent = techOn ? "Mostrando só a análise técnica: jornada da playlist, cards avançados e metodologia." : "Mostrando a leitura simples: resumo e cards principais.";
+}
+$("#tech-toggle").addEventListener("click", () => {
+  techOn = !techOn;
+  try { localStorage.setItem(TECH_KEY, techOn ? "1" : "0"); } catch (e) {}
+  renderCards(); renderDisc(); renderTechBar(); animateInsights();
+});
 (function buildInsights(){
-  try { renderHero(); renderJourney(); renderCards(); renderDisc(); renderRecs(); renderNote(); }
+  try { renderHero(); renderJourney(); renderCards(); renderDisc(); renderTechBar(); renderNote(); }
   catch (e){ console.error(e); $("#mix").innerHTML = `<article class="card ic"><h3>Não foi possível gerar os insights</h3><p>${esc(e.message)}</p></article>`; }
 })();
 
@@ -2732,12 +2722,50 @@ function openExport(){
   md.m.querySelectorAll(".xopt").forEach(b => b.addEventListener("click", () => { b.dataset.f === "xlsx" ? exportXlsx() : exportTxt(); md.close(); }));
 }
 
+/* ---------- duplicadas e covers: títulos parecidos (sem versão/remaster) agrupados por artista principal ---------- */
+function similarTitles(){
+  const g = new Map();
+  for (const t of BY_PLAYLIST){
+    const key = normC(cleanTitle(t.title)); if (key.length < 2 || t.artist === NI) continue;
+    if (!g.has(key)) g.set(key, []);
+    g.get(key).push(t);
+  }
+  const dups = [], covers = [];
+  for (const [key, rs] of g){
+    if (rs.length < 2) continue;
+    const mains = new Map();
+    for (const t of rs){ const m = splitArtists(t.artist)[0]; if (!mains.has(m)) mains.set(m, []); mains.get(m).push(t); }
+    for (const [, list] of mains) if (list.length > 1) dups.push({title: cleanTitle(list[0].title), rs: list});
+    if (mains.size > 1) covers.push({title: cleanTitle(rs[0].title), rs});
+  }
+  const by = (a, b) => b.rs.length - a.rs.length || coll.compare(a.title, b.title);
+  return {dups: dups.sort(by), covers: covers.sort(by)};
+}
+function openDups(){
+  const {dups, covers} = similarTitles();
+  let tab = dups.length || !covers.length ? "dups" : "covers";
+  const body = document.createElement("div");
+  const seg = `<div class="seg" role="group" aria-label="Tipo"><button type="button" data-t="dups">Duplicadas (${dups.length})</button><button type="button" data-t="covers">Covers (${covers.length})</button></div>`;
+  const md = openModal({title: "Duplicadas e covers", sub: "Títulos iguais ou parecidos (ignorando remaster, live, remix…)", body, headerExtra: seg, size: "lg"});
+  const draw = () => {
+    md.m.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === tab));
+    const list = tab === "dups" ? dups : covers;
+    body.innerHTML = `<p class="mdesc">${tab === "dups" ? "Mesmo título e mesmo artista principal: provavelmente a mesma música adicionada duas vezes (ou em versões diferentes). Para apagar, use o botão <strong>Músicas</strong>." : "Mesmo título gravado por artistas principais diferentes: covers, ou apenas músicas com o mesmo nome."}</p>` +
+      (list.length ? list.map(x => `<div class="eyebrow" style="margin:14px 0 6px">${esc(x.title)} · ${faixas(x.rs.length)}</div>${songTable(x.rs)}`).join("") : `<p class="muted">Nenhum caso encontrado.</p>`);
+  };
+  md.m.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.t; draw(); }));
+  draw();
+}
+
 /* ---------- wire the header buttons ---------- */
 $("#dt-table").innerHTML = `${ICON.list}<span>Músicas</span>`;
 $("#dt-import").innerHTML = `${ICON.up}<span>Adicionar músicas</span>`;
 $("#dt-export").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
 $("#dt-table").addEventListener("click", openTable);
 $("#dt-import").addEventListener("click", () => openImport());
+$("#dt-dups").innerHTML = `${ICON.list}<span>Duplicadas e covers</span>`;
+$("#dt-dups").addEventListener("click", openDups);
+{ const s = similarTitles(); $("#dt-dups").hidden = !s.dups.length && !s.covers.length; }
 $("#dt-export").addEventListener("click", openExport);
 $("#dt-update").innerHTML = `${ICON.sync}<span>Atualizar dados</span>`;
 $("#dt-update").addEventListener("click", openDataUpdate);

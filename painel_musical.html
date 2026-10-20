@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=1.1.0">
 </head>
 <body>
 <div class="wrap">
@@ -30,6 +30,7 @@
     </nav>
     <div class="dtools">
       <button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button>
+      <button class="dbtn" id="dt-dups" type="button" title="Ver músicas duplicadas e covers (mesmo título, artistas diferentes)"></button>
       <button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button>
       <button class="dbtn" id="dt-export" type="button" title="Baixar a lista em Excel ou texto"></button>
       <button class="dbtn" id="dt-update" type="button" title="Buscar no Spotify os dados que faltam (gênero, explícita, popularidade…)"></button>
@@ -114,9 +115,10 @@
 
   <!-- ================= INSIGHTS ================= -->
   <section id="insights" class="tabpanel" role="tabpanel" aria-labelledby="tab-insights">
-    <article class="card ins-hero rise" style="--d:1" id="ins-hero"></article>
+    <div class="ins-bar"><span id="tech-hint"></span><button class="dbtn" id="tech-toggle" type="button" aria-pressed="false"></button></div>
+    <article class="card ins-hero rise" style="--d:1" id="ins-hero" data-ins="simple"></article>
 
-    <article class="card journey rise" style="--d:2" id="journey">
+    <article class="card journey rise" style="--d:2" id="journey" data-ins="tech">
       <div class="eyebrow">A jornada da playlist · seis capítulos pela ordem de entrada</div>
       <h3 class="jt">A playlist em capítulos</h3>
       <div class="chapters" id="chapters"></div>
@@ -134,11 +136,7 @@
 
     <div class="mix" id="mix"></div>
 
-    <article class="card recs rise" style="--d:17" id="recs-card">
-      <div class="eyebrow">Recomendações</div>
-      <ol id="recs"></ol>
-    </article>
-    <p class="note" id="ins-note"></p>
+    <p class="note" id="ins-note" data-ins="tech"></p>
   </section>
 
   <footer><span id="foot-src"></span><span>Atalho: tecla <b>Esc</b> fecha filtros</span></footer>
@@ -147,6 +145,6 @@
 <div class="tip" id="tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/script.js"></script>
+<script src="js/script.js?v=1.1.0"></script>
 </body>
 </html>
