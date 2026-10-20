@@ -887,9 +887,132 @@ function render(){
   $("#content").style.display = empty ? "none" : "";
   $("#empty").classList.toggle("on", empty);
   if (empty){ hideTip(); return; }
-  renderKPIs(R); renderWave(R); renderYears(R); renderTree(); renderAlbums(); renderRank(); renderGenres(); renderProfile(R);
+  renderKPIs(R); renderWave(R); renderYears(R); renderTree(); renderAlbums(); renderRank(); renderGenres(); renderProfile(R); renderEvolution(R);
   renderFilteredList(R);
 }
+
+/* ---------------- chart 7: evolução por banda/gênero (linhas acumuladas pela ordem de adição; banda = artista principal) ---------------- */
+// as 8 primeiras linhas usam as cores categóricas validadas (versão escura), em ordem fixa; da 9ª em diante
+// (dá pra marcar todas) as cores são geradas espalhando o matiz. Cada linha mantém a cor enquanto está marcada
+const EVO_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+const EVO_DEFAULT = 8, EVO_TOPS = [1, 3, 5, 8, 10, 25, 50, 100, 250, 500, 750, 1000];
+const evoCol = s => s < EVO_COLORS.length ? EVO_COLORS[s] : `hsl(${Math.round(((s - EVO_COLORS.length) * 137.5 + 20) % 360)}, 62%, 62%)`;
+const evo = {mode: "band", sel: {band: null, genre: null}, slot: {band: new Map(), genre: new Map()}, list: [], map: new Map(), R: [], N: 0};
+const evoName = k => evo.mode === "genre" ? capFirst(k) : k;
+function evoBuild(R){
+  const sorted = [...R].sort((a, b) => a.n - b.n), idx = new Map();
+  sorted.forEach((t, i) => {
+    const keys = evo.mode === "band" ? (t.artist === NI ? [] : [splitArtistsRaw(t.artist)[0] || t.artist]) : (t.ge || []);
+    for (const k of keys) (idx.get(k) || idx.set(k, []).get(k)).push(i);
+  });
+  evo.R = sorted; evo.N = sorted.length;
+  evo.list = [...idx].map(([k, ix]) => ({k, ix, c: ix.length})).sort((a, b) => b.c - a.c || coll.compare(a.k, b.k));
+  evo.map = new Map(evo.list.map(s => [s.k, s]));
+}
+function evoAdd(k){
+  const m = evo.mode, used = new Set();
+  for (const [kk, s] of evo.slot[m]) if (evo.map.has(kk)) used.add(s);
+  let s = 0; while (used.has(s)) s++;
+  evo.sel[m].add(k); evo.slot[m].set(k, s); return true;
+}
+function evoDel(k){ evo.sel[evo.mode].delete(k); evo.slot[evo.mode].delete(k); }
+function evoTop(n){ const m = evo.mode; evo.sel[m] = new Set(); evo.slot[m] = new Map(); evo.list.slice(0, n).forEach(s => evoAdd(s.k)); }
+function evoReset(){ evoTop(EVO_DEFAULT); }
+function evoSel(){ if (!evo.sel[evo.mode]) evoReset(); return evo.sel[evo.mode]; }
+const evoColor = k => evoCol(evo.slot[evo.mode].get(k));
+const EVO_SPLIT = 25;
+const evoOptHtml = s => { const on = evoSel().has(s.k); return `<button type="button" class="evo-opt${on ? " on" : ""}" data-k="${esc(s.k)}" aria-pressed="${on}"${on ? ` style="--sc:${evoColor(s.k)}"` : ""}>${on ? "<i></i>" : ""}${esc(evoName(s.k))}<em>${s.c}</em></button>`; };
+function openEvoSingles(){
+  const body = document.createElement("div");
+  body.innerHTML = `<p class="mdesc">${evo.mode === "band" ? "Artistas" : "Gêneros"} com <strong>só 1 faixa</strong> na playlist. Uma linha de 1 faixa é só um degrau no gráfico, por isso ficam escondidos da lista principal. Clique para ligar ou desligar a linha.</p>
+    <input type="search" id="evs-q" placeholder="Buscar…" aria-label="Buscar" style="width:100%;max-width:340px;border:1px solid var(--line-2);background:rgba(8,26,20,.8);color:var(--ink);font:500 13px var(--body);padding:9px 12px;border-radius:12px;outline:none">
+    <div class="evo-opts big" id="evs-list"></div>`;
+  const md = openModal({title: `${evo.mode === "band" ? "Artistas" : "Gêneros"} com 1 faixa`, body, size: "md"});
+  const list = md.m.querySelector("#evs-list"), inp = md.m.querySelector("#evs-q");
+  const draw = () => {
+    const q = inp.value.trim().toLowerCase();
+    list.innerHTML = evo.list.filter(s => s.c === 1 && (!q || evoName(s.k).toLowerCase().includes(q))).map(evoOptHtml).join("") || `<span class="muted" style="font-size:12.5px">Nada encontrado.</span>`;
+  };
+  list.addEventListener("click", e => { const b = e.target.closest(".evo-opt"); if (b){ evoToggle(b.dataset.k); draw(); } });
+  inp.addEventListener("input", draw);
+  draw();
+}
+function evoPanels(){
+  const sel = evoSel();
+  const q = $("#evo-q").value.trim().toLowerCase();
+  // com mais de 25 bandas/gêneros, os de 1 faixa só saem da lista (ficam atrás do botão/modal) enquanto não há busca
+  const split = evo.list.length > EVO_SPLIT, singles = split ? evo.list.filter(s => s.c === 1) : [];
+  const opts = evo.list.filter(s => q ? evoName(s.k).toLowerCase().includes(q) : !split || s.c > 1);
+  $("#evo-opts").innerHTML = opts.map(evoOptHtml).join("") || `<span class="muted" style="font-size:12.5px">Nada encontrado.</span>`;
+  const sb = $("#evo-singles");
+  $("#evo-singles-row").style.display = singles.length ? "" : "none";
+  const on1 = singles.filter(s => sel.has(s.k)).length;
+  $("#evo-singles-x").style.display = on1 ? "inline-flex" : "none";
+  sb.textContent = `Ver os ${singles.length} ${evo.mode === "band" ? "artistas" : "gêneros"} com só 1 faixa${on1 ? ` · ${on1} no gráfico` : ""}`;
+  $("#evo-what").textContent = evo.mode === "band" ? "banda" : "gênero";
+  $("#evo-hint").textContent = `${evo.list.length} ${evo.mode === "band" ? "bandas/artistas" : "gêneros"} · acumulado de faixas pela ordem de adição`;
+  document.querySelectorAll("#evo-mode button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === evo.mode));
+  // atalhos "Top N": só os que cabem nesta playlist (N menor que o total de bandas/gêneros); "Todas" mostra o total.
+  // O atalho fica marcado quando as linhas escolhidas são exatamente as N maiores
+  const total = evo.list.length, cur = [...sel].filter(k => evo.map.has(k));
+  const isTop = n => cur.length === Math.min(n, total) && evo.list.slice(0, n).every(s => sel.has(s.k));
+  $("#evo-tops").innerHTML = [...EVO_TOPS.filter(n => n < total).map(n => `<button type="button" data-n="${n}" aria-pressed="${isTop(n)}">Top ${n}</button>`),
+    ...(total ? [`<button type="button" data-n="all" aria-pressed="${isTop(total)}">Todas · ${total}</button>`] : [])].join("");
+}
+function evoToggle(k){
+  if (evoSel().has(k)) evoDel(k);
+  else evoAdd(k);
+  evoPanels(); drawEvo();
+}
+function drawEvo(){
+  const box = $("#evo"); if (!box) return;
+  const W = box.clientWidth, N = evo.N;
+  if (!evo.list.length){ box.innerHTML = `<p class="none">${evo.mode === "genre" ? "Ainda não há gêneros para mostrar. Use \"Atualizar dados\" para buscá-los." : "Sem dados para este recorte."}</p>`; return; }
+  if (!W) return;
+  const shown = [...evoSel()].filter(k => evo.map.has(k)).sort((a, b) => evo.slot[evo.mode].get(a) - evo.slot[evo.mode].get(b));
+  const H = 300, L = 38, Rm = 16, Tp = 14, Bt = 26;
+  const X = i => L + (N <= 1 ? 0 : i / (N - 1)) * (W - L - Rm);
+  const cum = shown.map(k => { const ix = evo.map.get(k).ix, a = new Int32Array(N); let p = 0, c = 0; for (let i = 0; i < N; i++){ if (p < ix.length && ix[p] === i){ c++; p++; } a[i] = c; } return a; });
+  const mx = Math.max(1, ...cum.map(a => a[N - 1]));
+  const raw = mx / 4, pow = Math.pow(10, Math.floor(Math.log10(raw))), step = Math.max(1, [1, 2, 5, 10].map(m => m * pow).find(s => s >= raw));
+  const top = Math.ceil(mx / step) * step;
+  const Y = v => Tp + (1 - v / top) * (H - Tp - Bt);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução acumulada de faixas por ${evo.mode === "band" ? "banda" : "gênero"}, pela ordem de adição">`;
+  for (let v = 0; v <= top; v += step) svg += `<line x1="${L}" x2="${W - Rm}" y1="${Y(v)}" y2="${Y(v)}" stroke="rgba(110,231,183,.08)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+  [0, .25, .5, .75, 1].forEach((f, j, arr) => { const i = Math.round(f * (N - 1)); svg += `<text x="${X(i)}" y="${H - 6}" text-anchor="${j === 0 ? "start" : j === arr.length - 1 ? "end" : "middle"}">#${evo.R[i].n}</text>`; });
+  const every = Math.max(1, Math.ceil(N / 500));
+  cum.forEach((a, j) => {
+    const pts = []; for (let i = 0; i < N; i += every) pts.push(i); if (pts[pts.length - 1] !== N - 1) pts.push(N - 1);
+    const col = evoCol(evo.slot[evo.mode].get(shown[j]));
+    svg += `<path d="M${pts.map(i => `${X(i).toFixed(1)},${Y(a[i]).toFixed(1)}`).join("L")}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    svg += `<circle cx="${X(N - 1)}" cy="${Y(a[N - 1])}" r="4" fill="${col}" stroke="#071a14" stroke-width="2"/>`;
+  });
+  svg += `<g id="evo-hot" style="display:none"><line y1="${Tp}" y2="${H - Bt}" stroke="rgba(240,253,247,.35)" stroke-dasharray="3 3"/>${cum.map((a, j) => `<circle r="4.5" fill="${evoCol(evo.slot[evo.mode].get(shown[j]))}" stroke="#071a14" stroke-width="2"/>`).join("")}</g>`;
+  svg += `<rect id="evo-hit" x="${L}" y="0" width="${W - L - Rm}" height="${H - Bt}" fill="transparent"/></svg>`;
+  box.innerHTML = svg;
+  const s = box.querySelector("svg"), hot = s.querySelector("#evo-hot"), line = hot.querySelector("line"), dots = [...hot.querySelectorAll("circle")];
+  const at = e => {
+    const b = s.getBoundingClientRect(), x = (e.clientX - b.left) / b.width * W;
+    const i = Math.min(N - 1, Math.max(0, Math.round((x - L) / (W - L - Rm) * (N - 1))));
+    hot.style.display = "";
+    line.setAttribute("x1", X(i)); line.setAttribute("x2", X(i));
+    dots.forEach((d, j) => { d.setAttribute("cx", X(i)); d.setAttribute("cy", Y(cum[j][i])); });
+    const t = evo.R[i];
+    const rows = shown.map((k, j) => [k, cum[j][i], evoCol(evo.slot[evo.mode].get(k))]).sort((p, q) => q[1] - p[1]);
+    showTip(`<div class="eyebrow">Adição #${t.n}</div><div class="t">${esc(t.title)}</div><div class="k"><span>${esc(t.artist)}</span></div>${rows.length ? "<hr>" : ""}
+      ${rows.slice(0, 12).map(([k, v, col]) => `<div class="k"><span><i style="display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:7px;vertical-align:middle;background:${col}"></i>${esc(evoName(k))}</span><b>${v}</b></div>`).join("")}${rows.length > 12 ? `<div class="k"><span>+ ${rows.length - 12} linhas</span></div>` : ""}`, e);
+  };
+  s.addEventListener("pointermove", at);
+  s.addEventListener("pointerleave", () => { hot.style.display = "none"; hideTip(); });
+}
+function renderEvolution(R){ evoBuild(R); evoPanels(); drawEvo(); }
+$("#evo-mode").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.dataset.m === evo.mode) return; evo.mode = b.dataset.m; evoBuild(rows()); evoPanels(); drawEvo(); });
+$("#evo-tops").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; evoTop(b.dataset.n === "all" ? evo.list.length : +b.dataset.n); evoPanels(); drawEvo(); });
+$("#evo-none").addEventListener("click", () => { evo.sel[evo.mode] = new Set(); evo.slot[evo.mode] = new Map(); evoPanels(); drawEvo(); });
+$("#evo-opts").addEventListener("click", e => { const b = e.target.closest(".evo-opt"); if (b) evoToggle(b.dataset.k); });
+$("#evo-q").addEventListener("input", evoPanels);
+$("#evo-singles").addEventListener("click", openEvoSingles);
+$("#evo-singles-x").addEventListener("click", () => { evo.list.filter(s => s.c === 1).forEach(s => { if (evoSel().has(s.k)) evoDel(s.k); }); evoPanels(); drawEvo(); });
 
 /* ---------------- tabs ---------------- */
 const tabs = [...document.querySelectorAll(".tabs button")];
@@ -899,7 +1022,7 @@ function showTab(id){
   document.querySelectorAll(".tabpanel").forEach(p => p.classList.toggle("on", p.id === id));
   placePill(); hideTip();
   try { history.replaceState(null, "", id === "insights" ? "#insights" : "#"); } catch (e) {}
-  if (id === "insights") animateInsights(); else requestAnimationFrame(() => { renderTree(); renderYears(rows()); });
+  if (id === "insights") animateInsights(); else requestAnimationFrame(() => { renderTree(); renderYears(rows()); drawEvo(); });
 }
 tabs.forEach(t => t.addEventListener("click", () => showTab(t.getAttribute("aria-controls"))));
 addEventListener("hashchange", () => showTab(location.hash === "#insights" ? "insights" : "painel"));
@@ -1867,6 +1990,7 @@ function spotifyMeta(t, album){
   if (typeof t.popularity === "number") m.p = t.popularity;
   const aid = (t.artists || []).map(a => a.id).filter(Boolean);
   if (aid.length) m.aid = aid;
+  if (t.id) m.id = t.id;   // ID da faixa: é com ele que os links batem com as músicas já salvas (sem gastar requisição)
   return m;
 }
 function spotifyDate(album){
@@ -2440,15 +2564,18 @@ function openImport(prefillText = null){
       return;
     }
     go.style.display = "";
-    const isDup = r => existing.has((r.title + "|" + (r.artist || NI)).toLowerCase());
+    // links que já batem com músicas salvas (pelo ID) viram "reordenar", não duplicata nem faixa nova
+    const hitIds = new Set(mode === "add" ? matchLinkIds(parsed.rows.filter(r => r.id).map(r => r.id)).matched.map(m => m.id) : []);
+    const isHit = r => !!r.id && hitIds.has(r.id);
+    const isDup = r => !isHit(r) && existing.has((r.title + "|" + (r.artist || NI)).toLowerCase());
     const dedupeOn = mode === "add" && q("#im-dup").checked;
     const dup = dedupeOn ? parsed.rows.filter(isDup) : [];
-    const fresh = dedupeOn ? parsed.rows.filter(r => !isDup(r)) : parsed.rows;
+    const fresh = (dedupeOn ? parsed.rows.filter(r => !isDup(r)) : parsed.rows).filter(r => !isHit(r));
     const n = fresh.length;
     const arts = new Set(parsed.rows.map(r => r.artist || NI)).size;
-    go.disabled = n === 0; go.classList.toggle("danger", mode === "replace");
-    go.textContent = mode === "add" ? `Adicionar ${faixas(n)}` : `Substituir por ${faixas(n)}…`;
-    q("#im-prev").innerHTML = `<div class="pv ok"><b>${faixas(parsed.rows.length)}</b> reconhecidas · ${arts} artistas${dup.length ? ` · <b>${dup.length}</b> já estão na playlist e serão ignoradas` : ""}${parsed.warnings.length ? ` · <span class="warn">${parsed.warnings.length} aviso${parsed.warnings.length > 1 ? "s" : ""}</span>` : ""}</div>
+    go.disabled = n === 0 && !hitIds.size; go.classList.toggle("danger", mode === "replace");
+    go.textContent = mode === "add" ? (hitIds.size ? `Reordenar${n ? ` e adicionar ${faixas(n)}` : ""}…` : `Adicionar ${faixas(n)}`) : `Substituir por ${faixas(n)}…`;
+    q("#im-prev").innerHTML = `<div class="pv ok"><b>${faixas(parsed.rows.length)}</b> reconhecidas · ${arts} artistas${hitIds.size ? ` · <b>${hitIds.size}</b> já ${hitIds.size > 1 ? "estão" : "está"} na playlist e ${hitIds.size > 1 ? "serão reordenadas" : "será reordenada"} pela ordem dos links` : ""}${dup.length ? ` · <b>${dup.length}</b> já estão na playlist e serão ignoradas` : ""}${parsed.warnings.length ? ` · <span class="warn">${parsed.warnings.length} aviso${parsed.warnings.length > 1 ? "s" : ""}</span>` : ""}</div>
       ${parsed.warnings.length ? `<details class="warns"><summary>Ver avisos</summary><ul>${parsed.warnings.slice(0, 30).map(w => `<li>Linha ${w.line}: ${esc(w.msg)}</li>`).join("")}${parsed.warnings.length > 30 ? `<li>+ ${parsed.warnings.length - 30} avisos</li>` : ""}</ul></details>` : ""}
       ${dup.length ? `<details class="warns"><summary>Ver as ${dup.length} já existentes (ignoradas)</summary><ul>${dup.slice(0, 30).map(r => `<li>${esc(r.title)} — ${esc(r.artist || NI)}</li>`).join("")}${dup.length > 30 ? `<li>+ ${dup.length - 30} faixas</li>` : ""}</ul></details>` : ""}
       <p class="muted" style="margin:10px 0 4px">${dedupeOn && dup.length ? `Serão adicionadas (${faixas(fresh.length)}):` : "Faixas:"}</p>
@@ -2528,7 +2655,7 @@ function openImport(prefillText = null){
     const status = q("#sp-status"), btn = q("#im-go");
     status.classList.remove("err");
     if (!ids.length && !albumIds.length){ status.classList.add("err"); status.textContent = "Nenhum link do Spotify reconhecido."; return; }
-    const cache = loadTrackCache(), toFetch = ids.filter(x => !cache[x]), known = ids.length - toFetch.length;
+    const cache = {...ownTracksById(), ...loadTrackCache()}, toFetch = ids.filter(x => !cache[x]), known = ids.length - toFetch.length;
     let res = {rows: [], warnings: []};
     if (toFetch.length || albumIds.length){
       res = await fetchFromSpotify(id, secret, toFetch, albumIds, status, btn, known);
@@ -2539,6 +2666,7 @@ function openImport(prefillText = null){
     const albumRows = res.rows.filter(r => !fetchedSet.has(r.id));
     const trackRows = ids.map(x => cache[x] ? {n: null, id: x, ...cache[x]} : got.get(x)).filter(Boolean);
     parsed = {rows: [...albumRows, ...trackRows], warnings: res.warnings};
+    parsed.rows.forEach(r => { if (r.id && r.meta && !r.meta.id) r.meta = {...r.meta, id: r.id}; });
     rememberSpotifyCovers(parsed.rows);
     if (known){
       status.classList.remove("err");
@@ -2633,14 +2761,32 @@ function openImport(prefillText = null){
     const toRow = (r, n) => r.meta ? [n, r.title, r.artist, r.album, r.sec, r.date, r.meta] : [n, r.title, r.artist, r.album, r.sec, r.date];
     if (mode === "add"){
       const skip = q("#im-dup").checked;
-      const seen = new Set(existing), fresh = [];
+      const seen = new Set(existing), fresh = [], seq = [];
       const ordered = parsed.rows.every(r => r.n != null) ? [...parsed.rows].sort((a, b) => a.n - b.n) : parsed.rows;
-      for (const r of ordered){ const k = (r.title + "|" + (r.artist || NI)).toLowerCase(); if (skip && seen.has(k)) continue; seen.add(k); fresh.push(r); }
-      if (!fresh.length) return toast("Todas as faixas já estão na playlist.");
-      const ok = await confirmModal({title: `Adicionar ${faixas(fresh.length)}?`, ok: "Adicionar",
-        html: `<p>As faixas entram no fim da playlist, da <strong>#${NN + 1}</strong> à <strong>#${NN + fresh.length}</strong>, e o painel será recalculado com ${faixas(NN + fresh.length)}.</p>`});
+      // links que já batem com músicas salvas (pelo ID) não são adicionadas de novo: a música é reposicionada na ordem dos links
+      const idRows = ordered.filter(r => r.id), mt = idRows.length ? matchLinkIds(idRows.map(r => r.id)) : {matched: [], missing: BY_PLAYLIST};
+      const hit = new Map(mt.matched.map(m => [m.id, m.t]));
+      for (const r of ordered){
+        if (r.id && hit.has(r.id)){ seq.push({id: r.id, t: hit.get(r.id)}); continue; }
+        const k = (r.title + "|" + (r.artist || NI)).toLowerCase(); if (skip && seen.has(k)) continue; seen.add(k); fresh.push(r); seq.push({r});
+      }
+      if (!fresh.length && !hit.size) return toast("Todas as faixas já estão na playlist.");
+      const total = NN + fresh.length;
+      const ok = await confirmModal({title: hit.size ? "Reordenar e adicionar?" : `Adicionar ${faixas(fresh.length)}?`, ok: hit.size ? "Confirmar" : "Adicionar",
+        html: hit.size
+          ? `<p><strong>${faixas(hit.size)}</strong> dos links já ${hit.size > 1 ? "estão" : "está"} na playlist e ${hit.size > 1 ? "vão" : "vai"} ser <strong>reordenada${hit.size > 1 ? "s" : ""} pela ordem em que você colou</strong> (sem gastar nenhuma busca no Spotify).</p>
+            ${fresh.length ? `<p>${faixas(fresh.length)} nova${fresh.length > 1 ? "s" : ""} ${fresh.length > 1 ? "entram" : "entra"} na mesma sequência. O que não estava nos links fica no começo, na ordem atual.</p>` : ""}
+            <p>A playlist fica com <strong>${faixas(total)}</strong>.</p>`
+          : `<p>As faixas entram no fim da playlist, da <strong>#${NN + 1}</strong> à <strong>#${NN + fresh.length}</strong>, e o painel será recalculado com ${faixas(NN + fresh.length)}.</p>`});
       if (!ok) return;
-      commitRows([...currentRows(), ...fresh.map((r, i) => toRow(r, NN + i + 1))], `${faixas(fresh.length)} adicionada${fresh.length > 1 ? "s" : ""} · playlist com ${faixas(NN + fresh.length)}`);
+      ssSet("verify", "1");
+      if (hit.size){
+        const cache = loadTrackCache(), out = []; let n = 0;
+        for (const t of mt.missing) out.push(rowOf(t, ++n, null, cache));
+        for (const s of seq) out.push(s.t ? rowOf(s.t, ++n, s.id, cache) : toRow(s.r, ++n));
+        return commitRows(out, `${faixas(hit.size)} reordenada${hit.size > 1 ? "s" : ""}${fresh.length ? ` · ${faixas(fresh.length)} adicionada${fresh.length > 1 ? "s" : ""}` : ""} · playlist com ${faixas(total)}`);
+      }
+      commitRows(applyOrderPlan([...currentRows(), ...fresh.map((r, i) => toRow(r, NN + i + 1))], NN), `${faixas(fresh.length)} adicionada${fresh.length > 1 ? "s" : ""} · playlist com ${faixas(NN + fresh.length)}`);
     } else {
       const rows = parsed.rows.every(r => r.n != null) && new Set(parsed.rows.map(r => r.n)).size === parsed.rows.length ? parsed.rows.map(r => toRow(r, r.n)) : parsed.rows.map((r, i) => toRow(r, i + 1));
       const arts = new Set(parsed.rows.map(r => r.artist || NI)).size;
@@ -2650,17 +2796,115 @@ function openImport(prefillText = null){
           <p class="muted">Não dá para desfazer. Se quiser guardar a lista atual, exporte antes.</p>`,
         extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
       if (!ok) return;
+      ssSet("verify", "1");
       commitRows(rows, `Nova playlist carregada · ${faixas(rows.length)} de ${arts} artistas`);
     }
   });
   update();
 }
 
+/* ---------- ordem da playlist: bater links com as músicas já salvas (nenhuma requisição ao Spotify) ---------- */
+const ownKey = (title, artist) => (title || "").trim().toLowerCase() + "|" + (splitArtists(artist || "")[0] || "");
+// faixas que já estão na playlist e carregam o próprio ID, no mesmo formato do cache de faixas
+function ownTracksById(){
+  const o = {};
+  for (const t of BY_PLAYLIST) if (t.m && t.m.id) o[t.m.id] = {title: t.title, artist: t.artist === NI ? "" : t.artist, album: t.album === NI ? "" : t.album, sec: t.sec, date: t.date, meta: t.m};
+  return o;
+}
+/* id → música da playlist. 1º pelo ID guardado na música (meta.id); 2º, pras antigas sem ID, pelo cache de faixas
+   já buscadas (título + artista principal). matched = na ordem dos links; fresh = links que não estão na playlist;
+   missing = músicas da playlist que não vieram nos links */
+function matchLinkIds(ids){
+  const cache = loadTrackCache(), byId = new Map(), byKey = new Map(), used = new Set(), matched = [], fresh = [];
+  for (const t of BY_PLAYLIST){
+    if (t.m && t.m.id) byId.set(t.m.id, t);
+    else { const k = ownKey(t.title, t.artist); (byKey.get(k) || byKey.set(k, []).get(k)).push(t); }
+  }
+  for (const id of ids){
+    let t = byId.get(id);
+    if (!t && cache[id]){ const arr = byKey.get(ownKey(cache[id].title, cache[id].artist)); t = arr && arr.find(x => !used.has(x.n)); }
+    if (t && !used.has(t.n)){ used.add(t.n); matched.push({id, t}); } else fresh.push(id);
+  }
+  return {matched, fresh, missing: BY_PLAYLIST.filter(t => !used.has(t.n))};
+}
+// linha pra gravar de uma música já salva; com o id, guarda o ID dentro dos dados dela (dá pra bater de novo depois)
+function rowOf(t, n, id, cache){
+  const c = id && cache[id], base = {...(c && c.meta || {}), ...(t.m || {})};
+  const m = id && Object.keys(base).length ? {...base, id} : t.m;
+  const r = [n, t.title, t.artist === NI ? "" : t.artist, t.album === NI ? "" : t.album, t.sec, t.date];
+  if (m) r.push(m);
+  return r;
+}
+const ssGet = k => { try { return sessionStorage.getItem(STORE_KEY + ":" + k); } catch (e) { return null; } };
+const ssSet = (k, v) => { try { sessionStorage.setItem(STORE_KEY + ":" + k, v); } catch (e) {} };
+const ssDel = k => { try { sessionStorage.removeItem(STORE_KEY + ":" + k); } catch (e) {} };
+const linksText = ids => ids.map(id => `https://open.spotify.com/track/${id}`).join("\n");
+/* plano de ordem (ids na ordem dos links): usado quando faltaram músicas que ainda precisam ser buscadas e
+   entram na posição certa, e não no fim */
+function applyOrderPlan(rows, oldCount){
+  let plan = null; try { plan = JSON.parse(ssGet("plan") || "null"); } catch (e) {}
+  ssDel("plan");
+  if (!Array.isArray(plan) || !plan.length) return rows;
+  const pos = new Map(plan.map((id, i) => [id, i]));
+  const inPlan = r => r[6] && r[6].id && pos.has(r[6].id);
+  const front = rows.filter(r => !inPlan(r) && r[0] <= oldCount), mid = rows.filter(inPlan).sort((a, b) => pos.get(a[6].id) - pos.get(b[6].id)), tail = rows.filter(r => !inPlan(r) && r[0] > oldCount);
+  return [...front, ...mid, ...tail].map((r, i) => [i + 1, ...r.slice(1)]);
+}
+function openFixOrder(){
+  const body = document.createElement("div");
+  body.innerHTML = `<div class="ordnote"><div class="ordcaps">ATENÇÃO: AS MÚSICAS PRECISAM ESTAR NA ORDEM DE ADIÇÃO — DA PRIMEIRA MÚSICA ADICIONADA À PLAYLIST (#1) ATÉ A ÚLTIMA (#${NN}). SE VIEREM NA ORDEM ERRADA, A PLAYLIST VAI FICAR ERRADA DE NOVO.</div></div>
+    <ol class="ordsteps">
+      <li>Abra a playlist no <strong>Spotify do PC</strong>.</li>
+      <li>No topo da coluna com a data de adição, clique em <strong>"Adicionada em"</strong> até as <strong>MAIS ANTIGAS ficarem NO TOPO</strong> (seta para cima). Se não aparecer, clique nos <strong>3 tracinhos</strong> (☰) ao lado da lupa e escolha "Adicionada em".</li>
+      <li>Aperte <strong>Ctrl+A</strong> e depois <strong>Ctrl+C</strong>: o Spotify copia o <strong>link de cada música</strong>.</li>
+      <li>Volte aqui e cole no campo abaixo (<strong>Ctrl+V</strong>).</li>
+    </ol>
+    <textarea class="ordta" id="fo-text" spellcheck="false" placeholder="https://open.spotify.com/track/…&#10;https://open.spotify.com/track/…"></textarea>
+    <p class="muted" id="fo-status" style="margin:8px 0 0">Nada é buscado no Spotify: o site só confere os links com as músicas que já estão salvas aqui.</p>`;
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" id="fo-cancel">Cancelar</button><button class="pbtn" type="button" id="fo-go" disabled>Reordenar playlist</button>`;
+  const md = openModal({title: "Consertar a ordem da playlist", body, foot, size: "md"});
+  const q = s => md.m.querySelector(s), ta = q("#fo-text"), st = q("#fo-status"), go = q("#fo-go");
+  const ids = () => parseSpotifyIds(ta.value);
+  ta.addEventListener("input", () => { const n = ids().length; st.classList.remove("err"); st.textContent = n ? `${n} link${n > 1 ? "s" : ""} reconhecido${n > 1 ? "s" : ""}.` : "Nada é buscado no Spotify: o site só confere os links com as músicas que já estão salvas aqui."; go.disabled = !n; });
+  q("#fo-cancel").addEventListener("click", md.close);
+  go.addEventListener("click", async () => {
+    const list = ids(); if (!list.length) return;
+    const mt = matchLinkIds(list), cache = loadTrackCache();
+    if (!mt.matched.length){ st.classList.add("err"); st.textContent = "Nenhum link bate com as músicas salvas. Isso acontece com músicas que entraram sem link do Spotify (lista colada): nesse caso use Adicionar músicas → Substituir playlist."; return; }
+    const rows = []; let n = 0;
+    for (const t of mt.missing) rows.push(rowOf(t, ++n, null, cache));
+    for (const {id, t} of mt.matched) rows.push(rowOf(t, ++n, id, cache));
+    const ok = await confirmModal({title: "Reordenar a playlist?", ok: "Reordenar",
+      html: `<p><strong>${faixas(mt.matched.length)}</strong> de ${nf(NN)} batem com os links e vão ficar na ordem em que você colou: a primeira do que você colou vira a <strong>#${mt.missing.length + 1}</strong> e a última, a <strong>#${NN}</strong>. Nenhuma busca no Spotify é feita.</p>
+        ${mt.missing.length ? `<p><strong>${faixas(mt.missing.length)}</strong> da playlist não estavam nos links: ficam no começo (#1 a #${mt.missing.length}), na ordem atual.</p>` : ""}
+        ${mt.fresh.length ? `<p><strong>${mt.fresh.length} link${mt.fresh.length > 1 ? "s" : ""}</strong> não ${mt.fresh.length > 1 ? "estão" : "está"} na playlist. Depois de reordenar eu pergunto se você quer buscar ${mt.fresh.length > 1 ? "essas músicas" : "essa música"} e adicionar.</p>` : ""}
+        <p class="muted">Para guardar a lista atual antes, exporte primeiro.</p>`,
+      extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+    if (!ok) return;
+    if (mt.fresh.length){ ssSet("fresh", JSON.stringify({ids: mt.fresh, plan: list})); }
+    commitRows(rows, `Playlist reordenada · ${faixas(mt.matched.length)} conferidas com os links`);
+  });
+}
+async function askFetchFresh({ids, plan}){
+  const n = ids.length;
+  const ok = await confirmModal({title: `${n === 1 ? "Sobrou 1 link" : `Sobraram ${n} links`} fora da playlist`, ok: "Buscar e adicionar", cancel: "Agora não",
+    html: `<p>${n === 1 ? "Esse link não está" : "Esses links não estão"} na playlist. Quer que o site ${n === 1 ? "busque essa música" : "busque essas músicas"} no Spotify e ${n === 1 ? "a adicione" : "as adicione"}, na posição certa pela ordem dos links que você colou?</p><p class="muted">Gasta 1 busca no Spotify por música nova.</p>`});
+  if (!ok) return;
+  ssSet("plan", JSON.stringify(plan));
+  openImport(linksText(ids));
+}
+function askVerifyOrder(){
+  confirmModal({title: "Verifique se você salvou suas músicas na ordem certa", ok: "Verificar", cancel: "Agora não",
+    html: `<p>A playlist precisa estar na <strong>ordem em que as músicas foram adicionadas</strong>: a primeira adicionada é a <strong>#1</strong> e a última é a <strong>#${NN}</strong>.</p><p>Quer conferir agora?</p>`})
+    .then(ok => { if (ok) openTable({verify: true}); });
+}
+
 /* ---------- song table with removal ---------- */
-function openTable(){
+function openTable({verify = false} = {}){
   const marked = new Set(); let sortK = "n", sortDir = 1, query = "";
   const body = document.createElement("div"); body.className = "tbwrap";
-  body.innerHTML = `<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button><span class="tbcount" id="tb-count"></span></div>
+  body.innerHTML = `${verify ? `<div class="ordnote">Confira a coluna <strong>#</strong>: a playlist deve ir da <strong>primeira música adicionada (#1)</strong> até a <strong>última (#${NN})</strong>. Se estiver fora de ordem, clique em <strong>CONSERTAR ORDEM DA PLAYLIST</strong>.</div>` : ""}<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button>${STORE ? `<button class="gbtn" type="button" id="tb-reverse" title="A #1 vira a última e a última vira a #1">Inverter ordem</button><button class="pbtn" type="button" id="tb-fix" title="Cole os links da playlist do Spotify e a ordem é refeita, sem buscar nada">CONSERTAR ORDEM DA PLAYLIST</button>` : ""}<span class="tbcount" id="tb-count"></span></div>
     <div class="tbscroll"><table class="tb"><thead><tr><th class="ck"></th>${songHead()}</tr></thead><tbody></tbody></table></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `<span class="hintf" id="tb-hint">Marque as faixas que quer remover. Nada é apagado até você salvar.</span><span class="sp"></span><button class="gbtn" type="button" id="tb-cancel">Fechar</button><button class="pbtn danger" type="button" id="tb-save" disabled>Remover faixas</button>`;
@@ -2695,6 +2939,17 @@ function openTable(){
   q("#tb-markall").addEventListener("click", () => { visible.forEach(t => marked.add(t.n)); draw(); });
   q("#tb-clear").addEventListener("click", () => { marked.clear(); draw(); });
   q("#tb-cancel").addEventListener("click", md.close);
+  if (STORE) q("#tb-fix").addEventListener("click", openFixOrder);
+  if (STORE) q("#tb-reverse").addEventListener("click", async () => {
+    const first = BY_PLAYLIST[0], last = BY_PLAYLIST[NN - 1];
+    const ok = await confirmModal({title: "Inverter a ordem da playlist?", ok: "Inverter ordem",
+      html: `<p>A ordem de entrada das <strong>${faixas(NN)}</strong> vai ser invertida: <strong>${esc(last.title)}</strong> (hoje a #${NN}) passa a ser a <strong>#1</strong> e <strong>${esc(first.title)}</strong> (hoje a #1) passa a ser a <strong>#${NN}</strong>.</p>
+        <p>Painel e insights são recalculados com a nova ordem (o que depende de "quem entrou primeiro" muda).</p>
+        <p class="muted">Para voltar ao que era antes, é só inverter de novo. Para guardar a lista atual, exporte primeiro.</p>`,
+      extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+    if (!ok) return;
+    commitRows(currentRows().map(r => [NN + 1 - r[0], ...r.slice(1)]), `Ordem invertida · ${faixas(NN)}`);
+  });
   q("#tb-save").addEventListener("click", async () => {
     const k = marked.size; if (!k || k >= NN) return;
     const gone = BY_PLAYLIST.filter(t => marked.has(t.n));
@@ -2823,7 +3078,7 @@ function openDups(){
 $("#dt-table").innerHTML = `${ICON.list}<span>Músicas</span>`;
 $("#dt-import").innerHTML = `${ICON.up}<span>Adicionar músicas</span>`;
 $("#dt-export").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
-$("#dt-table").addEventListener("click", openTable);
+$("#dt-table").addEventListener("click", () => openTable());
 $("#dt-import").addEventListener("click", () => openImport());
 $("#dt-dups").innerHTML = `${ICON.list}<span>Duplicadas e covers</span>`;
 $("#dt-dups").addEventListener("click", openDups);
@@ -2840,12 +3095,18 @@ if (STORE) $("#srcline").textContent += " · lista editada";
 
 /* ---------------- boot ---------------- */
 let rz;
-addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { placePill(); if ($("#insights").classList.contains("on")) drawScatter(); if ($("#painel").classList.contains("on") && rows().length){ renderTree(); renderYears(rows()); renderKPIs(rows()); } }, 120); });
+addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { placePill(); if ($("#insights").classList.contains("on")) drawScatter(); if ($("#painel").classList.contains("on") && rows().length){ renderTree(); renderYears(rows()); renderKPIs(rows()); drawEvo(); } }, 120); });
 function boot(){
   placePill();
   render();
   queueAppleGenres();
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
+  if (STORE){
+    let fresh = null; try { fresh = JSON.parse(ssGet("fresh") || "null"); } catch (e) {}
+    const verify = ssGet("verify") === "1"; ssDel("fresh"); ssDel("verify");
+    if (fresh && fresh.ids && fresh.ids.length) setTimeout(() => askFetchFresh(fresh), 1400);
+    else if (verify) setTimeout(askVerifyOrder, 1400);
+  }
   if (location.hash === "#insights") showTab("insights");
   const params = new URLSearchParams(location.search);
   if (params.get("import") === "nova-playlist"){
