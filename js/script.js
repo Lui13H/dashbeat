@@ -32,6 +32,79 @@ for (const r of RAW){ const all = splitArtistsAll(String(r[2] || "")); if (all.l
 const countedIdx = all => all.map((a, i) => i).filter(i => i === 0 || SOLO.has(all[i].toLowerCase()));
 const splitArtists = s => { const all = splitArtistsAll(s.toLowerCase()); return countedIdx(all).map(i => all[i]); };
 const splitArtistsRaw = s => { const all = splitArtistsAll(s); return countedIdx(all).map(i => all[i]); };
+
+/* ---------- álbuns que são o mesmo ("Symbolic" e "Symbolic (Remastered Version)") ----------
+   Do mesmo artista principal, o site junta sozinho os álbuns que só mudam na marca de edição (remaster, deluxe, bonus…).
+   Quando o nome só se parece (um é o começo do outro, ou a grafia é quase igual), ele fica "em dúvida" e pergunta na tela
+   Duplicadas e covers › Álbuns. As respostas ficam salvas. O nome que prevalece num grupo é sempre o MAIS CURTO. */
+const ALBMERGE_KEY = "catalogo-musical:album-merges";
+const ALBMERGE = (() => { try { const o = JSON.parse(localStorage.getItem(ALBMERGE_KEY) || "null"); return o && typeof o === "object" ? o : {}; } catch (e) { return {}; } })();
+const saveAlbMerge = () => { try { localStorage.setItem(ALBMERGE_KEY, JSON.stringify(ALBMERGE)); } catch (e) {} };
+const albTokens = s => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/&/g, " and ").split(/[^a-z0-9]+/).filter(Boolean);
+const ED_KW = /^(remaster|remastered|remasterizado|remasterizada|remastering|mastered|deluxe|expanded|anniversary|edition|edicao|version|bonus|special|collector|collectors|reissue|mono|stereo|digital|explicit|clean|international|import|japan|japanese)$/;
+const ED_OK = /^(the|of|and|track|tracks|with|from|new|mix|mixed|disc|cd|re|\d{2,4}s?|\d+(st|nd|rd|th))$/;
+const editionish = txt => { const t = albTokens(txt); return t.length > 0 && t.some(w => ED_KW.test(w)) && t.every(w => ED_KW.test(w) || ED_OK.test(w)); };
+function albCore(name){   // o nome sem a marca de edição, em palavras: "Symbolic (Remastered Version)" -> ["symbolic"]
+  let s = String(name);
+  s = s.replace(/\s*[(\[]([^)\]]*)[)\]]/g, (m, inner) => editionish(inner) ? "" : m);
+  s = s.replace(/\s+[-–—:]\s+([^-–—:]+)$/, (m, rest) => editionish(rest) ? "" : m);
+  const t = albTokens(s); return t.length ? t : albTokens(name);
+}
+function lev(a, b){
+  const p = Array.from({length: b.length + 1}, (_, i) => i);
+  for (let i = 1; i <= a.length; i++){ let prev = p[0]; p[0] = i; for (let j = 1; j <= b.length; j++){ const t = p[j]; p[j] = Math.min(p[j] + 1, p[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = t; } }
+  return p[b.length];
+}
+function albRelation(ta, tb){   // "auto" = mesmo álbum (só muda a edição) · "doubt" = parece, mas pergunta · null = outro álbum
+  const A = ta.join(" "), B = tb.join(" ");
+  if (A === B) return {kind: "auto"};
+  const [s, l] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  if (l.length > s.length && s.every((w, i) => w === l[i])){   // um nome é o começo do outro ("Human" e "Human Live")
+    const extra = l.slice(s.length);
+    const sequel = extra.every(w => /^(\d+|i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii|vol|volume|part|pt|chapter)$/.test(w));   // "II", "Vol. 2": é outro álbum, não pergunta
+    return !sequel && extra.length <= 3 ? {kind: "doubt", why: "um nome é o começo do outro"} : null;
+  }
+  if (A.length >= 6 && B.length >= 6 && 1 - lev(A, B) / Math.max(A.length, B.length) >= .85) return {kind: "doubt", why: "nomes quase iguais (grafia diferente)"};
+  return null;
+}
+const albArtKey = a => { a = String(a || "").trim(); return a ? (splitArtists(a)[0] || a.toLowerCase()) : ""; };
+function analyzeAlbums(raw){
+  const byArt = new Map(), map = new Map(), groups = [], doubts = [], rejected = [];
+  for (const r of raw){
+    const alb = String(r[3] || "").trim(); if (!alb) continue;
+    const key = albArtKey(r[2]), e = byArt.get(key) || byArt.set(key, {name: String(r[2] || "").trim(), albs: new Map()}).get(key);
+    e.albs.set(alb, (e.albs.get(alb) || 0) + 1);
+  }
+  for (const [art, {name: artName, albs}] of byArt){
+    const names = [...albs.keys()]; if (names.length < 2) continue;
+    const core = new Map(names.map(n => [n, albCore(n)])), parent = new Map(names.map(n => [n, n]));
+    const find = x => { while (parent.get(x) !== x){ parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+    const edges = [];
+    for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++){
+      const rel = albRelation(core.get(names[i]), core.get(names[j])); if (!rel) continue;
+      const [a, b] = names[i] < names[j] ? [names[i], names[j]] : [names[j], names[i]], id = `${art}|${a}|${b}`;
+      edges.push({art, artName, a, b, id, rel, dec: ALBMERGE[id], ca: albs.get(a), cb: albs.get(b)});
+    }
+    const used = [];
+    for (const e of edges){
+      if (e.dec === "nao"){ rejected.push(e); continue; }
+      if (e.rel.kind === "auto" || e.dec === "sim"){ parent.set(find(e.a), find(e.b)); used.push(e); }
+    }
+    for (const e of edges) if (e.dec !== "nao" && !(e.rel.kind === "auto" || e.dec === "sim") && find(e.a) !== find(e.b)) doubts.push(e);
+    const comps = new Map();
+    for (const n of names){ const k = find(n); if (!comps.has(k)) comps.set(k, []); comps.get(k).push(n); }
+    for (const list of comps.values()){
+      if (list.length < 2) continue;
+      const canon = [...list].sort((x, y) => x.length - y.length || albs.get(y) - albs.get(x) || x.localeCompare(y))[0];   // o nome mais curto prevalece
+      for (const n of list) map.set(art + "|" + n, canon);
+      const ids = used.filter(e => list.includes(e.a) && list.includes(e.b));
+      groups.push({art, artName, canon, variants: list.map(n => ({name: n, count: albs.get(n)})).sort((x, y) => x.name.length - y.name.length || x.name.localeCompare(y.name)), ids: ids.map(e => e.id), confirmed: ids.some(e => e.rel.kind !== "auto")});
+    }
+  }
+  return {map, groups, doubts, rejected};
+}
+const ALBUM_INFO = analyzeAlbums(RAW);
+const albumCanon = (artist, album) => { const raw = String(album || "").trim(); return raw ? (ALBUM_INFO.map.get(albArtKey(artist) + "|" + raw) || raw) : NI; };
 /* gênero é do artista (não da faixa) no Spotify: um mapa nome-do-artista (minúsculo) → gêneros,
    guardado à parte da playlist porque vale pra qualquer lista. [] = pesquisado e sem gênero */
 const GENRE_KEY = "catalogo-musical:genres";
@@ -83,7 +156,7 @@ const hasBand = (r, name) => { const k = String(name).toLowerCase(); return band
 const T = RAW.map(([n, title, artist, album, sec, date, meta]) => {
   const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
   // gs = gênero do Spotify (null = falta buscar) · ge = gênero exibido/calculado (Spotify ou, na falta, Apple)
-  return {n, title, artist: a, bands: bandsOf(a), album: (album || "").trim() || NI,
+  return {n, title, artist: a, bands: bandsOf(a), album: albumCanon(artist, album), albumRaw: (album || "").trim() || NI,
     sec: sec, date: date || "", year: date ? +date.slice(0, 4) : NI, m, gs, ge, ...extraProps(m, ge)};
 });
 const ALL_BANDS = [...new Set(T.flatMap(t => t.bands))].sort(niLast);
@@ -97,7 +170,7 @@ for (const t of T){
     (albumBands.get(t.album) || albumBands.set(t.album, new Set()).get(t.album)).add(b);
   }
 }
-const state = {bands: new Set(), albums: new Set(), genres: new Set(), upTo: null};   // upTo: máquina do tempo (só faixas até a #n); null = playlist inteira
+const state = {bands: new Set(), albums: new Set(), genres: new Set(), years: new Set(), upTo: null};   // upTo: máquina do tempo (só faixas até a #n); null = playlist inteira
 let tmBusy = false;   // tocando ou arrastando a máquina do tempo: sem animações caras nos gráficos
 let spotifyUserDisplay = null;  // nome do usuário logado no Spotify (preenchido ao obter token)
 const $ = s => document.querySelector(s);
@@ -117,10 +190,11 @@ function groupBy(rows, key){
 }
 const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
 
-function rows(useBand = true, useAlbum = true, useGenre = true, useTime = true){
+function rows(useBand = true, useAlbum = true, useGenre = true, useTime = true, useYear = true){
   return T.filter(t => (!useTime || state.upTo == null || t.n <= state.upTo) &&
                        (!useBand || !state.bands.size || t.bands.some(b => state.bands.has(b))) &&
                        (!useAlbum || !state.albums.size || state.albums.has(t.album)) &&
+                       (!useYear || !state.years.size || state.years.has(t.year)) &&
                        (!useGenre || !state.genres.size || (t.ge && t.ge.some(g => state.genres.has(g)))));
 }
 const bandEnabled = b => !state.albums.size || [...bandAlbums.get(b)].some(a => state.albums.has(a));
@@ -203,6 +277,11 @@ document.addEventListener("keydown", e => { if (e.key === "Escape"){ document.bo
 const MS = {band: buildMS($("#ms-band"), "Banda/Artista", ALL_BANDS, "band"), album: buildMS($("#ms-album"), "Álbum", ALL_ALBUMS, "album")};
 
 function toggle(kind, v){
+  if (kind === "year"){   // clicar numa coluna da linha do tempo filtra as músicas daquele ano (clicar de novo tira; dá pra somar anos)
+    if (state.years.has(v)) state.years.delete(v); else state.years.add(v);
+    if (!rows().length){ state.years.delete(v); toast("Nenhuma faixa desse ano no recorte atual"); }
+    render(); return;
+  }
   if (kind === "genre"){
     if (state.genres.has(v)) state.genres.delete(v); else state.genres.add(v);
     if (!rows().length){ state.genres.delete(v); toast("Nenhuma faixa desse gênero no recorte atual"); }
@@ -220,10 +299,14 @@ function toggle(kind, v){
     const what = gone.length <= 2 ? gone.join(" e ") : `${gone.length} ${kind === "band" ? "álbuns" : "artistas"}`;
     toast(`${what} saí${gone.length > 1 ? "ram" : "u"} do filtro: sem faixas no novo recorte`);
   }
+  if (!rows().length && state.years.size){ state.years.clear(); toast("O filtro de ano saiu: sem faixas no novo recorte"); }
   if (!rows().length){ set.delete(v); toast(`Sem faixas de ${v} até a #${state.upTo} da máquina do tempo`); }
   render();
 }
-function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.upTo = null; tmSync(); render(); }
+function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.upTo = null; tmSync(); render(); }
+const activeFilters = () => state.bands.size + state.albums.size + state.genres.size + state.years.size;
+// "Limpar filtros" de cada card: tira banda, álbum, gênero e ano (a máquina do tempo tem o próprio botão de cancelar)
+function clearFilters(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); render(); }
 $("#clear").addEventListener("click", clearAll);
 $("#empty-clear").addEventListener("click", clearAll);
 
@@ -245,12 +328,12 @@ function renderFilters(){
     ms.foot.textContent = `${avail} de ${ms.els.size} disponíveis${set.size ? ` · ${set.size} selecionado${set.size > 1 ? "s" : ""}` : ""}`;
   }
   const chips = $("#chips");
-  const sig = [["band", state.bands], ["album", state.albums], ["genre", state.genres]].map(([k, s]) => k + ":" + [...s].join("")).join("|");
+  const sig = [["band", state.bands], ["album", state.albums], ["genre", state.genres], ["year", state.years]].map(([k, s]) => k + ":" + [...s].join("")).join("|");
   if (chips._sig !== sig){   // só reconstrói quando os filtros mudam: a cada quadro da máquina do tempo isso fazia os chips piscarem
     chips._sig = sig;
     const nodes = [];
-    for (const [kind, set, tag] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"], ["genre", state.genres, "Gênero"]]){
-      for (const v of set){
+    for (const [kind, set, tag] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"], ["genre", state.genres, "Gênero"], ["year", state.years, "Ano"]]){
+      for (const v of [...set].sort((a, b) => kind === "year" ? (a === NI ? 1 : b === NI ? -1 : a - b) : 0)){
         const c = document.createElement("button");
         c.className = "chip"; c.type = "button"; c.setAttribute("aria-label", `Remover ${v}`);
         c.innerHTML = `<b>${tag}</b><span>${esc(v)}</span><span class="x">×</span>`;
@@ -260,7 +343,9 @@ function renderFilters(){
     }
     chips.replaceChildren(...nodes, ROW_TIME);   // o chip do tempo é um elemento fixo: continua aqui, na linha de filtros
   }
-  $("#clear").classList.toggle("on", state.bands.size + state.albums.size + state.genres.size > 0 || state.upTo != null);
+  $("#clear").classList.toggle("on", activeFilters() > 0 || state.upTo != null);
+  const anyF = activeFilters() > 0;
+  document.querySelectorAll(".clr-btn").forEach(b => { b.hidden = !anyF; });
 }
 
 /* ---------------- text fitting (never break inside a word) ---------------- */
@@ -299,7 +384,7 @@ function modeOf(rows, key){
 function renderHeroTotal(R){
   const total = R.length, secs = sum(R, r => r.sec);
   tween($("#k-total"), total, v => fmtInt(Math.round(v)));
-  $("#k-total-sub").innerHTML = `<strong>${fmtLong(secs)}</strong> de música${state.bands.size + state.albums.size + (state.upTo != null ? 1 : 0) ? ` · ${pct(total, T.length)} do catálogo` : " em sequência"}`;
+  $("#k-total-sub").innerHTML = `<strong>${fmtLong(secs)}</strong> de música${state.bands.size + state.albums.size + state.years.size + (state.upTo != null ? 1 : 0) ? ` · ${pct(total, T.length)} do catálogo` : " em sequência"}`;
 }
 function renderKPIs(R){
   renderHeroTotal(R);
@@ -310,9 +395,10 @@ function renderKPIs(R){
   $("#k-art-sub").textContent = `em ${albs} álbu${albs === 1 ? "m" : "ns"}`;
   const timed = R.filter(r => r.sec > 0);
   tween($("#k-avg"), timed.length ? sum(timed, r => r.sec) / timed.length : 0, fmtDur);
-  const y = modeOf(R, "year");
-  tween($("#k-year"), y.best || 0, v => y.best ? String(Math.round(v)) : "—");
-  $("#k-year-sub").textContent = y.best ? `${y.max} faixa${y.max > 1 ? "s" : ""}${y.ties ? ` · empate com +${y.ties}` : ""}` : "";
+  // dado principal: ano médio de lançamento; a moda (ano com mais músicas) vira a informação secundária
+  const y = modeOf(R, "year"), dated = R.filter(r => r.year !== NI), avgY = dated.length ? Math.round(sum(dated, r => r.year) / dated.length) : 0;
+  tween($("#k-year"), avgY, v => avgY ? String(Math.round(v)) : "—");
+  $("#k-year-sub").innerHTML = y.best ? `Ano com mais músicas: <strong>${y.best}</strong> · ${y.max} faixa${y.max > 1 ? "s" : ""}${y.ties ? ` · empate com +${y.ties}` : ""}` : "";
   const a = modeOf(R, "artist");
   fitKpiText($("#k-top"), a.best || "—");
   $("#k-top-sub").textContent = a.best ? `${a.max} faixa${a.max > 1 ? "s" : ""} · ${pct(a.max, total)} do recorte${a.ties ? ` · empate com +${a.ties}` : ""}` : "";
@@ -370,7 +456,7 @@ const wave = $("#wave");
 const AVG_ALL = sum(T, t => t.sec) / T.length;
 function renderWave(R){
   const on = new Set(R);
-  const all = state.bands.size + state.albums.size === 0 && state.upTo == null;
+  const all = state.bands.size + state.albums.size + state.years.size === 0 && state.upTo == null;
   for (const t of T) t._w.classList.toggle("off", !all && !on.has(t));
 }
 
@@ -383,10 +469,15 @@ for (const y of ALL_YEARS){
   c.innerHTML = `<span class="v"></span><span class="b"></span><span class="y"></span>`;
   c.querySelector(".y").textContent = y === NI ? "n/i" : "’" + String(y).slice(2);
   bindTip(c, () => yearTip(y));
+  c.setAttribute("role", "button"); c.tabIndex = 0;
+  c.setAttribute("aria-label", y === NI ? "Filtrar as músicas de ano não identificado" : `Filtrar as músicas de ${y}`);
+  const pick = () => { if (!c.classList.contains("zero") || state.years.has(y)) toggle("year", y); };
+  c.addEventListener("click", pick);
+  c.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(); } });
   yearsEl.appendChild(c); YC.set(y, c);
 }
 function yearTip(y){
-  const R = rows().filter(r => r.year === y);
+  const R = rows(true, true, true, true, false).filter(r => r.year === y);
   if (!R.length) return `<div class="eyebrow">${y}</div><div class="t">Sem faixas neste recorte</div>`;
   const albs = [...groupBy(R, "album")].map(([a, rs]) => [a, rs.length, rs[0].artist]).sort((a, b) => b[1] - a[1] || coll.compare(a[0], b[0]));
   const top = albs.slice(0, 4);
@@ -407,6 +498,9 @@ function renderYears(R){
     const c = YC.get(y), n = counts[i];
     c.classList.toggle("zero", !n);
     c.classList.toggle("peak", n === peak && n > 0);
+    c.classList.toggle("sel", state.years.has(y));
+    c.classList.toggle("dim", state.years.size > 0 && !state.years.has(y));
+    c.setAttribute("aria-pressed", String(state.years.has(y)));
     c.querySelector(".v").textContent = n || "";
     c.querySelector(".b").style.height = n ? `${Math.max(3, (n / max) * H)}px` : "";
   });
@@ -429,6 +523,8 @@ function layoutYears(){
 /* ---------------- chart 2: treemap ---------------- */
 const treeEl = $("#tree");
 const TILES = new Map();
+let TREE_MODE = "artist";   // o gráfico de quadrados mostra bandas; com um ano (linha do tempo) ou uma banda (ranking, filtro, o próprio gráfico) escolhidos ele mostra álbuns ("album")
+const treeByAlbum = () => state.years.size > 0 || state.bands.size > 0;
 /* o squarify clássico decide linha por linha e às vezes estica um bloco grande pra poupar os pequenos.
    Aqui testamos todos os jeitos de montar as 3 primeiras linhas (1 a 6 blocos cada, o resto no clássico)
    e ficamos com o que deixa os MAIORES mais quadrados (peso = área²). 216 tentativas, ~3ms. */
@@ -579,10 +675,11 @@ function stableSquarify(items, W, H, now = false, progress = 1, final = null){
   return pick.L;
 }
 let TREE_FINAL = null, TREE_FINAL_KEY = "";
-function treeFinal(){   // quantas faixas cada banda tem no momento atual (sem a máquina do tempo), pra saber quem vai terminar grande
-  const key = T.length + "|" + [...state.albums].join(",");
+function treeFinal(){   // quantas faixas cada banda (ou álbum) tem no momento atual (sem a máquina do tempo), pra saber quem vai terminar grande
+  const byAlbum = treeByAlbum();
+  const key = T.length + "|" + byAlbum + "|" + [...state.albums].join(",") + "|" + [...state.bands].join(",") + "|" + [...state.years].join(",");
   if (TREE_FINAL && TREE_FINAL_KEY === key) return TREE_FINAL;
-  TREE_FINAL = new Map(); for (const [k, rs] of groupBy(rows(false, true, true, false), "artist")) TREE_FINAL.set(k, rs.length);
+  TREE_FINAL = new Map(); for (const [k, rs] of groupBy(byAlbum ? rows(true, false, true, false) : rows(false, true, true, false), byAlbum ? "album" : "artist")) TREE_FINAL.set(k, rs.length);
   TREE_FINAL_KEY = key; return TREE_FINAL;
 }
 function tileTip(b){
@@ -722,15 +819,27 @@ function topAlbumOf(rs){
 }
 
 function renderTree(){
-  const base = rows(false, true);
-  const g = groupBy(base, "artist");
+  const byAlbum = treeByAlbum(), keyName = byAlbum ? "album" : "artist";
+  let spawn = null;   // "leque": os álbuns da banda escolhida nascem de dentro do quadrado dela (vale pro clique no gráfico, no ranking ou no filtro)
+  if (TREE_MODE !== keyName){   // trocou de bandas para álbuns (ou o contrário): recomeça os quadrados, que mudam de chave e de clique
+    if (byAlbum && TREE_MODE === "artist" && state.bands.size){
+      const t = TILES.get([...state.bands].pop());
+      if (t && !t.classList.contains("leaving") && parseFloat(t.style.width) > 0) spawn = {l: t.style.left, t: t.style.top, w: t.style.width, h: t.style.height};
+    }
+    TREE_MODE = keyName;
+    for (const el of TILES.values()){ clearTimeout(el._rm); el.remove(); }
+    TILES.clear(); TREE_STRUCT = null; TREE_PREV = null; TREE_FINAL = null;
+  }
+  const ttl = $("#tree-title"); if (ttl) ttl.textContent = byAlbum ? "Músicas por álbum" : "Músicas por banda/artista";
+  const base = byAlbum ? rows(true, false) : rows(false, true);   // o filtro do próprio tipo de quadrado não esconde os outros quadrados
+  const g = groupBy(base, keyName);
   const items = [...g].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
   const W = treeEl.clientWidth, H = treeEl.clientHeight;
   const laid = stableSquarify(items, W, H, state.upTo == null && !tmBusy, state.upTo == null ? 1 : state.upTo / TM_N, state.upTo == null ? null : treeFinal());
   treeEl.classList.toggle("flow", tmBusy || !!tileHold);
   if (tmBusy) treeEl.style.setProperty("--tile-dur", tileDur().toFixed(2) + "s"); else if (!tileHold) treeEl.style.removeProperty("--tile-dur");   // tocando a máquina do tempo: movimento mais curto e contínuo
   const max = items.length ? items[0].value : 1;
-  const hasSel = state.bands.size > 0;
+  const selSet = byAlbum ? state.albums : state.bands, hasSel = selSet.size > 0;
   const seen = new Set();
   /* a fonte acompanha o tamanho do quadrado (quadrado pequeno = letra pequena, até 7px) e a margem interna também
      encolhe; vale a maior fonte em que o nome inteiro cabe numa linha (0 = só a capa) */
@@ -777,17 +886,18 @@ function renderTree(){
       el = document.createElement("div"); el.className = "tile";
       el.innerHTML = `<i class="cov"></i><div class="lbl"><strong></strong><span></span></div>`;
       el.querySelector("strong").textContent = d.k;
-      el.addEventListener("click", () => { if (!treeEl.closest(".tree-big")) toggle("band", d.k); });   // em tela cheia é só pra ver
-      bindTip(el, () => tileTip(d.k));
+      el.addEventListener("click", () => { if (!treeEl.closest(".tree-big")) toggle(byAlbum ? "album" : "band", d.k); });   // em tela cheia é só pra ver
+      bindTip(el, () => byAlbum ? albumTip(d.k) : tileTip(d.k));
       el.style.opacity = "0";
       // blocos novos nascem pequenininhos no canto de baixo à direita do gráfico e crescem até o lugar deles
-      el.style.left = W + "px"; el.style.top = H + "px"; el.style.width = "0px"; el.style.height = "0px";
+      if (spawn){ el.style.left = spawn.l; el.style.top = spawn.t; el.style.width = spawn.w; el.style.height = spawn.h; }
+      else { el.style.left = W + "px"; el.style.top = H + "px"; el.style.width = "0px"; el.style.height = "0px"; }
       treeEl.appendChild(el); TILES.set(d.k, el);
     }
     el.classList.remove("leaving"); clearTimeout(el._rm);   // voltou antes de sumir de vez
     const g2 = treeEl.classList.contains("flush") ? 0 : 2, x = d.x + g2, y = d.y + g2, w = Math.max(0, d.w - 2 * g2), h = Math.max(0, d.h - 2 * g2);
     const k = Math.sqrt(d.value / max);
-    const sel = state.bands.has(d.k);
+    const sel = selSet.has(d.k);
     el.classList.toggle("sel", sel);
     el.classList.toggle("dim", hasSel && !sel);
     el.style.background = sel ? "linear-gradient(150deg,rgba(209,250,229,.4),rgba(52,211,153,.3))" :
@@ -795,10 +905,11 @@ function renderTree(){
     const lbl = el.querySelector(".lbl");
     lbl.style.color = sel ? "#ECFDF5" : "#ECFDF5";
     el.querySelector("span").textContent = d.value;
-    const album = topAlbumOf(g.get(d.k));
-    const covKey = album ? d.k + "|" + album : "";
+    const album = byAlbum ? (d.k === NI ? null : d.k) : topAlbumOf(g.get(d.k));
+    const coverBand = byAlbum ? modeOf(g.get(d.k), "artist").best : d.k;   // álbum: a capa vem da banda que mais aparece nele
+    const covKey = album && coverBand ? coverBand + "|" + album : "";
     if (el.dataset.cov !== covKey){ el.dataset.cov = covKey; el.classList.remove("hascov"); }
-    if (album) getCover(d.k, album, url => {
+    if (covKey) getCover(coverBand, album, url => {
       if (el.dataset.cov !== covKey || !url) return;
       el.querySelector(".cov").style.backgroundImage = `url("${url}")`;
       el.classList.add("hascov");
@@ -968,13 +1079,25 @@ function albumTip(a){
     <div class="eyebrow">Faixa mais longa</div>
     <div class="k"><span style="color:var(--ink)">${esc(longest.title)}</span><b>${fmtDur(longest.sec)}</b></div>`;
 }
+/* card de álbuns com duas visões ("abas"): por quantidade de faixas (padrão) ou pelo tempo total somado (como era antes) */
+const ALB_KEY = "catalogo-musical:albums-mode";
+let albMode = (() => { try { return localStorage.getItem(ALB_KEY) === "duracao" ? "duracao" : "faixas"; } catch (e) { return "faixas"; } })();
 function renderAlbums(){
-  const g = groupBy(rows(true, false), "album");
-  const items = [...g].map(([k, rs]) => ({k, value: sum(rs, r => r.sec), n: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
+  const g = groupBy(rows(true, false), "album"), byDur = albMode === "duracao";
+  const items = [...g].map(([k, rs]) => ({k, value: byDur ? sum(rs, r => r.sec) : rs.length, n: rs.length, sec: sum(rs, r => r.sec)}))
+    .sort((a, b) => b.value - a.value || (byDur ? b.n - a.n : b.sec - a.sec) || coll.compare(a.k, b.k));
   renderList($("#albums"), items, {kind: "album", selected: state.albums, tip: albumTip, scrollToSel: true,
-    label: d => `${fmtDur(d.value)}<small>${d.n} faixa${d.n > 1 ? "s" : ""}</small>`});
-  $("#alb-hint").textContent = state.bands.size ? `${items.length} álbu${items.length > 1 ? "ns" : "m"} no recorte · clique para filtrar` : `${items.length} álbuns · clique para filtrar`;
+    label: d => byDur ? `${fmtDur(d.sec)}<small>${d.n} faixa${d.n > 1 ? "s" : ""}</small>` : `${d.n}<small>${fmtDur(d.sec)}</small>`});
+  $("#alb-title").textContent = byDur ? "Duração por álbum" : "Músicas por álbum";
+  const what = byDur ? "Tempo total somado das faixas" : "Quantidade de faixas de cada álbum";
+  $("#alb-hint").textContent = `${what} · ` + (state.bands.size ? `${items.length} álbu${items.length > 1 ? "ns" : "m"} no recorte` : `${items.length} álbuns`) + " · clique para filtrar";
+  $("#alb-mode").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === albMode)));
 }
+$("#alb-mode").addEventListener("click", e => {
+  const b = e.target.closest("button[data-m]"); if (!b || b.dataset.m === albMode) return;
+  albMode = b.dataset.m; try { localStorage.setItem(ALB_KEY, albMode); } catch (err) {}
+  cardRender("albums");
+});
 function rankTip(b){
   const base = rows(false, true);
   const g = [...groupBy(base, "artist")].map(([k, rs]) => [k, rs.length]).sort((x, y) => y[1] - x[1] || coll.compare(x[0], y[0]));
@@ -1096,7 +1219,7 @@ $("#filtered-list-card thead tr").innerHTML = songHead();
 let flSortK = "n", flSortDir = 1;
 function renderFilteredList(R){
   const card = $("#filtered-list-card");
-  const active = state.bands.size + state.albums.size + state.genres.size > 0;
+  const active = state.bands.size + state.albums.size + state.genres.size + state.years.size > 0;
   card.style.display = active ? "" : "none";
   if (!active) return;
   const list = [...R].sort(cmpSong(flSortK, flSortDir));
@@ -1119,7 +1242,7 @@ function render(){
   renderKPIs(R);
   for (const k of ["wave", "years", "tree", "albums", "rank", "genres", "profile"]) cardRender(k);   // cada card com o seu tempo (animação por card)
   // o gráfico de evolução compara bandas/gêneros entre si: com banda, álbum ou gênero filtrado ele não faz sentido, então some (a máquina do tempo não esconde)
-  const evoOff = state.bands.size + state.albums.size + state.genres.size > 0;
+  const evoOff = state.bands.size + state.albums.size + state.genres.size + state.years.size > 0;
   $("#evo-card").style.display = evoOff ? "none" : "";
   if (!evoOff) cardRender("evo");
   renderFilteredList(R);
@@ -1145,9 +1268,12 @@ function tmSync(){
   const want = tm.playing ? "pause" : "play";
   if (tm._icon !== want){
     tm._icon = want;
-    $("#tm-play").innerHTML = TM_ICON[want];
-    $("#tm-play").setAttribute("aria-label", tm.playing ? "Pausar" : "Reproduzir a playlist crescendo");
+    for (const id of ["#tm-play", "#tb-play"]){   // o do cabeçalho (barra fixa) é o mesmo botão, só que sempre à mão quando a tela desce
+      $(id).innerHTML = TM_ICON[want];
+      $(id).setAttribute("aria-label", tm.playing ? "Pausar" : "Reproduzir a playlist crescendo");
+    }
   }
+  tbPlayVis();
 }
 /* animação POR CARD: cada gráfico tem o seu "Animar" e só ele roda a playlist crescendo (os outros cards ficam como estão).
    O botão da máquina do tempo (barra de cima) anima TODOS os cards. Estados do card: parado ("Animar") → tocando ("Pausar") →
@@ -1155,7 +1281,7 @@ function tmSync(){
    Pra desenhar um card com o tempo dele, trocamos state.upTo só durante o desenho dele (rows() já respeita isso). */
 const CARD_DEF = {
   wave: () => { const R = rows(); renderHeroTotal(R); renderWave(R); },
-  years: () => renderYears(rows()), tree: () => renderTree(), albums: () => renderAlbums(), rank: () => renderRank(),
+  years: () => renderYears(rows(true, true, true, true, false)), tree: () => renderTree(), albums: () => renderAlbums(), rank: () => renderRank(),
   genres: () => renderGenres(), profile: () => renderProfile(rows()), evo: () => renderEvolution(rows())
 };
 const CARDS = {};
@@ -1197,12 +1323,19 @@ function toolbarChip(){
 /* VELOCIDADE UNIVERSAL: a da barra de cima, a de cada card e a da tela cheia são a mesma (tm.speed); mexer em uma muda todas */
 const SPEEDS = [0.125, 0.25, 0.5, 1, 2, 4], SPEED_SEGS = [];
 const speedTxt = s => (s === 0.125 ? "0,12" : String(s).replace(".", ",")) + "x";   // 0,125x aparece como "0,12x" (o valor continua 0,125)
-function syncSpeedSegs(){ for (const seg of SPEED_SEGS) seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.s === tm.speed)); }
+function syncSpeedSegs(){
+  for (const seg of SPEED_SEGS){
+    seg.querySelectorAll("button[data-s]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.s === tm.speed));
+    const t = seg.querySelector(".spd-txt"); if (t) t.textContent = speedTxt(tm.speed);
+  }
+}
 function setSpeed(v){ tm.speed = v; syncSpeedSegs(); }
+/* velocidade nos cards: um botão (mesmo tamanho dos outros) que mostra a velocidade atual e abre um mini menu com as opções */
 function makeSpeedSeg(){
-  const seg = document.createElement("span"); seg.className = "seg card-speed"; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Velocidade da animação (vale para o site todo)");
-  seg.innerHTML = SPEEDS.map(s => `<button type="button" data-s="${s}" aria-pressed="${s === tm.speed}">${speedTxt(s)}</button>`).join("");
-  seg.addEventListener("click", e => { const b = e.target.closest("button"); if (b) setSpeed(+b.dataset.s); });
+  const seg = document.createElement("span"); seg.className = "sty spd"; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Velocidade da animação (vale para o site todo)");
+  seg.innerHTML = `<button class="gbtn sty-btn spd-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Velocidade da animação (vale para o site todo)"><span class="spd-txt">${speedTxt(tm.speed)}</span><svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="sty-pop spd-pop">${SPEEDS.map(s => `<button type="button" data-s="${s}" aria-pressed="${s === tm.speed}">${speedTxt(s)}</button>`).join("")}</div>`;
+  seg.addEventListener("click", e => { const b = e.target.closest(".spd-pop button"); if (b){ setSpeed(+b.dataset.s); closeStyle(); } });
   SPEED_SEGS.push(seg);
   return seg;
 }
@@ -1279,6 +1412,16 @@ function cardToolsHost(host){
   if (!tools){ tools = document.createElement("div"); tools.className = "card-tools"; host.appendChild(tools); }
   return tools;
 }
+(function addClearButtons(){
+  for (const art of document.querySelectorAll("article.chart:not(#filtered-list-card):not(#evo-card)")){
+    const h = art.querySelector(":scope > header"); if (!h) continue;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "gbtn clr-btn"; b.hidden = true; b.textContent = "Limpar filtros";
+    b.title = "Tirar os filtros de banda, álbum, gênero e ano";
+    b.addEventListener("click", clearFilters);
+    cardToolsHost(h).appendChild(b);
+  }
+})();
 (function addCardButtons(){
   if (TM_N < 2 || TM_REDUCE) return;
   const nameOf = art => art.id === "evo-card" ? "evo" : art.querySelector("#years") ? "years" : art.querySelector("#tree") ? "tree" : art.querySelector("#albums") ? "albums"
@@ -1314,8 +1457,19 @@ function timeChip(){
   hdr.style.display = showHdr ? "" : "none";
   if (showHdr && hdr._html !== html){ hdr._html = html; hdr.innerHTML = html; }
 }
-addEventListener("scroll", () => { if (state.upTo != null) requestAnimationFrame(timeChip); }, {passive: true});
-addEventListener("resize", () => { if (state.upTo != null) timeChip(); });
+addEventListener("scroll", () => { if (state.upTo != null) requestAnimationFrame(timeChip); requestAnimationFrame(tbPlayVis); }, {passive: true});
+addEventListener("resize", () => { if (state.upTo != null) timeChip(); tbPlayVis(); });
+/* botão de tocar/pausar da máquina do tempo no cabeçalho: aparece quando a barra da máquina do tempo saiu de vista (tela desceu) e só no Painel */
+function tbPlayVis(){
+  const b = $("#tb-play"), box = $("#tm"); if (!b || !box) return;
+  let show = false;
+  if (!box.hidden && !TM_REDUCE && TM_N >= 2 && $("#painel").classList.contains("on")){
+    const r = box.getBoundingClientRect(), tb = document.querySelector(".toolbar");
+    const lim = innerWidth >= 900 && tb ? tb.getBoundingClientRect().bottom : 0;
+    show = r.bottom <= lim + 2 || r.top >= innerHeight;
+  }
+  b.style.display = show ? "" : "none";
+}
 // cancela a animação (se estiver tocando) e volta o painel direto pro final, com o ajuste lento do layout
 function tmCancel(){
   tm.paused = false; tm.playing = false; cancelAnimationFrame(tm.raf);
@@ -1373,6 +1527,9 @@ function tmPlay(){
   r.max = TM_N;
   if (TM_REDUCE){ $("#tm-play").style.display = "none"; $("#tm-speed").style.display = "none"; }
   $("#tm-play").addEventListener("click", tmPlay);
+  $("#tb-play").addEventListener("click", tmPlay);
+  document.querySelector("nav.tabs").addEventListener("click", () => setTimeout(tbPlayVis, 80));
+  tbPlayVis();
   $("#tm-now").addEventListener("click", () => { tmStop(); tmGo(TM_N); });
   $("#tm-speed").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setSpeed(+b.dataset.s); });
   SPEED_SEGS.push($("#tm-speed"));
@@ -2270,7 +2427,7 @@ const ICON = {
 const pad2 = n => String(n).padStart(2, "0");
 const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
-const currentRows = () => BY_PLAYLIST.map(t => { const r = [t.n, t.title, t.artist === NI ? "" : t.artist, t.album === NI ? "" : t.album, t.sec, t.date]; if (t.m) r.push(t.m); return r; });
+const currentRows = () => BY_PLAYLIST.map(t => { const r = [t.n, t.title, t.artist === NI ? "" : t.artist, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.date]; if (t.m) r.push(t.m); return r; });
 
 /* ---------- modal system ---------- */
 const modalStack = [];
@@ -3417,7 +3574,7 @@ const ownKey = (title, artist) => (title || "").trim().toLowerCase() + "|" + (sp
 // faixas que já estão na playlist e carregam o próprio ID, no mesmo formato do cache de faixas
 function ownTracksById(){
   const o = {};
-  for (const t of BY_PLAYLIST) if (t.m && t.m.id) o[t.m.id] = {title: t.title, artist: t.artist === NI ? "" : t.artist, album: t.album === NI ? "" : t.album, sec: t.sec, date: t.date, meta: t.m};
+  for (const t of BY_PLAYLIST) if (t.m && t.m.id) o[t.m.id] = {title: t.title, artist: t.artist === NI ? "" : t.artist, album: t.albumRaw === NI ? "" : t.albumRaw, sec: t.sec, date: t.date, meta: t.m};
   return o;
 }
 /* id → música da playlist. 1º pelo ID guardado na música (meta.id); 2º, pras antigas sem ID, pelo cache de faixas
@@ -3440,7 +3597,7 @@ function matchLinkIds(ids){
 function rowOf(t, n, id, cache){
   const c = id && cache[id], base = {...(c && c.meta || {}), ...(t.m || {})};
   const m = id && Object.keys(base).length ? {...base, id} : t.m;
-  const r = [n, t.title, t.artist === NI ? "" : t.artist, t.album === NI ? "" : t.album, t.sec, t.date];
+  const r = [n, t.title, t.artist === NI ? "" : t.artist, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.date];
   if (m) r.push(m);
   return r;
 }
@@ -3615,7 +3772,7 @@ function exportTxt(){
 }
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 const crc32 = u8 => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-function zipStore(files){
+function zipStore(files, type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"){
   const enc = new TextEncoder(), parts = [], central = []; let off = 0;
   for (const f of files){
     const name = enc.encode(f.name), data = typeof f.data === "string" ? enc.encode(f.data) : f.data, crc = crc32(data);
@@ -3633,7 +3790,7 @@ function zipStore(files){
   const csize = central.reduce((s, p) => s + p.length, 0);
   const e = new DataView(new ArrayBuffer(22));
   e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
-  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], {type});
 }
 function exportXlsx(){
   const x = s => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
@@ -3692,17 +3849,39 @@ function similarTitles(){
   const by = (a, b) => b.rs.length - a.rs.length || coll.compare(a.title, b.title);
   return {dups: dups.sort(by), covers: covers.sort(by), ignored: ignored.sort(by)};
 }
-const syncDupsBtn = () => { const s = similarTitles(); $("#dt-dups").hidden = !s.dups.length && !s.covers.length && !s.ignored.length; };
+const syncDupsBtn = () => { const s = similarTitles(), a = ALBUM_INFO; $("#dt-dups").hidden = !s.dups.length && !s.covers.length && !s.ignored.length && !a.groups.length && !a.doubts.length && !a.rejected.length; };
 function openDups(){
   let sim = similarTitles();
   let tab = sim.dups.length || !sim.covers.length ? "dups" : "covers";
   if (tab === "covers" && !sim.covers.length) tab = "ignored";
   const body = document.createElement("div");
-  const seg = `<div class="seg" role="group" aria-label="Tipo"><button type="button" data-t="dups"></button><button type="button" data-t="covers"></button><button type="button" data-t="ignored"></button></div>`;
-  const md = openModal({title: "Duplicadas e covers", sub: "Títulos iguais ou parecidos (ignorando remaster, live, remix…)", body, headerExtra: seg, size: "lg"});
+  let kind = "songs", ai = analyzeAlbums(RAW), atab = ai.doubts.length ? "doubt" : "auto", albChanged = false;
+  const seg = `<div class="seg" role="group" aria-label="O que comparar" data-g="kind"><button type="button" data-k="songs">Músicas</button><button type="button" data-k="albums"></button></div>
+    <div class="seg" role="group" aria-label="Tipo" data-g="tab"><button type="button" data-t="dups"></button><button type="button" data-t="covers"></button><button type="button" data-t="ignored"></button></div>`;
+  const md = openModal({title: "Duplicadas e covers", sub: "Títulos iguais ou parecidos (ignorando remaster, live, remix…) e álbuns que são o mesmo", body, headerExtra: seg, size: "lg",
+    onClose: () => { if (albChanged){ setFlash("Álbuns atualizados: a junção das edições já vale no painel."); location.reload(); } }});
+  const albRow = (x, btns) => `<div class="alb-row"><div class="alb-main">${x}</div><div class="alb-btns">${btns}</div></div>`;
+  const chips = vs => vs.map(v => `<span class="alb-chip">${esc(v.name)} <em>${faixas(v.count)}</em></span>`).join("");
+  const drawAlbums = () => {
+    const lab = {auto: `Unificados (${ai.groups.length})`, doubt: `Em dúvida (${ai.doubts.length})`, sep: `Separados por você (${ai.rejected.length})`}, keys = ["auto", "doubt", "sep"];
+    md.m.querySelectorAll('.seg[data-g="tab"] button').forEach((b, i) => { b.dataset.t = keys[i]; b.textContent = lab[keys[i]]; b.setAttribute("aria-pressed", keys[i] === atab); });
+    const desc = {
+      auto: "Álbuns que o site juntou sozinho: mesmo artista e mesmo nome, mudando só a edição (remaster, deluxe, bonus…). O nome que fica é o <strong>mais curto</strong>. Se algum não for o mesmo álbum, clique em <strong>Não é o mesmo</strong>.",
+      doubt: "Parecem ser o mesmo álbum, mas o site não tem certeza. <strong>É o mesmo</strong> junta no painel; <strong>São diferentes</strong> mantém separados e não pergunta de novo.",
+      sep: "Pares que você disse serem álbuns diferentes. <strong>Desfazer</strong> volta a pergunta (ou a junção automática)."
+    }[atab];
+    const pair = e => `<strong>${esc(e.a)}</strong> <em>${faixas(e.ca)}</em> <span class="alb-x">×</span> <strong>${esc(e.b)}</strong> <em>${faixas(e.cb)}</em> <span class="alb-art">${esc(e.artName || "")}</span>`;
+    let html = `<p class="mdesc">${desc}</p>`;
+    if (atab === "auto") html += ai.groups.length ? ai.groups.map(g => albRow(`<div><strong>${esc(g.canon)}</strong> <span class="alb-art">${esc(g.artName || "")}${g.confirmed ? " · confirmado por você" : ""}</span></div><div class="alb-vars">${chips(g.variants)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-split" data-id="${esc(g.ids.join("§"))}">Não é o mesmo</button>`)).join("") : `<p class="mdesc">Nenhum álbum foi juntado.</p>`;
+    else if (atab === "doubt") html += ai.doubts.length ? ai.doubts.map(e => albRow(`<div>${pair(e)}</div><div class="alb-why">${esc(e.rel.why)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-yes" data-id="${esc(e.id)}">É o mesmo</button><button class="gbtn dup-act" type="button" data-a="alb-no" data-id="${esc(e.id)}">São diferentes</button>`)).join("") : `<p class="mdesc">Nenhuma dúvida: o site não encontrou álbuns parecidos para perguntar.</p>`;
+    else html += ai.rejected.length ? ai.rejected.map(e => albRow(`<div>${pair(e)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-undo" data-id="${esc(e.id)}">Desfazer</button>`)).join("") : `<p class="mdesc">Você ainda não separou nenhum par.</p>`;
+    body.innerHTML = html;
+  };
   const draw = () => {
+    md.m.querySelectorAll('.seg[data-g="kind"] button').forEach(b => { if (b.dataset.k === "albums") b.textContent = `Álbuns (${ai.groups.length + ai.doubts.length})`; b.setAttribute("aria-pressed", b.dataset.k === kind); });
+    if (kind === "albums"){ drawAlbums(); return; }
     const lab = {dups: `Duplicadas (${sim.dups.length})`, covers: `Covers (${sim.covers.length})`, ignored: `Ignoradas (${sim.ignored.length})`};
-    md.m.querySelectorAll(".seg button").forEach(b => { b.textContent = lab[b.dataset.t]; b.setAttribute("aria-pressed", b.dataset.t === tab); });
+    md.m.querySelectorAll('.seg[data-g="tab"] button').forEach((b, i) => { b.dataset.t = ["dups", "covers", "ignored"][i]; b.textContent = lab[b.dataset.t]; b.setAttribute("aria-pressed", b.dataset.t === tab); });
     const list = sim[tab];
     const desc = {
       dups: "Mesmo título e mesmo artista principal: provavelmente a mesma música adicionada duas vezes (ou em versões diferentes). Para apagar, use o botão <strong>Músicas</strong>. Se não for repetida de verdade, clique em <strong>Não é repetida</strong>.",
@@ -3734,6 +3913,15 @@ function openDups(){
   }
   body.addEventListener("click", async e => {
     const b = e.target.closest(".dup-act"); if (!b) return;
+    if (b.dataset.a.startsWith("alb-")){
+      const ids = b.dataset.id.split("§");
+      if (b.dataset.a === "alb-yes") ALBMERGE[ids[0]] = "sim";
+      else if (b.dataset.a === "alb-no" || b.dataset.a === "alb-split") ids.forEach(id => { ALBMERGE[id] = "nao"; });
+      else ids.forEach(id => { delete ALBMERGE[id]; });
+      saveAlbMerge(); ai = analyzeAlbums(RAW); albChanged = true; syncDupsBtn(); draw();
+      toast(b.dataset.a === "alb-yes" ? "Álbuns juntados. O painel atualiza quando você fechar esta tela." : b.dataset.a === "alb-undo" ? "Voltou para as listas." : "Mantidos como álbuns diferentes. O painel atualiza quando você fechar esta tela.");
+      return;
+    }
     if (b.dataset.a === "ign"){
       const item = [...sim.dups, ...sim.covers].find(x => x.id === b.dataset.id);
       if (!item || !(await confirmIgnore(item))) return;
@@ -3742,7 +3930,9 @@ function openDups(){
     saveDupIgn(); sim = similarTitles(); syncDupsBtn(); draw();
     toast(b.dataset.a === "ign" ? "Marcado. Ele foi para \"Ignoradas\" (a análise de covers atualiza ao recarregar a página)." : "Voltou para as listas.");
   });
-  md.m.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.t; draw(); }));
+  md.m.querySelectorAll('.seg[data-g="tab"] button').forEach(b => b.addEventListener("click", () => { if (kind === "albums") atab = b.dataset.t; else tab = b.dataset.t; draw(); }));
+  md.m.querySelectorAll('.seg[data-g="kind"] button').forEach(b => b.addEventListener("click", () => { kind = b.dataset.k; draw(); }));
+  if (!sim.dups.length && !sim.covers.length && !sim.ignored.length && (ai.groups.length || ai.doubts.length || ai.rejected.length)) kind = "albums";
   draw();
 }
 
@@ -3755,6 +3945,8 @@ $("#dt-import").addEventListener("click", () => openImport());
 $("#dt-dups").innerHTML = `${ICON.list}<span>Duplicadas e covers</span>`;
 $("#dt-dups").addEventListener("click", openDups);
 syncDupsBtn();
+// dúvidas de álbum: avisa uma vez por sessão que dá pra decidir na tela de duplicadas
+if (ALBUM_INFO.doubts.length){ try { if (!sessionStorage.getItem("catalogo-musical:alb-doubt-toast")){ sessionStorage.setItem("catalogo-musical:alb-doubt-toast", "1"); setTimeout(() => toast(`${ALBUM_INFO.doubts.length} álbum${ALBUM_INFO.doubts.length > 1 ? "ns podem" : " pode"} ser o mesmo que outro: veja em Duplicadas e covers › Álbuns.`), 1800); } } catch (e) {} }
 $("#dt-export").addEventListener("click", openExport);
 $("#dt-update").innerHTML = `${ICON.sync}<span>Atualizar dados</span>`;
 $("#dt-update").addEventListener("click", openDataUpdate);

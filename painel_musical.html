@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=1.4.0">
-<link rel="stylesheet" href="css/scrollfx.css?v=1.4.0">
+<link rel="stylesheet" href="css/style.css?v=1.5.0">
+<link rel="stylesheet" href="css/scrollfx.css?v=1.5.0">
 </head>
 <body data-fx="dashboard">
 <div class="wrap">
@@ -30,11 +30,12 @@
       <button role="tab" id="tab-painel" aria-selected="true" aria-controls="painel">Painel</button>
       <button role="tab" id="tab-insights" aria-selected="false" aria-controls="insights">Insights</button>
     </nav>
-    <div class="tb-chips"><button class="chip tb-chip" id="tb-time" type="button" style="display:none" title="Voltar o painel para a playlist inteira"></button><button class="chip tb-chip" id="tb-anim" type="button" style="display:none" title="Voltar este gráfico para a playlist inteira"></button></div>
+    <div class="tb-chips"><button class="tm-play tb-play" id="tb-play" type="button" style="display:none" aria-label="Reproduzir a playlist crescendo" title="Máquina do tempo: tocar / pausar"></button><button class="chip tb-chip" id="tb-time" type="button" style="display:none" title="Voltar o painel para a playlist inteira"></button><button class="chip tb-chip" id="tb-anim" type="button" style="display:none" title="Voltar este gráfico para a playlist inteira"></button></div>
     <div class="dtools">
       <button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button>
       <button class="dbtn" id="dt-dups" type="button" title="Ver músicas duplicadas e covers (mesmo título, artistas diferentes)"></button>
       <button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button>
+      <button class="dbtn" id="dt-cards" type="button" title="Gerar imagens prontas para compartilhar com os destaques da playlist"></button>
       <button class="dbtn" id="dt-export" type="button" title="Baixar a lista em Excel ou texto"></button>
       <button class="dbtn" id="dt-update" type="button" title="Buscar no Spotify os dados que faltam (gênero, explícita, popularidade…)"></button>
     </div>
@@ -83,22 +84,22 @@
         <div class="minis">
           <article class="card kpi rise" style="--d:3"><div class="eyebrow">Artistas únicos</div><div class="val" id="k-art">0</div><div class="foot"><span class="dot"></span><span id="k-art-sub"></span></div></article>
           <article class="card kpi rise" style="--d:4"><div class="eyebrow">Duração média</div><div class="val" id="k-avg">00:00</div><div class="foot"><span class="dot"></span><span id="k-avg-sub">min:seg por faixa</span></div></article>
-          <article class="card kpi rise" style="--d:5"><div class="eyebrow">Ano com mais lançamentos</div><div class="val" id="k-year">—</div><div class="foot"><span class="dot"></span><span id="k-year-sub"></span></div></article>
+          <article class="card kpi rise" style="--d:5"><div class="eyebrow">Ano médio de lançamento</div><div class="val" id="k-year">—</div><div class="foot"><span class="dot"></span><span id="k-year-sub"></span></div></article>
           <article class="card kpi rise" style="--d:6"><div class="eyebrow">Banda/artista com mais faixas</div><div class="val txt" id="k-top">—</div><div class="foot"><span class="dot"></span><span id="k-top-sub"></span></div></article>
         </div>
       </div>
 
       <div class="grid">
         <article class="card chart rise" style="--d:7">
-          <header><div><div class="eyebrow">01 · Linha do tempo</div><h2>Músicas por ano de lançamento</h2></div><div class="hint">Passe o mouse para ver os álbuns de cada ano</div></header>
+          <header><div><div class="eyebrow">01 · Linha do tempo</div><h2>Músicas por ano de lançamento</h2></div><div class="hint">Passe o mouse para ver os álbuns de cada ano · clique para filtrar</div></header>
           <div class="body"><div class="years" id="years"></div></div>
         </article>
         <article class="card chart rise" style="--d:8">
-          <header><div><div class="eyebrow">02 · Participação</div><h2>Músicas por banda/artista</h2></div><button class="gbtn tree-exp" id="tree-expand" type="button" title="Ver o gráfico em tela cheia"><svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>Tela cheia</button><div class="hint hint-btn"><span class="tree-tools"><span id="tree-style-slot"></span></span></div></header>
+          <header><div><div class="eyebrow">02 · Participação</div><h2 id="tree-title">Músicas por banda/artista</h2></div><button class="gbtn tree-exp" id="tree-expand" type="button" title="Ver o gráfico em tela cheia"><svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>Tela cheia</button><div class="hint hint-btn"><span class="tree-tools"><span id="tree-style-slot"></span></span></div></header>
           <div class="body"><div class="tree" id="tree"></div></div>
         </article>
         <article class="card chart rise" style="--d:9">
-          <header><div><div class="eyebrow">03 · Repertório</div><h2>Duração por álbum</h2></div><div class="hint" id="alb-hint">Tempo total somado das faixas · clique para filtrar</div></header>
+          <header><div><div class="eyebrow">03 · Repertório</div><h2 id="alb-title">Músicas por álbum</h2></div><div class="hint" id="alb-hint"></div><div class="card-tools"><span class="seg alb-mode" id="alb-mode" role="group" aria-label="Ordenar os álbuns por"><button type="button" data-m="faixas" aria-pressed="true">Faixas</button><button type="button" data-m="duracao" aria-pressed="false">Duração</button></span></div></header>
           <div class="body"><div class="list albums" id="albums"></div></div>
         </article>
         <article class="card chart rise" style="--d:10">
@@ -177,7 +178,8 @@
 <div class="tip" id="tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/script.js?v=1.4.0"></script>
-<script src="js/scrollfx.js?v=1.4.0"></script>
+<script src="js/script.js?v=1.5.0"></script>
+<script src="js/cartoes.js?v=1.5.0"></script>
+<script src="js/scrollfx.js?v=1.5.0"></script>
 </body>
 </html>

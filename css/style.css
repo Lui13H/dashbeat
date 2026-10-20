@@ -144,6 +144,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 .kpi .val{font-family:var(--display);font-weight:600;font-size:clamp(30px,3.1vw,44px);line-height:1.05;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink)}
 .kpi .val.txt{word-break:normal;overflow-wrap:normal}
 .kpi .foot{color:var(--ink-3);font-size:12.5px;display:flex;align-items:center;gap:8px}
+.kpi .foot strong{color:var(--ink);font-weight:700}
 .kpi .dot{width:6px;height:6px;border-radius:50%;background:var(--emerald);box-shadow:0 0 10px var(--emerald)}
 
 /* ---------- charts ---------- */
@@ -156,7 +157,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 
 /* years */
 .years{position:absolute;inset:0;display:flex;align-items:flex-end;gap:2px;padding-top:22px}
-.yc{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;cursor:default}
+.yc{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;cursor:pointer;outline:none}
 .yc .v{font:600 9.5px var(--body);color:var(--ink-2);margin-bottom:5px;font-variant-numeric:tabular-nums;transition:opacity .4s}
 .yc .b{width:100%;max-width:22px;border-radius:5px 5px 2px 2px;height:0;transition:height .8s var(--ease), background .4s, box-shadow .4s;
   background:linear-gradient(180deg,var(--mint),var(--emerald-d));box-shadow:0 0 0 rgba(0,0,0,0)}
@@ -166,6 +167,11 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 .yc:hover .b{background:linear-gradient(180deg,#F0FDF7,var(--mint));box-shadow:0 0 24px rgba(110,231,183,.45)}
 .yc:hover .y{color:var(--ink)}
 .yc.peak .v{color:var(--glow)}
+.yc.sel .b{background:linear-gradient(180deg,#F0FDF7,var(--mint));box-shadow:0 0 24px rgba(110,231,183,.45)}
+.yc.sel .v,.yc.sel .y{color:var(--glow)}
+.yc.dim .b{opacity:.32}
+.yc.dim .v{opacity:.5}
+.yc:focus-visible .b{box-shadow:0 0 0 2px var(--mint)}
 .years.tight .yc .v{opacity:0}
 .years.tight .yc.peak .v{opacity:1}
 
@@ -178,27 +184,28 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 /* os botões de animação são filhos diretos da fileira de controles do card (display:contents), então quebram de linha como qualquer outro botão */
 .anim-grp{display:contents}
 .anim-chip{color:var(--glow)}
-.card-speed{margin-bottom:0;order:1}
-.card-speed button{padding:0 9px;height:30px;font-size:12px;line-height:1}
 /* botões da fileira de controles (Animar/Pausar/Retomar, Cancelar, chip, Estilo, Tela cheia) com a mesma altura do seletor de velocidade */
-.card-speed,.anim-btn,.sty-btn,.tree-exp{box-sizing:border-box;height:40px}
-.anim-btn,.sty-btn,.tree-exp{padding-top:0;padding-bottom:0;align-items:center}
+.anim-btn,.sty-btn,.tree-exp,.clr-btn{box-sizing:border-box;height:40px}
+.anim-btn,.sty-btn,.tree-exp,.clr-btn{padding-top:0;padding-bottom:0;align-items:center}
 /* "Tela cheia" fica na linha do título, à direita, com a mesma altura da div do título */
 .chart header > .tree-exp{align-self:stretch;height:auto}
 /* ordem em todos os cards: botões extras (à esquerda), velocidade, Animar/Pausar/Retomar, Cancelar, chip. Gráfico de quadrados: Estilo, velocidade, Animar/Pausar/Retomar, Cancelar — nessa ordem, fonte menor, tudo na mesma linha */
-.chart header .hint-btn .tree-tools{flex-wrap:nowrap;gap:6px;width:100%;container-type:inline-size}
-.tree-tools .sty{flex:1 1 auto;min-width:0}
-.tree-tools .card-speed{flex:2.4 1 auto;min-width:0}
-.tree-tools .anim-play,.tree-tools .anim-restart{flex:1 1 auto;min-width:0;justify-content:center}
-.tree-tools .sty-btn{width:100%;justify-content:center}
-.tree-tools .sty-btn,.tree-tools .anim-btn{font-size:clamp(10px,2.6cqw,12px);padding-left:clamp(4px,1.6cqw,10px);padding-right:clamp(4px,1.6cqw,10px);gap:4px;white-space:nowrap}
-.tree-tools .card-speed button{flex:1 1 0;min-width:0;font-size:clamp(9.5px,2.4cqw,11.5px);padding:0 clamp(3px,1.6cqw,10px)}
-.seg.card-speed{align-items:center;margin-bottom:0}   /* .seg (mais abaixo) põe margin-bottom:12px e empurrava o seletor 6px pra cima na fileira */
-@media (max-width:640px){.card-speed{display:none}}   /* no celular não cabe: a velocidade fica só na barra de cima */
+.chart header .hint-btn .tree-tools{gap:8px}
+.clr-btn[hidden]{display:none}
+.tree-tools .clr-btn,.card-tools .clr-btn{order:6;font-size:12px;padding-left:12px;padding-right:12px;white-space:nowrap}
+.tree-tools .sty-btn,.tree-tools .anim-btn,.card-tools .anim-btn{font-size:12px;padding-left:12px;padding-right:12px;gap:5px;white-space:nowrap}
+/* botão de velocidade: depois dos botões extras e antes do Animar; o mini menu abre embaixo dele */
+.sty.spd{order:1;flex:0 0 auto}
+.spd .sty-btn{min-width:74px;justify-content:center}
+.sty-pop.spd-pop{min-width:0;width:max-content;padding:8px;gap:2px}
+.spd-pop button{border:0;background:none;color:var(--ink-2);font:700 13px var(--body);padding:8px 16px;border-radius:9px;cursor:pointer;text-align:left}
+.spd-pop button:hover{color:var(--ink);background:rgba(110,231,183,.07)}
+.spd-pop button[aria-pressed="true"]{background:rgba(110,231,183,.16);color:var(--glow)}
 /* "Até a #n" no cabeçalho do site: na barra fixa (telas largas) ele fica junto das abas; no celular, onde a barra não é fixa, vira uma etiqueta flutuante no topo da tela */
 .tb-chip{flex:none}
 .tb-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 @media (max-width:899px){
+  .toolbar.rise{animation:none;transform:none;filter:none}   /* a animação de entrada deixava transform/filter no cabeçalho e prendia dentro dele o que é position:fixed (etiqueta flutuante e botão de play) */
   .tb-chips{position:fixed;top:10px;left:12px;z-index:90;max-width:calc(100vw - 24px)}
   .tb-chips .chip{background:rgba(4,16,12,.88);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 10px 24px -12px #000}
 }
@@ -569,6 +576,8 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .tm[hidden]{display:none}
 .tm-play{flex:none;width:44px;height:44px;border-radius:50%;border:1px solid var(--line-2);background:linear-gradient(135deg,var(--glow),var(--emerald));color:#022C22;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 24px -10px rgba(16,185,129,.8);transition:transform .2s}
 .tm-play:hover{transform:scale(1.06)}
+.tb-play{width:40px;height:40px}
+.tb-chips .tb-play{box-shadow:0 8px 20px -10px rgba(16,185,129,.9)}
 .tm-play svg{display:block}
 .tm-lead{display:flex;align-items:center;gap:10px;flex:none}
 .tm-main{flex:1 1 320px;min-width:0}
@@ -736,3 +745,49 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 /* botão "Animar" de cada gráfico */
 .anim-btn{padding:6px 11px;font-size:12px;border-radius:10px;flex:none}
 .anim-btn svg{width:13px;height:13px}
+
+/* ---------- cartões para compartilhar ---------- */
+.cd-wrap{display:grid;grid-template-columns:290px minmax(0,1fr);gap:24px;flex:1;min-height:0;overflow:hidden}
+.cd-side{display:flex;flex-direction:column;gap:18px;overflow:auto;padding-right:4px;min-height:0}
+.cd-field{display:flex;flex-direction:column;gap:8px}
+.cd-lbl{font:600 10.5px/1.2 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.cd-seg{margin-bottom:0;display:flex}
+.cd-seg button{flex:1;padding:8px 10px;white-space:nowrap}
+.cd-in{width:100%;border:1px solid var(--line-2);background:rgba(0,0,0,.25);color:var(--ink);border-radius:10px;padding:9px 12px;font:500 13.5px var(--body);outline:none}
+.cd-in:focus{border-color:var(--mint)}
+.cd-list{display:flex;flex-direction:column;gap:6px}
+.cd-list button{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:rgba(0,0,0,.18);color:var(--ink-2);font:600 13px var(--body);padding:9px 12px;border-radius:12px;cursor:pointer;text-align:left;transition:all .2s}
+.cd-list button b{flex:none;width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font:700 11px var(--body);background:rgba(110,231,183,.12);color:var(--glow)}
+.cd-list button:hover{color:var(--ink);border-color:rgba(110,231,183,.35)}
+.cd-list button[aria-selected="true"]{color:var(--glow);border-color:rgba(110,231,183,.45);background:rgba(110,231,183,.12)}
+.cd-note{margin:0;font-size:12px;line-height:1.45;color:var(--ink-3)}
+.cd-stage{position:relative;display:flex;align-items:center;justify-content:center;min-height:0;min-width:0}
+.cd-canvas{display:block;max-width:100%;max-height:100%;width:auto;height:auto;border-radius:16px;box-shadow:0 24px 60px -24px #000, 0 0 0 1px rgba(110,231,183,.14)}
+.alb-mode{margin-bottom:0;box-sizing:border-box;height:40px;align-items:center}
+.alb-mode button{height:30px;padding:0 12px;font-size:12px;line-height:1}
+.cd-stage .cd-sty{position:absolute;top:6px;left:6px;z-index:3}
+.cd-sty[hidden]{display:none}
+.cd-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:38px;height:38px;border-radius:50%;border:1px solid var(--line-2);background:rgba(4,16,12,.82);color:var(--ink);font:400 24px/1 var(--body);cursor:pointer;display:grid;place-items:center;padding:0 0 3px}
+.cd-nav:hover{border-color:rgba(110,231,183,.5);color:var(--glow)}
+.cd-prev{left:0}.cd-next{right:0}
+@media (max-width:760px){
+  .cd-wrap{display:flex;flex-direction:column;overflow:auto;gap:16px}
+  .cd-side{overflow:visible;flex:none}
+  .cd-list{flex-direction:row;flex-wrap:wrap}
+  .cd-stage{flex:none;padding:0 8px}
+  .cd-canvas{max-height:none;width:100%}
+  .cd-nav{width:34px;height:34px}
+}
+
+/* ---------- álbuns unificados / em dúvida (Duplicadas e covers) ---------- */
+.alb-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 4px;border-top:1px solid var(--line)}
+.alb-main{min-width:0;line-height:1.5;font-size:13.5px;color:var(--ink-2)}
+.alb-main strong{color:var(--ink)}
+.alb-main em{font-style:normal;color:var(--ink-3);font-size:12px}
+.alb-x{color:var(--ink-3);margin:0 4px}
+.alb-art{color:var(--ink-3);font-size:12px;margin-left:6px}
+.alb-why{margin-top:3px;font-size:12px;color:var(--ink-3)}
+.alb-vars{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.alb-chip{display:inline-flex;gap:6px;align-items:baseline;padding:3px 10px;border-radius:999px;border:1px solid var(--line-2);background:rgba(110,231,183,.08);font-size:12.5px;color:var(--ink)}
+.alb-btns{display:flex;gap:8px;flex:none;flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:640px){.alb-row{flex-direction:column;align-items:flex-start}.alb-btns{justify-content:flex-start}}
