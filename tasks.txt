@@ -24,6 +24,7 @@ CONCLUÍDO
 ✅ Músicas com feat/parceria contam só pro artista principal (o primeiro) nas estatísticas, gêneros e insights; os convidados não entram mais como artistas separados (substitui o item de contar cada artista separadamente).
 ✅ Botão "Duplicadas e covers" no topo (só aparece se houver casos): duas abas, Duplicadas (mesmo título e mesmo artista principal) e Covers (mesmo título, artistas principais diferentes), ignorando remaster/live/remix; cada grupo mostra a tabela de músicas.
 ✅ Aba Insights com duas visões, alternadas por um botão no topo (salvo no navegador): simples (resumo e cards principais) e técnica (jornada da playlist com capítulos/mapa de calor/dispersão, cards avançados como concentração, ritmo de descoberta, maratonas, ondas, títulos repetidos e duração × ordem, e a nota de metodologia). Cada visão mostra só o seu tipo. O card "Recomendações" foi removido (dava dicas genéricas, não recomendava músicas).
+✅ Importar por links: fechar a tela de importar no meio da busca PAUSA (não cancela) e guarda os links; ao reabrir, os links voltam e um modal pergunta "Continuar o carregamento?" (Continuar / Agora não). Com "Agora não", o botão vira "Continuar busca" e aparece "Cancelar busca" ao lado, que pede confirmação (avisa que terá sido à toa e que as requisições só voltam em ~24h). Faixas já carregadas não são buscadas de novo.
 
 IMPORTAÇÃO / SPOTIFY
 - Importar direto de outras plataformas: YouTube Music, Apple Music, Deezer, Sound Cloud.
@@ -87,7 +88,6 @@ habilitar compartilhamento de playlist
 fazer grafico desse de musicas quadradas só que de albuns como uma segunda opção de visualização (voce escolhe se quer ver por banda ou por album)
 
 quero que quando a pessoa clicar na banda pra filtrar a mudança visual que da no grafico dos quadrados seja um pouco mais sutil em vez de tampar completamente a foto da banda com um quadrado comicamente verde
-
 
 pesquisa api para pegar informacoes de bandas musicais pro usuario ler sobre as as bandas que ele quiser
 

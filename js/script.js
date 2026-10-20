@@ -1632,11 +1632,11 @@ function openModal({title, sub = "", body, foot, size = "", headerExtra = "", on
   return api;
 }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && modalStack.length){ e.stopPropagation(); modalStack[modalStack.length - 1].close(); } }, true);
-function confirmModal({title, html, ok = "Confirmar", danger = false, extra}){
+function confirmModal({title, html, ok = "Confirmar", cancel = "Cancelar", danger = false, extra}){
   return new Promise(res => {
     let done = false;
     const foot = document.createElement("div"); foot.className = "mfrow";
-    foot.innerHTML = `${extra ? `<button class="gbtn" type="button" data-x>${extra.label}</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn ${danger ? "danger" : ""}" type="button" data-o autofocus>${ok}</button>`;
+    foot.innerHTML = `${extra ? `<button class="gbtn" type="button" data-x>${extra.label}</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" data-c>${cancel}</button><button class="pbtn ${danger ? "danger" : ""}" type="button" data-o autofocus>${ok}</button>`;
     const md = openModal({title, body: `<div class="confirm">${html}</div>`, foot, size: "sm", onClose: () => { if (!done) res(false); }});
     foot.querySelector("[data-c]").onclick = () => md.close();
     foot.querySelector("[data-o]").onclick = () => { done = true; md.close(); res(true); };
@@ -1876,7 +1876,23 @@ function spotifyDate(album){
   if (d.length === 4) return d + "-01-01";
   return "";
 }
-async function spotifyFetchTracks(ids, token, onProgress, onWait){
+/* controle da busca por links. As buscas chamam gate() antes de cada pedido ao Spotify:
+   - cancel(): lança o erro de cancelamento (nada é importado);
+   - suspend(): fechou a tela de importar. Lança um erro "keepPartial", que devolve o que já veio (e o
+     cache de faixas guarda), sem gastar mais nenhuma requisição; ao reabrir, a busca recomeça só do que falta */
+function makeFetchCtl(){
+  const c = {stop: null,
+    cancel(){ c.stop = "cancel"; },
+    suspend(){ if (!c.stop) c.stop = "suspend"; },
+    gate(){
+      if (!c.stop) return;
+      const e = new Error(c.stop === "cancel" ? "Busca cancelada: nenhuma música foi adicionada." : "Busca pausada.");
+      if (c.stop === "cancel") e.cancelled = true; else e.keepPartial = true;
+      throw e;
+    }};
+  return c;
+}
+async function spotifyFetchTracks(ids, token, onProgress, onWait, ctl){
   /* desde fev/2026 o Spotify removeu a busca em lote (GET /tracks?ids=...) para apps em
      Development Mode; agora só GET /tracks/{id}, uma faixa por vez. Com listas grandes isso
      esbarra no limite de requisições (HTTP 429). O header Retry-After do Spotify, nesse modo,
@@ -1889,6 +1905,7 @@ async function spotifyFetchTracks(ids, token, onProgress, onWait){
     for (let i = 0; i < ids.length; i++){
       const id = ids[i];
       for (let tries = 0; ; tries++){
+        if (ctl) ctl.gate();
         let r; try { r = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {headers: {Authorization: `Bearer ${token}`}}); }
         catch (e) { throw new Error("Não foi possível buscar as faixas no Spotify."); }
         if (r.status === 429){
@@ -1916,7 +1933,7 @@ async function spotifyFetchTracks(ids, token, onProgress, onWait){
   }
   return {rows, warnings};
 }
-async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait){
+async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait, ctl){
   /* álbum é catálogo público (como uma faixa avulsa), não precisa de login — e GET /albums/{id}
      já devolve o nome/data do álbum junto com a primeira página de faixas numa única chamada */
   const rows = [], warnings = [];
@@ -1929,6 +1946,7 @@ async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait){
       while (url){
         let r;
         for (;;){
+          if (ctl) ctl.gate();
           try { r = await fetch(url, {headers: {Authorization: `Bearer ${token}`}}); }
           catch (e) { throw new Error("Não foi possível buscar o álbum no Spotify."); }
           if (r.status === 429){
@@ -2094,7 +2112,7 @@ function openRateLimitModal({done, total, update = false}){
   });
 }
 // known = músicas da mesma colagem que já vieram do que está salvo (não passam pelo Spotify, mas contam como "carregadas")
-async function spotifyRunFetch({token, ids, albumIds, status, btn, known = 0}){
+async function spotifyRunFetch({token, ids, albumIds, status, btn, known = 0, ctl}){
   status.classList.remove("err");
   btn.disabled = true;
   status.textContent = albumIds.length ? `Buscando álbum${albumIds.length > 1 ? "ns" : ""}…` : `Buscando ${faixas(ids.length)}…`;
@@ -2134,7 +2152,7 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn, known = 0}){
         done = base + d; total = base + t;
         etaEndTs = performance.now() + ((performance.now() - t0) / Math.max(done, 1)) * (total - done);
         status.textContent = `Buscando faixa ${done} de ${total}${an > 1 ? ` (álbum ${ai} de ${an})` : ""}…${etaEndTs != null ? ` cerca de ${fmtEta(etaEndTs - performance.now())} restante` : ""}`;
-      }, onWait));
+      }, onWait, ctl));
     }
     const stoppedEarly = results.length && results[results.length - 1].partial;
     if (ids.length && !stoppedEarly){
@@ -2143,7 +2161,7 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn, known = 0}){
         done = base + d; total = base + t;
         etaEndTs = performance.now() + ((performance.now() - t0) / Math.max(done, 1)) * (total - done);
         render();
-      }, onWait));
+      }, onWait, ctl));
     }
     clearInterval(tick);
     const rows = results.flatMap(r => r.rows), warnings = results.flatMap(r => r.warnings);
@@ -2348,10 +2366,14 @@ function openDataUpdate(){
 }
 
 /* ---------- import modal ---------- */
+let importSession = null;   // {text, mode}: busca por links pausada porque a pessoa fechou a tela de importar
 function openImport(prefillText = null){
   // somar músicas à playlist de exemplo misturaria o exemplo com as da pessoa: aí só dá pra substituir
   // e com playlist própria o modal sempre abre em "Adicionar": substituir só passando pela confirmação da aba
-  let mode = STORE ? "add" : "replace", parsed = null;
+  // busca por links que ficou pausada porque a pessoa fechou esta tela: volta com os mesmos links e pergunta se continua
+  const sess = prefillText == null ? importSession : null;
+  if (sess){ importSession = null; prefillText = sess.text; }
+  let mode = sess ? sess.mode : STORE ? "add" : "replace", parsed = null;
   const body = document.createElement("div");
   body.innerHTML = `<p class="mdesc" id="im-desc"></p>
     <div class="imrow"><label class="chk" id="im-dupwrap"><input type="checkbox" id="im-dup" checked><span>Ignorar faixas que já estão na playlist (mesmo título e artista)</span></label></div>
@@ -2370,13 +2392,35 @@ function openImport(prefillText = null){
     </div>
     <div id="im-prev" class="prev"></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
-  foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
+  foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="gbtn" type="button" id="im-cancel-fetch" style="display:none">Cancelar busca</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
   const isAllowedUser = spotifyUserDisplay === "Crowd Goes Wild" || spotifyUserDisplay === "juia";
   const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add"${STORE || isAllowedUser ? "" : ` disabled title="A playlist atual é só um exemplo: primeiro substitua pela sua"`}>Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
-  const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md", headerExtra});
+  const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md", headerExtra,
+    onClose: () => {
+      // fechar a tela no meio da busca (ou com ela adiada) não cancela: pausa e guarda os links pra quando reabrir
+      if (fetchCtl) fetchCtl.suspend();
+      if (fetchCtl || pendingResume) importSession = {text: ta.value, mode};
+    }});
   const q = s => md.m.querySelector(s), ta = q("#im-text");
   const existing = new Set(BY_PLAYLIST.map(t => (t.title + "|" + t.artist).toLowerCase()));
+  /* busca por links: fechar esta tela no meio PAUSA (não cancela). Ao reabrir, os links voltam e um modal pergunta
+     se continua; "Agora não" deixa pendente: o botão vira "Continuar busca" e "Cancelar busca" aparece ao lado */
+  let fetchCtl = null, pendingResume = false, lastStop = null;
+  function syncFetchUI(){
+    q("#im-cancel-fetch").style.display = fetchCtl || pendingResume ? "" : "none";
+    ta.readOnly = !!fetchCtl;
+    const go = q("#im-go");
+    if (fetchCtl){ go.disabled = true; go.classList.remove("danger"); go.textContent = "Buscando…"; }
+    else if (pendingResume){ go.disabled = false; go.classList.remove("danger"); go.textContent = "Continuar busca"; }
+  }
+  async function askResumeSession(){
+    pendingResume = true; syncFetchUI();
+    const ok = await confirmModal({title: "Continuar o carregamento?", ok: "Continuar", cancel: "Agora não",
+      html: `<p>A busca das músicas foi <strong>pausada</strong> quando você fechou esta tela. Seus links continuam aqui, e as músicas que já tinham carregado não são buscadas de novo.</p>`});
+    if (ok){ pendingResume = false; syncFetchUI(); runCcFetch(); }
+  }
   function update(){
+    if (fetchCtl || pendingResume) return syncFetchUI();
     md.m.querySelectorAll("#im-mode-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === mode));
     q("#im-desc").innerHTML = mode === "add"
       ? `As músicas novas entram <strong>no fim da playlist</strong>, como as adições mais recentes (a partir da #${NN + 1}). Nada do que já existe é apagado.`
@@ -2443,7 +2487,7 @@ function openImport(prefillText = null){
     } catch (e) { parsed = {rows: [], warnings: [], error: e.message}; }
     update();
   };
-  let tmr; ta.addEventListener("input", () => { clearTimeout(tmr); tmr = setTimeout(fromText, 200); });
+  let tmr; ta.addEventListener("input", () => { if (pendingResume){ pendingResume = false; syncFetchUI(); } clearTimeout(tmr); tmr = setTimeout(fromText, 200); });
   async function loadFile(f){
     try {
       if (/\.xlsx$/i.test(f.name)){ const cells = await xlsxToCells(await f.arrayBuffer()); parsed = cellsToRows(cells); ta.value = cells.map(r => r.join("\t")).join("\n"); setSpotifyMode(false); }
@@ -2488,6 +2532,7 @@ function openImport(prefillText = null){
     let res = {rows: [], warnings: []};
     if (toFetch.length || albumIds.length){
       res = await fetchFromSpotify(id, secret, toFetch, albumIds, status, btn, known);
+      if (lastStop === "suspend") return;
       if (!res){ parsed = null; update(); return; }
     }
     const fetchedSet = new Set(toFetch), got = new Map(res.rows.filter(r => fetchedSet.has(r.id)).map(r => [r.id, r]));
@@ -2538,8 +2583,22 @@ function openImport(prefillText = null){
   async function fetchFromSpotify(id, secret, ids, albumIds, status, btn, known = 0){
     const token = await getToken(id, secret, status);
     if (!token) return;
-    return spotifyRunFetch({token, ids, albumIds, status, btn, known});
+    fetchCtl = makeFetchCtl(); syncFetchUI();
+    const ctl = fetchCtl;
+    try { return await spotifyRunFetch({token, ids, albumIds, status, btn, known, ctl}); }
+    finally { lastStop = ctl.stop; fetchCtl = null; syncFetchUI(); }
   }
+  q("#im-cancel-fetch").addEventListener("click", async () => {
+    if (!fetchCtl && !pendingResume) return;
+    const ok = await confirmModal({title: "Cancelar a busca?", danger: true, ok: "Cancelar busca", cancel: "Voltar",
+      html: `<p>Se cancelar agora, o carregamento das músicas <strong>terá sido à toa</strong>: nenhuma música será importada.</p>
+        <p>E as requisições ao Spotify que já foram usadas só voltam a ficar disponíveis daqui a cerca de <strong>24 horas</strong>.</p>`});
+    if (!ok) return;
+    if (fetchCtl){ fetchCtl.cancel(); return; }
+    pendingResume = false; parsed = null;
+    q("#sp-status").textContent = "Busca cancelada: nenhuma música foi adicionada.";
+    update();
+  });
   q("#im-copy-help").addEventListener("click", openPlaylistLinkHelp);
   q("#sp-genre").checked = genreOn();
   q("#sp-genre").addEventListener("change", e => setGenreOn(e.target.checked));
@@ -2562,8 +2621,11 @@ function openImport(prefillText = null){
   }
   q("#im-dup").addEventListener("change", update);
   q("#im-cancel").addEventListener("click", md.close);
+  if (sess) setTimeout(askResumeSession, 0);
   if (STORE) q("#im-restore").addEventListener("click", restoreOriginal);
   q("#im-go").addEventListener("click", async () => {
+    if (fetchCtl) return;
+    if (pendingResume){ pendingResume = false; syncFetchUI(); return runCcFetch(); }
     if (!parsed || !parsed.rows.length){
       if (q("#sp-fields").style.display !== "none") return runCcFetch();
       return;
