@@ -198,4 +198,19 @@ adicionar graficos que combinem com a maquina do tempo, já pensei em pelo menos
 extimativa de progressão (grafico parecido com o delinhas), quero que o site calcule uma linha pra cada uma das bandas levando em consideração várias coisas que voce pensar ai como parametro, mas eu também darei algumas ideias:
 quão mais velho o pico dessa banda na playlist maenos chance de subir, quando mais velha a banda mais chance de terem musicas a serem escutadas, enquanto as mais novas nao tem tanto, quanto mais perto do atual o pico, mais chance de continuar ou ter mais deles, leve em considerações curvas de acelerações e desacelerações que aconteceram no gráfico, e na pagina de insights ainda use essas projeções para formular insights, misture insgths de passado presente e futuro, projeções com mais precisão e menos precisão, sei la, seja criativo e me surpreenda
 
-possibilidade de trocar a cor do site e quais tabelas mostrar e em quais posições
+possibilidade de trocar a cor do site e quais tabelas mostrar e em quais posições, e quero que tenha a opção automática que deixa a cor do site de acordo com a paleta principal de cores das bandas
+
+
+
+
+
+
+
+**Site / Playlists**
+
+* os dois masters são albuns diferentes mas o site não diferenciou
+
+
+* Buscar uma forma de fazer uma distinção melhor dos gêneros por exemplo thrash metal, nu metal, groove metal, power metal etc
+* Separar a ferramenta em playlists premium e playlists básica
+* Abrir a tela de músicas da ctrl A ctrl C tem que gerar um texto válido que o site leia no upload
