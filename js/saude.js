@@ -4,7 +4,7 @@
    Nenhuma ação gasta busca sozinha: os botões só abrem as telas que já pedem confirmação. */
 (() => {
 "use strict";
-const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, h: 5, cv: 5, ad: 5, au: 5};   // peso de cada verificação na nota (soma 95: nunca zera só por isso; peso 0 = só informa)
+const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, h: 5, cv: 5, ad: 5, au: 5, sg: 0};   // peso de cada verificação na nota (soma 95: nunca zera só por isso; peso 0 = só informa)
 const FULL_AT = 0.25;                                                       // com 25% das faixas afetadas o item já custa o peso inteiro
 const MAX_SEC = 20 * 60;
 
@@ -36,6 +36,7 @@ function healthChecks(list = BY_PLAYLIST){
   const ni = list.filter(t => t.artist === NI || t.albumRaw === NI || !t.dateRaw);
   const sim = similarTitles(), dupTracks = uniq(sim.dups.flatMap(x => x.rs));
   const oddDur = list.filter(t => t.sec === 0 || t.sec > MAX_SEC);
+  const sugs = list.filter(t => t.m && t.m.ty && t.m.ty !== "album" && ASING[singleKey(t)] && ASING[singleKey(t)].album && !ASING_IGN.has(singleKey(t)));   // sugestão da Apple: não pesa na nota
   const spell = artistSpellings(list), ai = ALBUM_INFO, autoG = ai.groups.filter(g => !g.confirmed);
   const mk = (k, count, frac, level, extra) => ({k, count, frac, level: count ? level : "ok", w: HEALTH_W[k], ...extra});
   const items = [
@@ -48,6 +49,7 @@ function healthChecks(list = BY_PLAYLIST){
     mk("cv", sim.covers.length, uniq(sim.covers.flatMap(x => x.rs)).length / N, "warn", {tracks: uniq(sim.covers.flatMap(x => x.rs))}),   // dúvida do site: pesa na nota até a pessoa classificar
     mk("ad", ai.doubts.length, Math.min(1, ai.doubts.reduce((n, e) => n + e.ca + e.cb, 0) / N), "warn", {}),
     mk("au", autoG.length, Math.min(1, autoG.reduce((n, g) => n + g.variants.reduce((m, v) => m + v.count, 0), 0) / N), "warn", {}),
+    mk("sg", sugs.length, 0, "help", {tracks: sugs}),
     mk("h", spell.length, Math.min(1, spell.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {groups: spell})
   ];
   for (const it of items) it.penalty = it.count ? Math.min(it.w, it.w * Math.min(1, it.frac / FULL_AT)) : 0;
@@ -69,6 +71,7 @@ const META = {
   au: {t: "Álbuns que o site acha iguais", ok: "Nenhum álbum aguardando confirmação.", d: n => `${plural(n, "grupo de álbuns", "grupos de álbuns")} que o site acha serem o mesmo (edições como remaster ou deluxe). Já contam como um só nos gráficos, mas esperam a sua confirmação.`, act: "aauto"},
   f: {t: "Prováveis duplicadas", ok: "Nenhuma música repetida.", d: n => `${plural(n, "caso de música provavelmente repetida", "casos de músicas provavelmente repetidas")} (mesmo título e artista principal).`, act: "dups"},
   g: {t: "Duração suspeita", ok: "Nenhuma duração estranha.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração de 0 s ou de mais de 20 minutos.`, act: "list"},
+  sg: {t: "Faixas fora de álbum que são de álbum", ok: "Nenhuma faixa fora de álbum com sugestão de álbum.", d: n => `${plural(n, "faixa marcada como single, EP ou coletânea existe", "faixas marcadas como single, EP ou coletânea existem")} num álbum, segundo a Apple. É só uma sugestão: não pesa na nota.`, act: "singles"},
   h: {t: "Grafias parecidas do mesmo artista", ok: "Nenhum artista escrito de duas formas.", d: n => `${plural(n, "artista aparece", "artistas aparecem")} escrito de mais de um jeito. Se for a mesma banda, junte os nomes.`, act: "spell"}
 };
 const LEVEL = {ok: "ok", warn: "atenção", help: "ajuda"};
@@ -107,6 +110,26 @@ function editTrack(t){
   };
 }
 
+// sugestão (não obrigatória): trocar single/EP/coletânea por "faixa de álbum", com o álbum que a Apple achou
+function openSingles(tracks){
+  const body = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
+  body.innerHTML = `<div class="confirm"><p>A Apple achou estas faixas dentro de um álbum. Marque as que quer <strong>transformar em faixa de álbum</strong>: o álbum passa a ser o da Apple e o tipo passa a ser álbum. Nada muda até você aplicar, e isso <strong>não pesa na nota</strong>.</p>
+    <div class="du-rows">${tracks.map(t => { const a = ASING[singleKey(t)]; return `<label class="chk"><input type="checkbox" data-n="${t.n}" checked><span><b>${esc(t.title)}</b> · ${esc(t.artist)}<br><span class="muted">${esc(t.albumRaw === NI ? "—" : t.albumRaw)} (${TYPE_PT[t.m.ty] || t.m.ty}) → <strong>${esc(a.album)}</strong>${a.tn && a.tt ? ` · faixa ${a.tn} de ${a.tt}` : ""}</span></span></label>`; }).join("")}</div></div>`;
+  foot.innerHTML = `<button class="gbtn" type="button" data-keep>Manter como está</button><span class="sp"></span><button class="gbtn" type="button" data-c>Fechar</button><button class="pbtn" type="button" data-ok>Aplicar</button>`;
+  const md = openModal({title: "Faixas que são de álbum", sub: "Sugestão da Apple", body, foot, size: "md"});
+  const boxes = [...body.querySelectorAll("input")], picked = () => boxes.filter(b => b.checked).map(b => +b.dataset.n);
+  const sync = () => { const k = picked().length; foot.querySelector("[data-ok]").disabled = !k; foot.querySelector("[data-keep]").disabled = !k; foot.querySelector("[data-ok]").textContent = k ? `Aplicar ${plural(k, "faixa", "faixas")}` : "Aplicar"; };
+  body.addEventListener("change", sync); sync();
+  foot.querySelector("[data-c]").onclick = md.close;
+  // "Manter como está": a pessoa viu e quer assim, então não sugere de novo
+  foot.querySelector("[data-keep]").onclick = () => { const n = new Set(picked()); tracks.filter(t => n.has(t.n)).forEach(t => ASING_IGN.add(singleKey(t))); saveASingIgn(); toast("Mantidas como estão. Não vou sugerir de novo."); md.close(); };
+  foot.querySelector("[data-ok]").onclick = () => {
+    const sel = picked(), by = new Map(tracks.filter(t => sel.includes(t.n)).map(t => [t.n, ASING[singleKey(t)]]));
+    ssSet("health", "1");
+    commitRows(currentRows().map(r => { const a = by.get(r[0]); if (!a) return r; const m = {...(r[6] || {}), ty: "album"}; if (a.tn) m.tn = a.tn; if (a.tt) m.tt = a.tt; return [r[0], r[1], r[2], a.album, r[4], r[5], m]; }), `${plural(by.size, "faixa virou", "faixas viraram")} faixa${by.size > 1 ? "s" : ""} de álbum`);
+  };
+}
+
 function openHealth(){
   const H = healthChecks(), bad = H.items.filter(i => i.count && i.w);
   const body = document.createElement("div"); body.className = "sd";
@@ -123,6 +146,7 @@ function openHealth(){
     const btn = m.act === "upd" ? `<button class="gbtn" type="button" data-act="upd">Atualizar dados</button>`
       : m.act === "covers" ? `<button class="gbtn" type="button" data-act="dups" data-o="covers">Revisar covers</button>`
       : m.act === "adoubt" ? `<button class="gbtn" type="button" data-act="dups" data-o="adoubt">Revisar álbuns</button>`
+      : m.act === "singles" ? `<button class="gbtn" type="button" data-act="singles">Ver sugestões (${nf(it.count)})</button>`
       : m.act === "aauto" ? `<button class="gbtn" type="button" data-act="dups" data-o="aauto">Revisar álbuns</button>`
       : m.act === "dups" ? `<button class="gbtn" type="button" data-act="dups" data-o="dups">Revisar duplicadas</button>`
       : m.act === "spell" ? `<button class="gbtn" type="button" data-act="spell" data-k="${it.k}">Juntar nomes (${nf(it.count)})</button>`
@@ -146,6 +170,7 @@ function openHealth(){
     else if (a === "fix"){ md.close(); openFixOrder(); }
     else if (a === "rev"){ md.close(); askReverse(); }
     else if (a === "list"){ const it = by(b.dataset.k); list(META[it.k].t, it.tracks, `${faixas(it.tracks.length)} · “—” é o que está em branco`); }
+    else if (a === "singles"){ md.close(); openSingles(by("sg").tracks); }
     else if (a === "spell"){
       const groups = by("h").groups || [], keys = Object.keys(ALIAS);
       const sm = openModal({title: META.h.t, size: "md", sub: "Mesma banda escrita de jeitos diferentes",

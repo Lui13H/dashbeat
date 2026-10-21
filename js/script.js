@@ -175,6 +175,14 @@ const saveADates = () => { try { localStorage.setItem(ADATE_KEY, JSON.stringify(
 const yearOnly = d => /^\d{4}-01-01$/.test(d || "");
 const adateKey = (artist, album) => `${(splitArtistsRaw(String(artist || ""))[0] || "").toLowerCase()}|${String(album || "").trim().toLowerCase()}`;
 const adateFor = (artist, album, base) => { const d = ADATES[adateKey(artist, album)]; return yearOnly(base) && d && d.slice(0, 4) === base.slice(0, 4) ? d : base; };
+/* faixas que não são de álbum (single/EP, coletânea…) mas talvez sejam: busca na Apple (sem login). "artista principal|título" → {album, tn, tt} ("" = só existe como single).
+   É só uma sugestão (não pesa na nota): a pessoa aceita ou recusa na Saúde; recusadas ficam em ASING_IGN */
+const ASING_KEY = "catalogo-musical:apple-singles", ASING_IGN_KEY = "catalogo-musical:apple-singles-ignored";
+const ASING = (() => { try { return JSON.parse(localStorage.getItem(ASING_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const ASING_IGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(ASING_IGN_KEY) || "[]")); } catch (e) { return new Set(); } })();
+const saveASing = () => { try { localStorage.setItem(ASING_KEY, JSON.stringify(ASING)); } catch (e) {} };
+const saveASingIgn = () => { try { localStorage.setItem(ASING_IGN_KEY, JSON.stringify([...ASING_IGN])); } catch (e) {} };
+const singleKey = t => `${(splitArtistsRaw(t.artist)[0] || "").toLowerCase()}|${normC(cleanTitle(t.title))}`;
 const T = RAW.map(([n, title, artist, album, sec, date, meta], ri) => {
   const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
   const od = ALBUM_INFO.dates.get(albArtKey(artist) + "|" + String(album || "").trim()), dateUse = adateFor(artist, album, od || date || "");   // álbum unificado: vale a data mais antiga
@@ -839,6 +847,28 @@ function queueAppleGenres(){
 }
 /* data completa: 1 busca na Apple por álbum cuja data (do Spotify) é só o ano. Mesma fila das capas e dos gêneros (depois deles).
    Em silêncio: sem aviso e sem recarregar. O que a Apple achar vale na próxima vez que o site abrir, e a busca segue aos poucos */
+/* faixa fora de álbum ou faixa de álbum? 1 busca na Apple por faixa que o Spotify não marca como álbum. Só vale um álbum "de verdade": sem - Single/EP, ao vivo ou coletânea; o mais antigo */
+function pickSongAlbum(results, artist, title){
+  const a = normC(artist), nt = normC(cleanTitle(title)), skip = /\b(best of|greatest|hits|collection|anthology|essentials?|box set|live|ao vivo)\b/i;
+  const variant = /(live|demo|radio edit|acoustic|remix|instrumental|writing in progress|edit)/i, ownVariant = variant.test(title);   // faixa ao vivo/demo/edit só vale se a sua também for
+  const ok = results.filter(r => r.kind === "song" && r.collectionName && (ownVariant || !variant.test(r.trackName || "")) && normC(cleanTitle(r.trackName || "")) === nt && (() => { const ra = normC(r.artistName || ""); return ra && (ra.includes(a) || a.includes(ra)); })()
+    && !/\s-\s(single|ep)$/i.test(r.collectionName) && !skip.test(r.collectionName));
+  const ed = r => albTokens(r.collectionName).join(" ") !== albCore(r.collectionName).join(" ") ? 1 : 0;   // o mais antigo; na mesma data, o álbum sem marca de edição (deluxe, remaster…)
+  ok.sort((x, y) => String(x.releaseDate || "9").localeCompare(String(y.releaseDate || "9")) || ed(x) - ed(y));
+  const r = ok[0]; return r ? {album: r.collectionName, tn: r.trackNumber || 0, tt: r.trackCount || 0} : null;
+}
+function queueAppleSingles(){
+  const need = new Map();
+  for (const t of T){
+    if (!t.m || !t.m.ty || t.m.ty === "album" || t.artist === NI || !t.title) continue;   // single/EP, coletânea… tudo que não é faixa de álbum
+    const k = singleKey(t); if (!(k in ASING) && !need.has(k)) need.set(k, {main: splitArtistsRaw(t.artist)[0], title: t.title});
+  }
+  for (const [k, x] of need) coverQueue.push({job: async () => {
+    const r = pickSongAlbum(await itunes(`search?entity=song&limit=15&term=${encodeURIComponent(x.main + " " + cleanTitle(x.title))}`), x.main, x.title);
+    ASING[k] = r || ""; saveASing();
+  }});
+  if (need.size) pumpCovers();
+}
 function queueAppleDates(){
   const need = new Map();
   for (const r of RAW){
@@ -4148,7 +4178,7 @@ function boot(){
   placePill();
   render();
   queueAppleGenres();
-  if (STORE) queueAppleDates();
+  if (STORE){ queueAppleDates(); queueAppleSingles(); }
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
   if (STORE){
     let fresh = null; try { fresh = JSON.parse(ssGet("fresh") || "null"); } catch (e) {}
