@@ -344,8 +344,6 @@ function dataset(scope){
   if (am && am[1].length >= 2) d.facts.push({label: "Álbum com mais faixas", main: am[0], detail: `${modeOf(am[1], "artist").best || am[1][0].artist} · ${faixas(am[1].length)}`});
   const ex = R.filter(r => r.ex !== null && r.ex !== undefined);
   if (ex.length >= Math.max(1, N * .3)){ const c = ex.filter(r => r.ex).length; d.facts.push({label: "Letras explícitas", main: `${pct(c, ex.length, 0)} das faixas`, detail: `${fmtInt(c)} de ${fmtInt(ex.length)} faixas com esse dado`}); }
-  const pp = R.filter(r => typeof r.pop === "number");
-  if (pp.length >= Math.max(1, N * .3)) d.facts.push({label: "Popularidade média", main: `${Math.round(sum(pp, r => r.pop) / pp.length)} de 100`, detail: `Média de ${fmtInt(pp.length)} faixas com esse dado · quanto maior, mais tocada`});
   d.cards = ["cover"];
   if (d.bands.length) d.cards.push("bands");
   if (d.bands.length >= 4) d.cards.push("treemap");

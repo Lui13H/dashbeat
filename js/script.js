@@ -17,7 +17,12 @@ function clearStore(){ try { localStorage.removeItem(STORE_KEY); } catch (e) {} 
 function setFlash(msg){ try { sessionStorage.setItem(STORE_KEY + ":flash", msg); } catch (e) {} }
 function takeFlash(){ try { const m = sessionStorage.getItem(STORE_KEY + ":flash"); sessionStorage.removeItem(STORE_KEY + ":flash"); return m; } catch (e) { return null; } }
 const STORE = readStore();
-const RAW = STORE ? STORE.rows : DEFAULT_RAW;
+const RAW0 = STORE ? STORE.rows : DEFAULT_RAW;   // linhas como estão salvas
+/* "é a mesma banda" (o site não detectou: "Guns N' Roses" x "Guns N Roses"): nome (minúsculo) → nome que fica. Só na visualização:
+   o que está salvo na playlist e nos arquivos baixados não muda (t.artistRaw guarda o original) */
+const ALIAS_KEY = "catalogo-musical:artist-alias";
+const ALIAS = (() => { try { return JSON.parse(localStorage.getItem(ALIAS_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveAlias = () => { try { localStorage.setItem(ALIAS_KEY, JSON.stringify(ALIAS)); } catch (e) {} };
 const NI = "Não identificado";
 const coll = new Intl.Collator("pt-BR", {sensitivity: "base", numeric: true});
 /* numa faixa com vários artistas (feat., parceria) o principal (o primeiro) sempre conta; os outros só contam
@@ -26,6 +31,9 @@ const coll = new Intl.Collator("pt-BR", {sensitivity: "base", numeric: true});
    splitArtistsAll devolve todos, só pra saber se a faixa é uma parceria */
 const ARTIST_SEP = /\s*(?:,|&|\/|\bfeat\.?(?=\s)|\bft\.?(?=\s))\s*/i;
 const splitArtistsAll = s => s.split(ARTIST_SEP).map(x => x.trim()).filter(Boolean);
+// troca cada artista da faixa pelo nome que a pessoa escolheu (mantém os separadores: "A feat. B")
+const aliasArtist = a => Object.keys(ALIAS).length ? a.split(/(\s*(?:,|&|\/|feat\.?(?=\s)|ft\.?(?=\s))\s*)/i).map((x, i) => i % 2 ? x : (ALIAS[x.trim().toLowerCase()] ? x.replace(x.trim(), ALIAS[x.trim().toLowerCase()]) : x)).join("") : a;
+const RAW = RAW0.map(r => { const a = String(r[2] || ""), b = aliasArtist(a); return a === b ? r : [r[0], r[1], b, ...r.slice(3)]; });
 const SOLO = new Set();   // artistas (minúsculo) com pelo menos uma faixa solo na lista
 for (const r of RAW){ const all = splitArtistsAll(String(r[2] || "")); if (all.length === 1) SOLO.add(all[0].toLowerCase()); }
 // posições (em splitArtistsAll) dos artistas que contam nessa faixa: o principal e quem tem faixa solo
@@ -103,7 +111,7 @@ function analyzeAlbums(raw){
       const oldest = list.map(n => dmin.get(n)).filter(Boolean).sort()[0] || "";
       if (oldest) for (const n of list) dates.set(art + "|" + n, oldest);
       const ids = used.filter(e => list.includes(e.a) && list.includes(e.b));
-      groups.push({art, artName, canon, oldest, variants: list.map(n => ({name: n, count: albs.get(n)})).sort((x, y) => x.name.length - y.name.length || x.name.localeCompare(y.name)), ids: ids.map(e => e.id), confirmed: ids.some(e => e.rel.kind !== "auto")});
+      groups.push({art, artName, canon, oldest, variants: list.map(n => ({name: n, count: albs.get(n)})).sort((x, y) => x.name.length - y.name.length || x.name.localeCompare(y.name)), ids: ids.map(e => e.id), confirmed: ids.some(e => e.rel.kind !== "auto" || e.dec === "sim")});
     }
   }
   return {map, dates, groups, doubts, rejected};
@@ -140,12 +148,12 @@ function shownGenres(artist){
 }
 /* coluna 7 (opcional): dados extras que vêm de graça na resposta do Spotify —
    x explícita (0/1) · ty tipo do lançamento (album/single/compilation) · tn nº da faixa no álbum ·
-   tt total de faixas do álbum · p popularidade 0–100 · aid IDs dos artistas */
+   tt total de faixas do álbum · aid IDs dos artistas */
 const TYPE_PT = {album: "Álbum", single: "Single/EP", compilation: "Coletânea"};
 // campos planos (pra tabelas e ordenação); null/"" = dado que não existe pra essa música
 function extraProps(m, gs){
   const ok = !!(m && m.x !== undefined);
-  return {genre: gs && gs.length ? gs.join(", ") : "", pop: ok && typeof m.p === "number" ? m.p : null, ex: ok ? m.x : null,
+  return {genre: gs && gs.length ? gs.join(", ") : "", ex: ok ? m.x : null,
     ty: ok && m.ty || ""};
 }
 /* "bandas" de uma faixa = os artistas que contam nela (principal + quem tem faixa solo). Cada uma é uma banda
@@ -158,11 +166,20 @@ function bandsOf(artist){
 }
 const bandsOfRow = r => r.bands || [r.artist];
 const hasBand = (r, name) => { const k = String(name).toLowerCase(); return bandsOfRow(r).some(b => b.toLowerCase() === k); };
-const T = RAW.map(([n, title, artist, album, sec, date, meta]) => {
+/* data completa pela Apple (sem login, não gasta o Spotify): o Spotify às vezes só sabe o ano ("1990-01-01").
+   "artista principal|álbum" → "AAAA-MM-DD" ("" = a Apple não achou). Só vale pra faixa cuja data ainda é só o ano e se o ano bater;
+   a data guardada na playlist e nos arquivos baixados continua intacta */
+const ADATE_KEY = "catalogo-musical:apple-dates";
+const ADATES = (() => { try { return JSON.parse(localStorage.getItem(ADATE_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveADates = () => { try { localStorage.setItem(ADATE_KEY, JSON.stringify(ADATES)); } catch (e) {} };
+const yearOnly = d => /^\d{4}-01-01$/.test(d || "");
+const adateKey = (artist, album) => `${(splitArtistsRaw(String(artist || ""))[0] || "").toLowerCase()}|${String(album || "").trim().toLowerCase()}`;
+const adateFor = (artist, album, base) => { const d = ADATES[adateKey(artist, album)]; return yearOnly(base) && d && d.slice(0, 4) === base.slice(0, 4) ? d : base; };
+const T = RAW.map(([n, title, artist, album, sec, date, meta], ri) => {
   const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
-  const od = ALBUM_INFO.dates.get(albArtKey(artist) + "|" + String(album || "").trim()), dateUse = od || date || "";   // álbum unificado: vale a data mais antiga
+  const od = ALBUM_INFO.dates.get(albArtKey(artist) + "|" + String(album || "").trim()), dateUse = adateFor(artist, album, od || date || "");   // álbum unificado: vale a data mais antiga
   // gs = gênero do Spotify (null = falta buscar) · ge = gênero exibido/calculado (Spotify ou, na falta, Apple)
-  return {n, title, artist: a, bands: bandsOf(a), album: albumCanon(artist, album), albumRaw: (album || "").trim() || NI,
+  return {n, title, artist: a, artistRaw: String(RAW0[ri][2] || "").trim(), bands: bandsOf(a), album: albumCanon(artist, album), albumRaw: (album || "").trim() || NI,
     sec: sec, date: dateUse, dateRaw: date || "", year: dateUse ? +dateUse.slice(0, 4) : NI, m, gs, ge, ...extraProps(m, ge)};
 });
 const ALL_BANDS = [...new Set(T.flatMap(t => t.bands))].sort(niLast);
@@ -743,7 +760,7 @@ const normC = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").repl
 /* pontos: 5 = nome igual · 4 = mesmo álbum sem marca de edição · 3 = mesmo álbum numa edição (deluxe, remaster…) · 2 = nome parecido.
    Antes o texto entre parênteses era ignorado ("Vol. 3: (The Subliminal Verses)" virava "vol 3" e a edição Deluxe ganhava da padrão) e um
    "Slipknot - EP" valia como o álbum "Slipknot". Só aceita a partir de `min` pontos. */
-function pickCover(results, artist, album, min = 2){
+function pickAlbum(results, artist, album, min = 2){
   const a = normC(artist), alRaw = String(album).toLowerCase().trim(), alCore = albCore(album).join(" "), alN = normC(album);
   const wantsEp = /\b(ep|single)\b/i.test(album), wantsLive = /\b(live|ao vivo)\b/i.test(album);
   const sameArtist = results.filter(r => { const ra = normC(r.artistName || ""); return ra && (ra.includes(a) || a.includes(ra)); });
@@ -758,8 +775,9 @@ function pickCover(results, artist, album, min = 2){
     return c && alN && (c === alN || c.includes(alN) || alN.includes(c)) ? 2 : 0;
   };
   const best = sameArtist.map(r => [r, score(r)]).filter(x => x[1] >= min).sort((x, y) => y[1] - x[1])[0];
-  return best ? artUrl(best[0]) : null;
+  return best ? best[0] : null;
 }
+const pickCover = (...args) => artUrl(pickAlbum(...args));
 /* álbuns unificados: a capa pode ter sido guardada com o nome de uma das edições ("Symbolic (Remastered Version)") */
 function coverAlias(key){
   const i = key.indexOf("|"); if (i < 0) return null;
@@ -818,6 +836,24 @@ function queueAppleGenres(){
     saveAGenres(); refreshShownGenres();
   }});
   if (need.size) pumpCovers();
+}
+/* data completa: 1 busca na Apple por álbum cuja data (do Spotify) é só o ano. Mesma fila das capas e dos gêneros (depois deles).
+   Em silêncio: sem aviso e sem recarregar. O que a Apple achar vale na próxima vez que o site abrir, e a busca segue aos poucos */
+function queueAppleDates(){
+  const need = new Map();
+  for (const r of RAW){
+    const [, , artist, album, , date] = r, a = String(artist || "").trim(), al = String(album || "").trim();
+    if (!a || !al || !yearOnly(date)) continue;
+    const k = adateKey(a, al);
+    if (!(k in ADATES) && !need.has(k)) need.set(k, {main: splitArtistsRaw(a)[0], album: al});
+  }
+  if (!need.size) return;
+  for (const [k, x] of need) coverQueue.push({job: async () => {
+    const r = pickAlbum(await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(x.main + " " + x.album)}`), x.main, x.album, 3);   // só vale o mesmo álbum
+    const d = r && r.releaseDate ? String(r.releaseDate).slice(0, 10) : "";
+    ADATES[k] = d; saveADates();
+  }});
+  pumpCovers();
 }
 let rgT;
 function refreshShownGenres(){
@@ -1202,25 +1238,16 @@ function renderProfile(R){
   const missing = STORE ? R.filter(t => !t.m).length : 0;
   $("#prof-hint").innerHTML = M.length ? `${M.length === R.length ? `todas as ${faixas(M.length)}` : `${nf(M.length)} de ${faixas(R.length)}`} com esses dados${missing ? ` · <button type="button" class="lnk" data-upd style="padding:0">completar ${missing}</button>` : ""}` : "";
   if (!M.length){
-    el.innerHTML = `<div class="empty-in"><p>Explícitas, singles e popularidade aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
+    el.innerHTML = `<div class="empty-in"><p>Explícitas e singles aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
     return;
   }
   const ex = M.filter(t => t.m.x).length;
   const ty = {album: 0, single: 0, compilation: 0}; M.forEach(t => { if (t.m.ty in ty) ty[t.m.ty]++; });
   const tyN = ty.album + ty.single + ty.compilation;
-  const P = M.filter(t => typeof t.m.p === "number"), hist = [0, 0, 0, 0, 0];
-  P.forEach(t => hist[Math.min(4, Math.floor(t.m.p / 20))]++);
-  const hi = P.length ? P.reduce((a, b) => b.m.p > a.m.p ? b : a) : null, lo = P.length ? P.reduce((a, b) => b.m.p < a.m.p ? b : a) : null;
   let html = tyN ? profStack("De onde vêm", pct(ty.album, tyN, 0) + " de álbuns", [[ty.album, "#34D399", "Álbum"], [ty.single, "#A3E635", "Single/EP"], [ty.compilation, "#047857", "Coletânea"]], tyN) : "";
   html += profStack("Explícitas", pct(ex, M.length, 0), [[ex, "#F0FDF7", "Explícitas"], [M.length - ex, "#047857", "Sem palavrão"]], M.length);
-  if (P.length){
-    const avg = Math.round(sum(P, t => t.m.p) / P.length), pm = Math.max(1, ...hist);
-    html += `<div class="pf"><div class="pf-h"><span>Popularidade no Spotify</span><b>média ${avg}</b></div>
-      <div class="mbars pf-pop">${hist.map((v, i) => `<div><b>${v}</b><i style="height:${Math.max(3, v / pm * 44)}px"></i><span>${i * 20}–${i === 4 ? 100 : i * 20 + 19}</span></div>`).join("")}</div>
-      <div class="legend"><span>Mais popular: <strong>${esc(cleanTitle(hi.title))}</strong> (${hi.m.p})</span><span>Mais lado B: <strong>${esc(cleanTitle(lo.title))}</strong> (${lo.m.p})</span></div></div>`;
-  }
-  // sem popularidade (o Spotify nem sempre manda) o card ficaria com buraco: entra o ranking de explícitas por artista
-  if (!P.length && ex){
+  // ranking de explícitas por artista
+  if (ex){
     const arts = [...groupBy(M, "artist")].map(([k, rs]) => ({k, n: rs.length, e: rs.filter(t => t.m.x).length}))
       .filter(a => a.n >= 3 && a.e).sort((a, b) => b.e / b.n - a.e / a.n || b.e - a.e).slice(0, 4);
     if (arts.length) html += `<div class="pf"><div class="pf-h"><span>Artistas mais explícitos</span><b>% das faixas</b></div>
@@ -1240,7 +1267,6 @@ const SONG_COLS = [
   {k: "genre", l: "Gênero", cls: "gn", cell: t => t.genre ? esc(t.genre) : ND},
   {k: "date", l: "Lançamento", cell: t => t.date ? esc(t.date) : ND},
   {k: "sec", l: "Duração", num: true, cell: t => t.sec ? durTxt(t.sec) : ND},
-  {k: "pop", l: "Popularidade", num: true, cell: t => t.pop ?? ND},
   {k: "ex", l: "Explícita", cell: t => t.ex === null ? ND : t.ex ? "Sim" : "Não"},
   {k: "ty", l: "Tipo", cell: t => TYPE_PT[t.ty] || ND}
 ];
@@ -1920,6 +1946,16 @@ const cleanTitle = s => s.replace(/\s+-\s+(\d{4}\s+)?(remaster(ed)?|remix|live|a
 const DUPIGN_KEY = "catalogo-musical:dups-ignored";
 const DUPIGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(DUPIGN_KEY) || "[]")); } catch (e) { return new Set(); } })();
 const saveDupIgn = () => { try { localStorage.setItem(DUPIGN_KEY, JSON.stringify([...DUPIGN])); } catch (e) {} };
+/* "é a mesma música, só outra versão" (ao vivo, remaster, deluxe…): sai das listas como as ignoradas (entra no mesmo DUPIGN, então também
+   não conta como cover nem como repetida) e guarda o tipo da versão pra mostrar em "Tratados" */
+const VERS_KEY = "catalogo-musical:dups-versions";
+const VERS = (() => { try { return JSON.parse(localStorage.getItem(VERS_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveVers = () => { try { localStorage.setItem(VERS_KEY, JSON.stringify(VERS)); } catch (e) {} };
+const VERS_LABEL = {live: "versão ao vivo", remaster: "remasterizada", deluxe: "edição deluxe/especial", other: "outra versão (remix, acústica…)"};
+/* "é um cover" confirmado pela pessoa: sai da lista de pendências (vai pra "Tratados") mas NÃO é ignorado, então continua contando como cover nos insights */
+const CONF_KEY = "catalogo-musical:dups-confirmed";
+const CONF = (() => { try { return new Set(JSON.parse(localStorage.getItem(CONF_KEY) || "[]")); } catch (e) { return new Set(); } })();
+const saveConf = () => { try { localStorage.setItem(CONF_KEY, JSON.stringify([...CONF])); } catch (e) {} };
 const coverIgnored = key => DUPIGN.has("c|" + normC(key));
 const RULES = [];
 const rule = fn => RULES.push(fn);
@@ -2216,21 +2252,6 @@ rule(() => {
     kick: [pc0(c.single, M.length), "das faixas vieram de singles ou EPs"]};
 });
 
-// CATÁLOGO · mainstream or deep cuts (only if Spotify still sends popularity)
-rule(() => {
-  const P = MT.filter(t => typeof t.m.p === "number"); if (P.length < 20) return null;
-  const avg = sum(P, t => t.m.p) / P.length, srt = [...P].sort((a, b) => b.m.p - a.m.p);
-  const hits = P.filter(t => t.m.p >= 60).length, deep = P.filter(t => t.m.p < 30).length;
-  const byArt = IS.art.map(a => { const pp = a.rs.filter(t => t.m && typeof t.m.p === "number"); return {a, n: pp.length, avg: pp.length ? sum(pp, t => t.m.p) / pp.length : 0}; }).filter(x => x.n >= 4).sort((x, y) => x.avg - y.avg);
-  const under = byArt[0];
-  return {extra: true, kind: "cat", theme: 4, score: avg >= 60 || avg < 35 ? 67 : 55,
-    title: avg >= 60 ? "Uma playlist de hits" : avg < 35 ? "Você garimpa o lado B" : "Entre os hits e o lado B",
-    body: `<ul><li>${B(`${faixas(hits)} são hits`)} (popularidade 60+) e ${B(`${faixas(deep)} são lado B`)} (abaixo de 30).</li>
-      ${under ? `<li>${B(`${under.a.k} é o seu artista mais "underground"`)}: popularidade média ${Math.round(under.avg)} nas suas faixas.</li>` : ""}</ul>${covNote(P)}`,
-    viz: V.bars([[cleanTitle(srt[0].title), srt[0].artist, srt[0].m.p], ["Média da playlist", faixas(P.length), Math.round(avg)], [cleanTitle(srt[srt.length - 1].title), srt[srt.length - 1].artist, srt[srt.length - 1].m.p]], 100),
-    kick: [String(Math.round(avg)), "de popularidade média no Spotify (0 a 100)"]};
-});
-
 // CATÁLOGO · genre profile
 const GT = T.filter(t => t.ge && t.ge.length);
 const GCOUNT = (() => { const m = new Map(); for (const t of GT) for (const g of t.ge) m.set(g, (m.get(g) || 0) + 1); return [...m].sort((a, b) => b[1] - a[1]); })();
@@ -2469,7 +2490,7 @@ const ICON = {
 const pad2 = n => String(n).padStart(2, "0");
 const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
-const currentRows = () => BY_PLAYLIST.map(t => { const r = [t.n, t.title, t.artist === NI ? "" : t.artist, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.dateRaw]; if (t.m) r.push(t.m); return r; });
+const currentRows = () => BY_PLAYLIST.map(t => { const r = [t.n, t.title, t.artistRaw, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.dateRaw]; if (t.m){ const {p, ...rest} = t.m; r.push(rest); } return r; });
 
 /* ---------- modal system ---------- */
 const modalStack = [];
@@ -2592,7 +2613,7 @@ function parseDate(v){
 const HDR = {n: /^(n[uú]mero|numero|n[ºo°]?|#|pos(i[cç][aã]o)?|ordem|index)$/i, title: /^(m[uú]sicas?|faixas?|t[ií]tulo|title|track|song|nome(_da_m[uú]sica)?)$/i, artist: /^(bandas?|artistas?|banda_artista|banda\/artista|artist|int[eé]rprete)$/i,
   album: /^([aá]lbum|album)$/i, dur: /^(dura[cç][aã]o|tempo|duration|length|dur)$/i, date: /^(data|lan[cç]amento|data_(de_)?lan[cç]amento|release(_date)?|ano|year|date)$/i,
   meta: /^(dados_spotify|meta)$/i};
-// coluna extra que a própria exportação em texto grava: os dados do Spotify em JSON (explícita, tipo, popularidade…)
+// coluna extra que a própria exportação em texto grava: os dados do Spotify em JSON (explícita, tipo…)
 function parseMeta(v){
   if (!v || v[0] !== "{") return null;
   try { const m = JSON.parse(v); return m && typeof m === "object" && !Array.isArray(m) ? m : null; } catch (e) { return null; }
@@ -2719,13 +2740,12 @@ async function spotifyToken(id, secret){
   return j.access_token;
 }
 /* tudo isso já vem na mesma resposta da faixa/álbum — guardar não custa pedido nenhum.
-   popularidade só vem na faixa completa (GET /tracks), e pode faltar em apps de desenvolvimento */
+   */
 function spotifyMeta(t, album){
   const m = {x: t.explicit ? 1 : 0};
   if (album && album.album_type) m.ty = album.album_type;
   if (t.track_number) m.tn = t.track_number;
   if (album && album.total_tracks) m.tt = album.total_tracks;
-  if (typeof t.popularity === "number") m.p = t.popularity;
   const aid = (t.artists || []).map(a => a.id).filter(Boolean);
   if (aid.length) m.aid = aid;
   if (t.id) m.id = t.id;   // ID da faixa: é com ele que os links batem com as músicas já salvas (sem gastar requisição)
@@ -3132,7 +3152,7 @@ function openDataUpdate(){
   const total = () => todo.length + (useGenre ? ga : 0);
   const drawConfirm = () => {
     body.innerHTML = `<div class="confirm">
-      <p>Vamos buscar no Spotify o que falta nas suas músicas (explícita, single ou álbum, popularidade${ga ? " e gênero" : ""}).</p>
+      <p>Vamos buscar no Spotify o que falta nas suas músicas (explícita, single ou álbum${ga ? " e gênero" : ""}).</p>
       <div class="du-rows">
         ${todo.length ? `<div><b>${nf(todo.length)}</b><span>música${todo.length > 1 ? "s" : ""} sem dados ou sem o link guardado · <strong>1 busca por música</strong> (pelo link quando existe, senão pelo nome)</span></div>` : ""}
         ${free.size ? `<div><b>${nf(free.size)}</b><span>música${free.size > 1 ? "s" : ""} com o link recuperado do que já foi buscado · <strong>sem gastar busca</strong></span></div>` : ""}
@@ -3616,7 +3636,7 @@ const ownKey = (title, artist) => (title || "").trim().toLowerCase() + "|" + (sp
 // faixas que já estão na playlist e carregam o próprio ID, no mesmo formato do cache de faixas
 function ownTracksById(){
   const o = {};
-  for (const t of BY_PLAYLIST) if (t.m && t.m.id) o[t.m.id] = {title: t.title, artist: t.artist === NI ? "" : t.artist, album: t.albumRaw === NI ? "" : t.albumRaw, sec: t.sec, date: t.dateRaw, meta: t.m};
+  for (const t of BY_PLAYLIST) if (t.m && t.m.id) o[t.m.id] = {title: t.title, artist: t.artistRaw, album: t.albumRaw === NI ? "" : t.albumRaw, sec: t.sec, date: t.dateRaw, meta: t.m};
   return o;
 }
 /* id → música da playlist. 1º pelo ID guardado na música (meta.id); 2º, pras antigas sem ID, pelo cache de faixas
@@ -3639,7 +3659,7 @@ function matchLinkIds(ids){
 function rowOf(t, n, id, cache){
   const c = id && cache[id], base = {...(c && c.meta || {}), ...(t.m || {})};
   const m = id && Object.keys(base).length ? {...base, id} : t.m;
-  const r = [n, t.title, t.artist === NI ? "" : t.artist, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.dateRaw];
+  const r = [n, t.title, t.artistRaw, t.albumRaw === NI ? "" : t.albumRaw, t.sec, t.dateRaw];
   if (m) r.push(m);
   return r;
 }
@@ -3728,9 +3748,20 @@ function askVerifyOrder(){
     .then(ok => { if (ok) openTable({verify: true}); });
 }
 
+async function askReverse(){
+  const first = BY_PLAYLIST[0], last = BY_PLAYLIST[NN - 1];
+  const ok = await confirmModal({title: "Inverter a ordem da playlist?", ok: "Inverter ordem",
+    html: `<p>A ordem de entrada das <strong>${faixas(NN)}</strong> vai ser invertida: <strong>${esc(last.title)}</strong> (hoje a #${NN}) passa a ser a <strong>#1</strong> e <strong>${esc(first.title)}</strong> (hoje a #1) passa a ser a <strong>#${NN}</strong>.</p>
+      <p>Painel e insights são recalculados com a nova ordem (o que depende de "quem entrou primeiro" muda).</p>
+      <p class="muted">Para voltar ao que era antes, é só inverter de novo. Para guardar a lista atual, exporte primeiro.</p>`,
+    extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+  if (!ok) return;
+  commitRows(currentRows().map(r => [NN + 1 - r[0], ...r.slice(1)]), `Ordem invertida · ${faixas(NN)}`);
+}
+
 /* ---------- song table with removal ---------- */
-function openTable({verify = false} = {}){
-  const marked = new Set(); let sortK = "n", sortDir = 1, query = "";
+function openTable({verify = false, query: q0 = ""} = {}){
+  const marked = new Set(); let sortK = "n", sortDir = 1, query = q0;
   const body = document.createElement("div"); body.className = "tbwrap";
   body.innerHTML = `${verify ? `<div class="ordnote">Confira a coluna <strong>#</strong>: a playlist deve ir da <strong>primeira música adicionada (#1)</strong> até a <strong>última (#${NN})</strong>. Se estiver fora de ordem, clique em <strong>CONSERTAR ORDEM DA PLAYLIST</strong>.</div>` : ""}<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button>${STORE ? `<button class="gbtn" type="button" id="tb-reverse" title="A #1 vira a última e a última vira a #1">Inverter ordem</button><button class="pbtn" type="button" id="tb-fix" title="Cole os links da playlist do Spotify e a ordem é refeita, sem buscar nada">CONSERTAR ORDEM DA PLAYLIST</button>` : ""}<span class="tbcount" id="tb-count"></span></div>
     <div class="tbscroll"><table class="tb"><thead><tr><th class="ck"></th>${songHead()}</tr></thead><tbody></tbody></table></div>`;
@@ -3763,21 +3794,13 @@ function openTable({verify = false} = {}){
   });
   md.m.querySelectorAll("th[data-k]").forEach(th => { const go = () => { if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = 1; } draw(); };
     th.addEventListener("click", go); th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } }); });
+  q("#tb-q").value = q0;
   let tmr; q("#tb-q").addEventListener("input", e => { clearTimeout(tmr); tmr = setTimeout(() => { query = e.target.value; draw(); }, 120); });
   q("#tb-markall").addEventListener("click", () => { visible.forEach(t => marked.add(t.n)); draw(); });
   q("#tb-clear").addEventListener("click", () => { marked.clear(); draw(); });
   q("#tb-cancel").addEventListener("click", md.close);
   if (STORE) q("#tb-fix").addEventListener("click", openFixOrder);
-  if (STORE) q("#tb-reverse").addEventListener("click", async () => {
-    const first = BY_PLAYLIST[0], last = BY_PLAYLIST[NN - 1];
-    const ok = await confirmModal({title: "Inverter a ordem da playlist?", ok: "Inverter ordem",
-      html: `<p>A ordem de entrada das <strong>${faixas(NN)}</strong> vai ser invertida: <strong>${esc(last.title)}</strong> (hoje a #${NN}) passa a ser a <strong>#1</strong> e <strong>${esc(first.title)}</strong> (hoje a #1) passa a ser a <strong>#${NN}</strong>.</p>
-        <p>Painel e insights são recalculados com a nova ordem (o que depende de "quem entrou primeiro" muda).</p>
-        <p class="muted">Para voltar ao que era antes, é só inverter de novo. Para guardar a lista atual, exporte primeiro.</p>`,
-      extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
-    if (!ok) return;
-    commitRows(currentRows().map(r => [NN + 1 - r[0], ...r.slice(1)]), `Ordem invertida · ${faixas(NN)}`);
-  });
+  if (STORE) q("#tb-reverse").addEventListener("click", askReverse);
   q("#tb-save").addEventListener("click", async () => {
     const k = marked.size; if (!k || k >= NN) return;
     const gone = BY_PLAYLIST.filter(t => marked.has(t.n));
@@ -3837,11 +3860,11 @@ function zipStore(files, type = "application/vnd.openxmlformats-officedocument.s
 function exportXlsx(){
   const x = s => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const col = i => String.fromCharCode(65 + i);
-  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento", "gêneros", "popularidade", "explícita", "tipo_lançamento", "link_spotify"];
+  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento", "gêneros", "explícita", "tipo_lançamento", "link_spotify"];
   const rows = currentRows();
   const extra = r => {
     const m = r[6] || {}, gs = shownGenres((r[2] || "").trim() || NI);
-    return [gs ? gs.join(", ") : "", typeof m.p === "number" ? m.p : "", m.x === undefined ? "" : m.x ? "Sim" : "Não", TYPE_PT[m.ty] || "", m.id ? `https://open.spotify.com/track/${m.id}` : ""];
+    return [gs ? gs.join(", ") : "", m.x === undefined ? "" : m.x ? "Sim" : "Não", TYPE_PT[m.ty] || "", m.id ? `https://open.spotify.com/track/${m.id}` : ""];
   };
   const cell = (v, r, i, s) => typeof v === "number" ? `<c r="${col(i)}${r}"${s ? ` s="${s}"` : ""}><v>${v}</v></c>` : `<c r="${col(i)}${r}" t="inlineStr"${s ? ` s="${s}"` : ""}><is><t xml:space="preserve">${x(v)}</t></is></c>`;
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -3880,7 +3903,7 @@ function similarTitles(){
     g.get(key).push(t);
   }
   const dups = [], covers = [], ignored = [];
-  const put = (item) => (DUPIGN.has(item.id) ? ignored : item.kind === "d" ? dups : covers).push(item);
+  const put = (item) => (DUPIGN.has(item.id) || CONF.has(item.id) ? ignored : item.kind === "d" ? dups : covers).push(item);
   for (const [key, rs] of g){
     if (rs.length < 2) continue;
     const mains = new Map();
@@ -3891,48 +3914,119 @@ function similarTitles(){
   const by = (a, b) => b.rs.length - a.rs.length || coll.compare(a.title, b.title);
   return {dups: dups.sort(by), covers: covers.sort(by), ignored: ignored.sort(by)};
 }
-const syncDupsBtn = () => { const s = similarTitles(), a = ALBUM_INFO; $("#dt-dups").hidden = !s.dups.length && !s.covers.length && !s.ignored.length && !a.groups.length && !a.doubts.length && !a.rejected.length; };
-function openDups(){
+/* juntar nomes de artista que são a mesma banda: pergunta qual nome fica e aplica (só na visualização; o salvo não muda) */
+function pickBandName(names, title, lead){
+  return new Promise(res => {
+    let done = false;
+    const pb = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
+    pb.innerHTML = `<div class="confirm"><p>${lead}</p>
+      <div class="du-rows">${names.map((n, i) => `<label class="chk"><input type="radio" name="band" value="${esc(n.name)}"${i === 0 ? " checked" : ""}><span>${esc(n.name)} <em>${faixas(n.count)}</em></span></label>`).join("")}</div>
+      <p class="muted">Em todo o painel os outros nomes passam a contar como esse. O que está salvo na playlist e nos arquivos baixados não muda. Dá para desfazer na Saúde, em “Grafias parecidas do mesmo artista”.</p></div>`;
+    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-o autofocus>Juntar</button>`;
+    const pm = openModal({title, body: pb, foot, size: "sm", onClose: () => { if (!done) res(null); }});
+    foot.querySelector("[data-c]").onclick = pm.close;
+    foot.querySelector("[data-o]").onclick = () => { done = true; res(pb.querySelector("input:checked").value); pm.close(); };
+  });
+}
+/* o que a pessoa classificou como "Duplicada" (nomes de artista juntados a partir de um cover): id do grupo → {title, names, canon} */
+const DUPMARK_KEY = "catalogo-musical:dups-joined";
+const DUPMARK = (() => { try { return JSON.parse(localStorage.getItem(DUPMARK_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveDupMark = () => { try { localStorage.setItem(DUPMARK_KEY, JSON.stringify(DUPMARK)); } catch (e) {} };
+function undoDupMark(id){
+  const r = DUPMARK[id]; if (!r) return;
+  for (const n of r.names) if (n !== r.canon.toLowerCase()) delete ALIAS[n];
+  delete DUPMARK[id]; saveDupMark(); saveAlias(); setFlash("Nomes separados de novo: voltou para a lista."); ssSet("health", "1"); location.reload();
+}
+function applyAlias(canon, names){
+  for (const n of names) if (n.name.toLowerCase() !== canon.toLowerCase()) ALIAS[n.name.toLowerCase()] = canon;
+  saveAlias(); setFlash(`Nomes juntados: agora tudo conta como ${canon}.`); ssSet("health", "1"); location.reload();
+}
+function undoAlias(key){ delete ALIAS[key]; saveAlias(); setFlash("Nome separado de novo."); ssSet("health", "1"); location.reload(); }
+/* escolher quais faixas de um grupo apagar (sempre fica pelo menos uma); pede confirmação antes, como qualquer remoção */
+function openDeleteList(item, intro){
+  const body = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
+  body.innerHTML = `<div class="confirm"><p>${intro}</p><div class="du-rows">${item.rs.map((t, i) => `<label class="chk"><input type="checkbox" data-n="${t.n}"${i ? " checked" : ""}><span><b>#${t.n}</b> ${esc(t.title)} · ${esc(t.artist)} · ${esc(t.albumRaw === NI ? "—" : t.albumRaw)} · ${t.sec ? durTxt(t.sec) : "—"}</span></label>`).join("")}</div><p class="muted">Fica pelo menos uma faixa. Nada é apagado até você confirmar.</p></div>`;
+  foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn danger" type="button" data-ok>Apagar</button>`;
+  const md = openModal({title: "Quais faixas apagar?", body, foot, size: "sm"});
+  const ok = foot.querySelector("[data-ok]"), boxes = [...body.querySelectorAll("input")];
+  const picked = () => boxes.filter(b => b.checked).map(b => +b.dataset.n);
+  const sync = () => { const k = picked().length; ok.disabled = !k || k >= boxes.length; ok.textContent = k ? `Apagar ${faixas(k)}…` : "Apagar"; };
+  body.addEventListener("change", sync); sync();
+  foot.querySelector("[data-c]").onclick = md.close;
+  ok.onclick = async () => {
+    const del = new Set(picked()), gone = item.rs.filter(t => del.has(t.n));
+    const go = await confirmModal({title: `Apagar ${faixas(gone.length)}?`, danger: true, ok: "Apagar",
+      html: `<p>Vão sair da playlist: ${gone.map(t => `<strong>${esc(t.title)}</strong> (#${t.n}, ${esc(t.artist)})`).join(", ")}.</p><p>A playlist fica com <strong>${faixas(NN - gone.length)}</strong>, renumeradas mantendo a ordem. Painel e insights serão recalculados.</p><p class="muted">Para guardar a lista antes, exporte primeiro.</p>`,
+      extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
+    if (!go) return;
+    ssSet("health", "1");
+    commitRows(currentRows().filter(r => !del.has(r[0])), `${faixas(gone.length)} removida${gone.length > 1 ? "s" : ""} · playlist com ${faixas(NN - gone.length)}`);
+  };
+}
+function openDups(opt = {}){
   let sim = similarTitles();
-  let tab = sim.dups.length || !sim.covers.length ? "dups" : "covers";
-  if (tab === "covers" && !sim.covers.length) tab = "ignored";
+  let tab = sim.dups.length || sim.covers.length ? "dups" : "ignored";   // nada para tratar: abre direto em Tratados
   const body = document.createElement("div");
-  let kind = "songs", ai = analyzeAlbums(RAW), atab = ai.doubts.length ? "doubt" : "auto", albChanged = false;
+  let kind = "songs", ai = analyzeAlbums(RAW), atab = ai.doubts.length || ai.groups.some(g => !g.confirmed) ? "doubt" : "done", albChanged = false;
   const seg = `<div class="seg" role="group" aria-label="O que comparar" data-g="kind"><button type="button" data-k="songs">Músicas</button><button type="button" data-k="albums"></button></div>
+    <div class="seg" role="group" aria-label="Situação" data-g="state"><button type="button" data-s="pend"></button><button type="button" data-s="done"></button></div>
     <div class="seg" role="group" aria-label="Tipo" data-g="tab"><button type="button" data-t="dups"></button><button type="button" data-t="covers"></button><button type="button" data-t="ignored"></button></div>`;
   const md = openModal({title: "Duplicadas e covers", sub: "Títulos iguais ou parecidos (ignorando remaster, live, remix…) e álbuns que são o mesmo", body, headerExtra: seg, size: "lg",
-    onClose: () => { if (albChanged){ setFlash("Álbuns atualizados: a junção das edições já vale no painel."); location.reload(); } }});
+    onClose: () => { if (albChanged){ setFlash("Álbuns atualizados: a junção das edições já vale no painel."); ssSet("health", "1"); location.reload(); } else if (opt.back) opt.back(); }});
+  const sg = n => md.m.querySelector('.seg[data-g="' + n + '"]');
+  let lastPend = tab === "ignored" ? "dups" : tab;   // última aba de "Para tratar" (pra voltar a ela)
   const albRow = (x, btns) => `<div class="alb-row"><div class="alb-main">${x}</div><div class="alb-btns">${btns}</div></div>`;
   const chips = vs => vs.map(v => `<span class="alb-chip">${esc(v.name)} <em>${faixas(v.count)}</em></span>`).join("");
   const drawAlbums = () => {
-    const lab = {auto: `Unificados (${ai.groups.length})`, doubt: `Em dúvida (${ai.doubts.length})`, sep: `Separados por você (${ai.rejected.length})`}, keys = ["auto", "doubt", "sep"];
-    md.m.querySelectorAll('.seg[data-g="tab"] button').forEach((b, i) => { b.dataset.t = keys[i]; b.textContent = lab[keys[i]]; b.setAttribute("aria-pressed", keys[i] === atab); });
-    const desc = {
-      auto: "Álbuns que o site juntou sozinho: mesmo artista e mesmo nome, mudando só a edição (remaster, deluxe, bonus…). O nome que fica é o <strong>mais curto</strong> e a data, a <strong>mais antiga</strong>. Se algum não for o mesmo álbum, clique em <strong>Não é o mesmo</strong>.",
-      doubt: "Parecem ser o mesmo álbum, mas o site não tem certeza. <strong>É o mesmo</strong> junta no painel; <strong>São diferentes</strong> mantém separados e não pergunta de novo.",
-      sep: "Pares que você disse serem álbuns diferentes. <strong>Desfazer</strong> volta a pergunta (ou a junção automática)."
-    }[atab];
+    const autoG = ai.groups.filter(g => !g.confirmed), nDoneA = ai.groups.length - autoG.length + ai.rejected.length;
+    sg("state").hidden = false; sg("tab").hidden = true;
+    sg("state").querySelectorAll("button").forEach(x => { const done = x.dataset.s === "done"; x.textContent = done ? `Tratados (${nDoneA})` : `Para tratar (${ai.doubts.length + autoG.length})`; x.setAttribute("aria-pressed", done === (atab === "done")); });
     const pair = e => `<strong>${esc(e.a)}</strong> <em>${faixas(e.ca)}</em> <span class="alb-x">×</span> <strong>${esc(e.b)}</strong> <em>${faixas(e.cb)}</em> <span class="alb-art">${esc(e.artName || "")}</span>`;
-    let html = `<p class="mdesc">${desc}</p>`;
-    if (atab === "auto") html += ai.groups.length ? ai.groups.map(g => albRow(`<div><strong>${esc(g.canon)}</strong> <span class="alb-art">${esc(g.artName || "")}${g.oldest ? " · data mais antiga: " + esc(g.oldest) : ""}${g.confirmed ? " · confirmado por você" : ""}</span></div><div class="alb-vars">${chips(g.variants)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-split" data-id="${esc(g.ids.join("§"))}">Não é o mesmo</button>`)).join("") : `<p class="mdesc">Nenhum álbum foi juntado.</p>`;
-    else if (atab === "doubt") html += ai.doubts.length ? ai.doubts.map(e => albRow(`<div>${pair(e)}</div><div class="alb-why">${esc(e.rel.why)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-yes" data-id="${esc(e.id)}">É o mesmo</button><button class="gbtn dup-act" type="button" data-a="alb-no" data-id="${esc(e.id)}">São diferentes</button>`)).join("") : `<p class="mdesc">Nenhuma dúvida: o site não encontrou álbuns parecidos para perguntar.</p>`;
-    else html += ai.rejected.length ? ai.rejected.map(e => albRow(`<div>${pair(e)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-undo" data-id="${esc(e.id)}">Desfazer</button>`)).join("") : `<p class="mdesc">Você ainda não separou nenhum par.</p>`;
-    body.innerHTML = html;
+    if (atab !== "done"){
+      const chipsA = vs => vs.map(v => `<span class="alb-chip">${esc(v.name)} <em>${faixas(v.count)}</em></span>`).join("");
+      body.innerHTML = `<p class="mdesc">O site só sugere: <strong>nada é decidido por ele</strong>. Os que ele acha que são o mesmo álbum já contam como um só nos gráficos, mas continuam aqui (e pesam na nota da Saúde) até você classificar. <strong>Mesmo álbum</strong> confirma (o nome que fica é o mais curto e a data, a mais antiga); <strong>Álbuns diferentes</strong> mantém separados e não pergunta de novo.</p>` +
+        (ai.doubts.length + autoG.length ? ai.doubts.map(e => albRow(`<div>${pair(e)}</div><div class="alb-why">${esc(e.rel.why)}</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-yes" data-id="${esc(e.id)}">Mesmo álbum</button><button class="gbtn dup-act" type="button" data-a="alb-no" data-id="${esc(e.id)}">Álbuns diferentes</button>`)).join("")
+          + autoG.map(g => albRow(`<div><strong>${esc(g.canon)}</strong> <span class="alb-art">${esc(g.artName || "")}${g.oldest ? " · data mais antiga: " + esc(g.oldest) : ""}</span></div><div class="alb-vars">${chipsA(g.variants)}</div><div class="alb-why">Suspeita do site: mesmo álbum (já conta como um só)</div>`, `<button class="gbtn dup-act" type="button" data-a="alb-confirm" data-id="${esc(g.ids.join("§"))}">Mesmo álbum</button><button class="gbtn dup-act" type="button" data-a="alb-split" data-id="${esc(g.ids.join("§"))}">Álbuns diferentes</button>`)).join("")
+          : `<p class="muted">Nada para tratar: o site não encontrou álbuns parecidos.</p>`);
+      return;
+    }
+    // "Tratados": uma coluna por classificação, lado a lado; só nome do álbum e quantas faixas
+    const rows = vs => `<table><tbody>${vs.map(v => `<tr><td>${esc(v.name)}</td><td class="muted">${faixas(v.count)}</td></tr>`).join("")}</tbody></table>`;
+    const grp = (title, art, vs, btn) => `<div class="trt-g"><div class="trt-h"><span>${esc(title)}${art ? ` <em>${esc(art)}</em>` : ""}</span><span class="trt-b">${btn}</span></div>${rows(vs)}</div>`;
+    const undo = id => `<button class="gbtn dup-act" type="button" data-a="alb-undo" data-id="${esc(id)}">Desfazer</button>`;
+    const cols = [
+      ["Álbuns diferentes", ai.rejected.map(e => grp(e.artName || "Artista", "", [{name: e.a, count: e.ca}, {name: e.b, count: e.cb}], undo(e.id)))],
+      ["Mesmo álbum", ai.groups.filter(g => g.confirmed).map(g => grp(g.canon, g.artName, g.variants, undo(g.ids.join("§"))))]
+    ];
+    body.innerHTML = `<p class="mdesc">O que você já tratou. <strong>Desfazer</strong> devolve o caso para as listas.</p><div class="trt">${cols.map(([t, gs]) => `<section class="trt-c"><h4>${t} <em>${gs.length}</em></h4>${gs.length ? gs.join("") : `<p class="muted">Nada aqui.</p>`}</section>`).join("")}</div>`;
+  };
+  // "Tratados": uma coluna por classificação, lado a lado; cada grupo mostra só música e banda
+  const drawTreated = () => {
+    const tbl = rs => `<table><tbody>${rs.map(t => `<tr><td>${esc(t.title)}</td><td class="muted">${esc(t.artist)}</td></tr>`).join("")}</tbody></table>`;
+    const grp = (x, sub) => `<div class="trt-g"><div class="trt-h"><span>${esc(x.title)} <em>${faixas(x.rs.length)}</em>${sub ? `<small>${sub}</small>` : ""}</span><span class="trt-b">${VERS[x.id] ? `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="delv">Apagar…</button>` : ""}<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="undo">Desfazer</button></span></div>${tbl(x.rs)}</div>`;
+    // Duplicadas: grupos que a pessoa disse serem a mesma banda (os nomes foram juntados); acha as faixas pelo título e pelo nome que ficou
+    const dupCol = Object.keys(DUPMARK).map(id => { const r = DUPMARK[id], rs = BY_PLAYLIST.filter(t => "c|" + normC(cleanTitle(t.title)) === id && splitArtists(t.artist)[0] === r.canon.toLowerCase()); return rs.length ? {id, title: r.title, rs} : null; }).filter(Boolean);
+    const cols = [
+      ["Outra música", sim.ignored.filter(x => !CONF.has(x.id) && !VERS[x.id]).map(x => grp(x))],
+      ["Cover", sim.ignored.filter(x => CONF.has(x.id)).map(x => grp(x))],
+      ["Outra versão", sim.ignored.filter(x => !CONF.has(x.id) && VERS[x.id]).map(x => grp(x, VERS_LABEL[VERS[x.id]]))],
+      ["Duplicadas", dupCol.map(x => grp(x, "nomes juntados").replace('data-a="undo"', 'data-a="dup-undo"'))]
+    ];
+    body.innerHTML = `<p class="mdesc">O que você já tratou, separado por classificação. <strong>Desfazer</strong> devolve o caso para as listas.</p><div class="trt">${cols.map(([t, gs]) => `<section class="trt-c"><h4>${t} <em>${gs.length}</em></h4>${gs.length ? gs.join("") : `<p class="muted">Nada aqui.</p>`}</section>`).join("")}</div>`;
   };
   const draw = () => {
-    md.m.querySelectorAll('.seg[data-g="kind"] button').forEach(b => { if (b.dataset.k === "albums") b.textContent = `Álbuns (${ai.groups.length + ai.doubts.length})`; b.setAttribute("aria-pressed", b.dataset.k === kind); });
+    md.m.querySelectorAll('.seg[data-g="kind"] button').forEach(b => { if (b.dataset.k === "albums") b.textContent = `Álbuns (${ai.doubts.length + ai.groups.filter(g => !g.confirmed).length})`; b.setAttribute("aria-pressed", b.dataset.k === kind); });
     if (kind === "albums"){ drawAlbums(); return; }
-    const lab = {dups: `Duplicadas (${sim.dups.length})`, covers: `Covers (${sim.covers.length})`, ignored: `Ignoradas (${sim.ignored.length})`};
-    md.m.querySelectorAll('.seg[data-g="tab"] button').forEach((b, i) => { b.dataset.t = ["dups", "covers", "ignored"][i]; b.textContent = lab[b.dataset.t]; b.setAttribute("aria-pressed", b.dataset.t === tab); });
-    const list = sim[tab];
-    const desc = {
-      dups: "Mesmo título e mesmo artista principal: provavelmente a mesma música adicionada duas vezes (ou em versões diferentes). Para apagar, use o botão <strong>Músicas</strong>. Se não for repetida de verdade, clique em <strong>Não é repetida</strong>.",
-      covers: "Mesmo título gravado por artistas principais diferentes: covers, ou apenas músicas com o mesmo nome. Se forem músicas diferentes, clique em <strong>Não é cover</strong>.",
-      ignored: "Casos que você marcou como \"não é cover\" ou \"não é repetida\". Clique em <strong>Desfazer</strong> para voltarem às listas."
-    }[tab];
-    const btn = x => tab === "ignored" ? `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="undo">Desfazer</button>`
-      : `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="ign">${x.kind === "c" ? "Não é cover" : "Não é repetida"}</button>`;
-    const tag = x => tab === "ignored" ? ` · <span style="text-transform:none;letter-spacing:0">${x.kind === "c" ? "não é cover" : "não é repetida"}</span>` : "";
+    const nDone = sim.ignored.length + Object.keys(DUPMARK).length, pend = [...sim.dups, ...sim.covers].sort((a, b) => b.rs.length - a.rs.length || coll.compare(a.title, b.title));
+    sg("state").hidden = false;
+    sg("state").querySelectorAll("button").forEach(x => { const done = x.dataset.s === "done"; x.textContent = done ? `Tratados (${nDone})` : `Para tratar (${pend.length})`; x.setAttribute("aria-pressed", done === (tab === "ignored")); });
+    sg("tab").hidden = true;   // em "Para tratar" duplicadas e covers vêm juntas: a pessoa é que diz qual é o problema
+    if (tab === "ignored"){ drawTreated(); return; }
+    const list = pend;
+    const desc = "Músicas com o mesmo título (ou parecido). O site só suspeita do problema: você classifica cada caso. <strong>Repetida</strong> = a mesma música duas vezes (você escolhe qual apagar, e ela pesa na nota até sumir). <strong>Outra versão</strong> = ao vivo, remaster, deluxe… (o site sugere apagar, sem pesar na nota). <strong>Cover</strong> = outro artista (ou o mesmo) regravou. <strong>Duplicada</strong> = os nomes dos artistas são a mesma banda escrita diferente. <strong>Outra música</strong> = só têm nome parecido.";
+    const B = (x, a, l) => `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="${a}">${l}</button>`;
+    const btn = x => `<span class="dup-btns">${x.kind === "c" ? B(x, "conf", "Cover") + B(x, "band", "Duplicada") : B(x, "rep", "Repetida") + B(x, "ver", "Outra versão") + B(x, "conf", "Cover")}${B(x, "ign", "Outra música")}</span>`;
+    const tag = x => ` · <span style="text-transform:none;letter-spacing:0">suspeita: ${x.kind === "c" ? "cover" : "repetida"}</span>`;
     body.innerHTML = `<p class="mdesc">${desc}</p>` +
       (list.length ? list.map(x => `<div class="eyebrow dup-head" style="margin:14px 0 6px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span>${esc(x.title)} · ${faixas(x.rs.length)}${tag(x)}</span>${btn(x)}</div>${songTable(x.rs)}`).join("") : `<p class="muted">Nenhum caso ${tab === "ignored" ? "ignorado" : "encontrado"}.</p>`);
   };
@@ -3944,37 +4038,88 @@ function openDups(){
       const byAge = [...item.rs].sort((a, b) => (b.year === NI ? -1 : a.year === NI ? 1 : b.year - a.year) || b.n - a.n);
       const nova = byAge[0], orig = [...byAge].reverse().find(r => splitArtists(r.artist)[0] !== splitArtists(nova.artist)[0]) || byAge[byAge.length - 1];
       const versoes = new Set(item.rs.map(r => splitArtists(r.artist)[0])).size;
-      return confirmModal({title: "Não é um cover?", ok: "Sim, marcar", cancel: "Cancelar",
+      return confirmModal({title: "Outra música?", ok: "Sim, marcar", cancel: "Cancelar",
         html: `<p>Deseja marcar ${who(nova)} como <strong>não sendo um cover</strong> de ${who(orig)}?</p>
           <p class="muted" style="margin-top:10px">${versoes > 2 ? `Vale para as ${versoes} versões deste título. ` : ""}O caso sai da lista de covers e você pode desfazer em “Ignoradas”.</p>`});
     }
     const a = item.rs[0];
-    return confirmModal({title: "Não é repetida?", ok: "Sim, marcar", cancel: "Cancelar",
+    return confirmModal({title: "Outra música?", ok: "Sim, marcar", cancel: "Cancelar",
       html: `<p>Deseja marcar as ${item.rs.length} faixas <strong>“${esc(item.title)}”</strong> de <strong>${esc(a.artist)}</strong> como <strong>não repetidas</strong>?</p>
         <p class="muted" style="margin-top:10px">O caso sai da lista de duplicadas e você pode desfazer em “Ignoradas”.</p>`});
   }
+  // nomes (artista principal) que aparecem no grupo, com o nº de faixas de cada um
+  const mainNames = item => { const m = new Map(); for (const t of item.rs){ const n = splitArtistsRaw(t.artist)[0]; m.set(n, (m.get(n) || 0) + 1); } return [...m].map(([name, count]) => ({name, count})).sort((a, b) => b.count - a.count); };
+  // pergunta que tipo de versão é (ao vivo, remaster, deluxe, outra)
+  const pickVersion = item => new Promise(res => {
+    let done = false;
+    const pb = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
+    pb.innerHTML = `<div class="confirm"><p>As ${item.rs.length} faixas <strong>“${esc(item.title)}”</strong> são <strong>a mesma música</strong>, em versões diferentes. Que tipo de versão?</p>
+      <div class="du-rows">${Object.entries(VERS_LABEL).map(([k, l], i) => `<label class="chk"><input type="radio" name="vers" value="${k}"${i === 0 ? " checked" : ""}><span>${l[0].toUpperCase() + l.slice(1)}</span></label>`).join("")}</div>
+      <p class="muted">Sai das listas de repetidas e covers e não conta como cover. Dá para desfazer em “Tratados”.</p></div>`;
+    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-o autofocus>Marcar</button>`;
+    const pm = openModal({title: "Mesma música, outra versão", body: pb, foot, size: "sm", onClose: () => { if (!done) res(null); }});
+    foot.querySelector("[data-c]").onclick = pm.close;
+    foot.querySelector("[data-o]").onclick = () => { done = true; res(pb.querySelector("input:checked").value); pm.close(); };
+  });
   body.addEventListener("click", async e => {
     const b = e.target.closest(".dup-act"); if (!b) return;
     if (b.dataset.a.startsWith("alb-")){
       const ids = b.dataset.id.split("§");
       if (b.dataset.a === "alb-yes") ALBMERGE[ids[0]] = "sim";
+      else if (b.dataset.a === "alb-confirm") ids.forEach(id => { ALBMERGE[id] = "sim"; });   // o site já contava como o mesmo: só confirma
       else if (b.dataset.a === "alb-no" || b.dataset.a === "alb-split") ids.forEach(id => { ALBMERGE[id] = "nao"; });
       else ids.forEach(id => { delete ALBMERGE[id]; });
-      saveAlbMerge(); ai = analyzeAlbums(RAW); albChanged = true; syncDupsBtn(); draw();
-      toast(b.dataset.a === "alb-yes" ? "Álbuns juntados. O painel atualiza quando você fechar esta tela." : b.dataset.a === "alb-undo" ? "Voltou para as listas." : "Mantidos como álbuns diferentes. O painel atualiza quando você fechar esta tela.");
+      saveAlbMerge(); ai = analyzeAlbums(RAW); if (b.dataset.a !== "alb-confirm") albChanged = true; draw();
+      toast(b.dataset.a === "alb-confirm" ? "Confirmado como o mesmo álbum." : b.dataset.a === "alb-yes" ? "Álbuns juntados. O painel atualiza quando você fechar esta tela." : b.dataset.a === "alb-undo" ? "Voltou para as listas." : "Mantidos como álbuns diferentes. O painel atualiza quando você fechar esta tela.");
       return;
     }
-    if (b.dataset.a === "ign"){
+    let verItem = null;
+    if (b.dataset.a === "dup-undo"){ undoDupMark(b.dataset.id); return; }
+    if (b.dataset.a === "band"){
+      const item = sim.covers.find(x => x.id === b.dataset.id);
+      const names = item && mainNames(item);
+      const canon = item && await pickBandName(names, "Duplicada: qual nome fica?", `Os artistas de <strong>“${esc(item.title)}”</strong> são a <strong>mesma banda</strong> escrita de jeitos diferentes? Então é a mesma música, <strong>duplicada</strong>. Escolha o <strong>nome que fica</strong> (depois ela aparece em Duplicadas):`);
+      if (canon){ DUPMARK[item.id] = {title: item.title, names: names.map(n => n.name.toLowerCase()), canon}; saveDupMark(); applyAlias(canon, names); }
+      return;
+    }
+    if (b.dataset.a === "rep"){
+      const item = sim.dups.find(x => x.id === b.dataset.id);
+      if (item) openDeleteList(item, `As ${item.rs.length} faixas <strong>“${esc(item.title)}”</strong> são a mesma música repetida. Marque as que quer apagar. <strong>Enquanto existirem, a repetida continua pesando na nota da Saúde.</strong>`);
+      return;
+    }
+    if (b.dataset.a === "delv"){
+      const item = sim.ignored.find(x => x.id === b.dataset.id);
+      if (item) openDeleteList(item, `As ${item.rs.length} faixas <strong>“${esc(item.title)}”</strong> são a mesma música em versões diferentes. Marque as que quer apagar (não afeta a nota da Saúde).`);
+      return;
+    }
+    if (b.dataset.a === "conf"){ CONF.add(b.dataset.id); saveConf(); }
+    else if (b.dataset.a === "ver"){
+      const item = [...sim.dups, ...sim.covers].find(x => x.id === b.dataset.id);
+      verItem = item;
+      const type = item && await pickVersion(item);
+      if (!type){ return; }
+      DUPIGN.add(item.id); VERS[item.id] = type; saveVers();
+    } else if (b.dataset.a === "ign"){
       const item = [...sim.dups, ...sim.covers].find(x => x.id === b.dataset.id);
       if (!item || !(await confirmIgnore(item))) return;
       DUPIGN.add(b.dataset.id);
-    } else DUPIGN.delete(b.dataset.id);
-    saveDupIgn(); sim = similarTitles(); syncDupsBtn(); draw();
-    toast(b.dataset.a === "ign" ? "Marcado. Ele foi para \"Ignoradas\" (a análise de covers atualiza ao recarregar a página)." : "Voltou para as listas.");
+    } else { DUPIGN.delete(b.dataset.id); if (CONF.delete(b.dataset.id)) saveConf(); if (VERS[b.dataset.id]){ delete VERS[b.dataset.id]; saveVers(); } }
+    if (b.dataset.a !== "conf") saveDupIgn(); sim = similarTitles(); draw();
+    if (verItem){
+      const again = await confirmModal({title: "Apagar alguma versão?", ok: "Escolher quais", cancel: "Agora não",
+        html: `<p>As ${verItem.rs.length} faixas <strong>“${esc(verItem.title)}”</strong> são a mesma música em versões diferentes. Costuma valer a pena ficar só com uma.</p><p class="muted">Isso não pesa na nota da Saúde: apagar é só uma sugestão.</p>`});
+      if (again) openDeleteList(verItem, `Marque as versões que quer apagar. Sempre fica pelo menos uma.`);
+    }
+    toast(b.dataset.a === "undo" ? "Voltou para as listas." : "Tratado. Ele foi para \"Tratados\" (a análise de covers atualiza ao recarregar a página).");
   });
   md.m.querySelectorAll('.seg[data-g="tab"] button').forEach(b => b.addEventListener("click", () => { if (kind === "albums") atab = b.dataset.t; else tab = b.dataset.t; draw(); }));
+  sg("state").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { if (kind === "albums") atab = b.dataset.s === "done" ? "done" : "doubt"; else tab = b.dataset.s === "done" ? "ignored" : lastPend; draw(); }));
   md.m.querySelectorAll('.seg[data-g="kind"] button').forEach(b => b.addEventListener("click", () => { kind = b.dataset.k; draw(); }));
-  if (!sim.dups.length && !sim.covers.length && !sim.ignored.length && (ai.groups.length || ai.doubts.length || ai.rejected.length)) kind = "albums";
+  const albPend = ai.doubts.length + ai.groups.filter(g => !g.confirmed).length;
+  if (!sim.dups.length && !sim.covers.length && (albPend || !sim.ignored.length && (ai.groups.length || ai.rejected.length))) kind = "albums";
+  if (opt.kind) kind = opt.kind;
+  if (opt.tab) tab = opt.tab;
+  if (opt.atab) atab = opt.atab === "doubt" ? "doubt" : "done";
   draw();
 }
 
@@ -3984,11 +4129,8 @@ $("#dt-import").innerHTML = `${ICON.up}<span>Adicionar músicas</span>`;
 $("#dt-export").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
 $("#dt-table").addEventListener("click", () => openTable());
 $("#dt-import").addEventListener("click", () => openImport());
-$("#dt-dups").innerHTML = `${ICON.list}<span>Duplicadas e covers</span>`;
-$("#dt-dups").addEventListener("click", openDups);
-syncDupsBtn();
 // dúvidas de álbum: avisa uma vez por sessão que dá pra decidir na tela de duplicadas
-if (ALBUM_INFO.doubts.length){ try { if (!sessionStorage.getItem("catalogo-musical:alb-doubt-toast")){ sessionStorage.setItem("catalogo-musical:alb-doubt-toast", "1"); setTimeout(() => toast(`${ALBUM_INFO.doubts.length} álbum${ALBUM_INFO.doubts.length > 1 ? "ns podem" : " pode"} ser o mesmo que outro: veja em Duplicadas e covers › Álbuns.`), 1800); } } catch (e) {} }
+if (ALBUM_INFO.doubts.length){ try { if (!sessionStorage.getItem("catalogo-musical:alb-doubt-toast")){ sessionStorage.setItem("catalogo-musical:alb-doubt-toast", "1"); setTimeout(() => toast(`${ALBUM_INFO.doubts.length} álbum${ALBUM_INFO.doubts.length > 1 ? "ns podem" : " pode"} ser o mesmo que outro: veja em Saúde › Álbuns.`), 1800); } } catch (e) {} }
 $("#dt-export").addEventListener("click", openExport);
 $("#dt-update").innerHTML = `${ICON.sync}<span>Atualizar dados</span>`;
 $("#dt-update").addEventListener("click", openDataUpdate);
@@ -4006,6 +4148,7 @@ function boot(){
   placePill();
   render();
   queueAppleGenres();
+  if (STORE) queueAppleDates();
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
   if (STORE){
     let fresh = null; try { fresh = JSON.parse(ssGet("fresh") || "null"); } catch (e) {}
