@@ -174,6 +174,13 @@ const ADATES = (() => { try { return JSON.parse(localStorage.getItem(ADATE_KEY) 
 const saveADates = () => { try { localStorage.setItem(ADATE_KEY, JSON.stringify(ADATES)); } catch (e) {} };
 const yearOnly = d => /^\d{4}-01-01$/.test(d || "");
 const adateKey = (artist, album) => `${(splitArtistsRaw(String(artist || ""))[0] || "").toLowerCase()}|${String(album || "").trim().toLowerCase()}`;
+/* reavaliação de datas (álbuns do mesmo artista que saíram "no mesmo dia" por causa da Apple): DFIX[artista|álbum] = {d: data, review: bool}.
+   Vale só enquanto a data guardada da faixa ainda é só o ano (se a pessoa editar, a edição manda). review = a pessoa precisa conferir à mão (pesa na nota).
+   DREV = álbuns já reavaliados (não pergunta de novo) */
+const DFIX_KEY = "catalogo-musical:date-fix", DREV_KEY = "catalogo-musical:date-reviewed";
+const DFIX = (() => { try { return JSON.parse(localStorage.getItem(DFIX_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const DREV = (() => { try { return new Set(JSON.parse(localStorage.getItem(DREV_KEY) || "[]")); } catch (e) { return new Set(); } })();
+const saveDFix = () => { try { localStorage.setItem(DFIX_KEY, JSON.stringify(DFIX)); localStorage.setItem(DREV_KEY, JSON.stringify([...DREV])); } catch (e) {} };
 const adateFor = (artist, album, base) => { const d = ADATES[adateKey(artist, album)]; return yearOnly(base) && d && d.slice(0, 4) === base.slice(0, 4) ? d : base; };
 /* faixas que não são de álbum (single/EP, coletânea…) mas talvez sejam: busca na Apple (sem login). "artista principal|título" → {album, tn, tt} ("" = só existe como single).
    É só uma sugestão (não pesa na nota): a pessoa aceita ou recusa na Saúde; recusadas ficam em ASING_IGN */
@@ -185,9 +192,9 @@ const saveASingIgn = () => { try { localStorage.setItem(ASING_IGN_KEY, JSON.stri
 const singleKey = t => `${(splitArtistsRaw(t.artist)[0] || "").toLowerCase()}|${normC(cleanTitle(t.title))}`;
 const T = RAW.map(([n, title, artist, album, sec, date, meta], ri) => {
   const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
-  const od = ALBUM_INFO.dates.get(albArtKey(artist) + "|" + String(album || "").trim()), dateUse = adateFor(artist, album, od || date || "");   // álbum unificado: vale a data mais antiga
+  const od = ALBUM_INFO.dates.get(albArtKey(artist) + "|" + String(album || "").trim()), dfx = DFIX[adateKey(artist, album)], dateUse = dfx && (yearOnly(date) || dfx.force) ? dfx.d : adateFor(artist, album, od || date || "");   // álbum unificado: vale a data mais antiga
   // gs = gênero do Spotify (null = falta buscar) · ge = gênero exibido/calculado (Spotify ou, na falta, Apple)
-  return {n, title, artist: a, artistRaw: String(RAW0[ri][2] || "").trim(), bands: bandsOf(a), album: albumCanon(artist, album), albumRaw: (album || "").trim() || NI,
+  return {n, title, artist: a, dfix: !!(dfx && dfx.review && yearOnly(date)), artistRaw: String(RAW0[ri][2] || "").trim(), bands: bandsOf(a), album: albumCanon(artist, album), albumRaw: (album || "").trim() || NI,
     sec: sec, date: dateUse, dateRaw: date || "", year: dateUse ? +dateUse.slice(0, 4) : NI, m, gs, ge, ...extraProps(m, ge)};
 });
 const ALL_BANDS = [...new Set(T.flatMap(t => t.bands))].sort(niLast);
@@ -857,6 +864,40 @@ function pickSongAlbum(results, artist, title){
   ok.sort((x, y) => String(x.releaseDate || "9").localeCompare(String(y.releaseDate || "9")) || ed(x) - ed(y));
   const r = ok[0]; return r ? {album: r.collectionName, tn: r.trackNumber || 0, tt: r.trackCount || 0} : null;
 }
+/* MusicBrainz (grátis, sem login, ~1 pedido por segundo): segunda fonte depois da Apple e antes de qualquer busca no Spotify */
+async function mbJSON(path){
+  const r = await fetch("https://musicbrainz.org/ws/2/" + path + (path.includes("?") ? "&" : "?") + "fmt=json");
+  if (!r.ok) throw new Error("mb " + r.status);
+  return r.json();
+}
+const mbArtistOk = (credits, art) => { const a = normC(art); return (credits || []).some(c => { const n = normC(c.name || (c.artist && c.artist.name) || ""); return n && (n === a || n.includes(a) || a.includes(n)); }); };
+// data original (a mais antiga) do álbum: release-group sem tipo secundário (ao vivo, coletânea…); "" se não achar
+async function mbAlbumDate(art, album){
+  const core = albCore(album).join(" "); if (!core) return "";
+  await new Promise(r => setTimeout(r, 1200));
+  const j = await mbJSON("release-group/?query=" + encodeURIComponent(`releasegroup:"${core}" AND artist:"${art}" AND primarytype:album`) + "&limit=15");
+  const ok = ((j && j["release-groups"]) || []).filter(g => g.title && albTokens(g.title).join(" ") === core && !(g["secondary-types"] || []).length && mbArtistOk(g["artist-credit"], art));
+  ok.sort((x, y) => String(x["first-release-date"] || "9").localeCompare(String(y["first-release-date"] || "9")));
+  return ok[0] ? String(ok[0]["first-release-date"] || "") : "";
+}
+// a faixa num álbum de verdade: release oficial de um release-group do tipo álbum (sem tipo secundário e sem marca de edição); o mais antigo
+async function mbTrackAlbum(art, title){
+  const nt = normC(cleanTitle(title));
+  await new Promise(r => setTimeout(r, 1200));
+  const j = await mbJSON("recording/?query=" + encodeURIComponent(`recording:"${cleanTitle(title)}" AND artist:"${art}"`) + "&limit=15");
+  const cands = [];
+  for (const rec of (j && j.recordings) || []){
+    if (normC(cleanTitle(rec.title || "")) !== nt || !mbArtistOk(rec["artist-credit"], art)) continue;
+    for (const rel of rec.releases || []){
+      const rg = rel["release-group"] || {};
+      if (rg["primary-type"] !== "Album" || (rg["secondary-types"] || []).length || (rel.status && rel.status !== "Official")) continue;
+      if (albCore(rel.title || "").join(" ") !== albTokens(rel.title || "").join(" ")) continue;
+      cands.push({album: rel.title, date: rel.date || rg["first-release-date"] || "", tn: 0, tt: rel["track-count"] || 0});
+    }
+  }
+  cands.sort((x, y) => String(x.date || "9").localeCompare(String(y.date || "9")));
+  return cands[0] ? {album: cands[0].album, tn: 0, tt: 0} : null;   // o nº de faixas do MusicBrainz varia por edição: não usa
+}
 function queueAppleSingles(){
   const need = new Map();
   for (const t of T){
@@ -864,7 +905,8 @@ function queueAppleSingles(){
     const k = singleKey(t); if (!(k in ASING) && !need.has(k)) need.set(k, {main: splitArtistsRaw(t.artist)[0], title: t.title});
   }
   for (const [k, x] of need) coverQueue.push({job: async () => {
-    const r = pickSongAlbum(await itunes(`search?entity=song&limit=15&term=${encodeURIComponent(x.main + " " + cleanTitle(x.title))}`), x.main, x.title);
+    let r = pickSongAlbum(await itunes(`search?entity=song&limit=15&term=${encodeURIComponent(x.main + " " + cleanTitle(x.title))}`), x.main, x.title);
+    if (!r){ try { r = await mbTrackAlbum(x.main, x.title); } catch (e) {} }   // 2ª fonte grátis: MusicBrainz
     ASING[k] = r || ""; saveASing();
   }});
   if (need.size) pumpCovers();
@@ -880,7 +922,8 @@ function queueAppleDates(){
   if (!need.size) return;
   for (const [k, x] of need) coverQueue.push({job: async () => {
     const r = pickAlbum(await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(x.main + " " + x.album)}`), x.main, x.album, 3);   // só vale o mesmo álbum
-    const d = r && r.releaseDate ? String(r.releaseDate).slice(0, 10) : "";
+    let d = r && r.releaseDate ? String(r.releaseDate).slice(0, 10) : "";
+    if (!d){ try { const m = await mbAlbumDate(x.main, x.album); if (/^\d{4}-\d{2}-\d{2}$/.test(m)) d = m; } catch (e) {} }   // 2ª fonte grátis: MusicBrainz (o ano precisa bater, como na Apple)
     ADATES[k] = d; saveADates();
   }});
   pumpCovers();
@@ -4187,13 +4230,14 @@ function boot(){
     else if (verify) setTimeout(askVerifyOrder, 1400);
   }
   if (location.hash === "#insights") showTab("insights");
+  const untouched = !STORE && !touchedExample();   // exemplo do site sem nenhuma alteração
   const params = new URLSearchParams(location.search);
   if (params.get("import") === "nova-playlist"){
     params.delete("import");
     const qs = params.toString();
     history.replaceState({}, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
-    openImport();
-  } else if (!STORE && !touchedExample()) openExampleNotice();
+    if (untouched) openImport();   // quem já tem dados (playlist própria ou qualquer decisão guardada) não leva modal nenhum ao entrar
+  } else if (untouched) openExampleNotice();
 }
 /* o aviso "esta playlist é só um exemplo" só vale pra quem ainda não mexeu em nada nos dados do exemplo:
    qualquer decisão guardada (álbuns, duplicadas, covers, versões, nomes juntados, sugestões recusadas) já conta como mexida */
