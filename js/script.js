@@ -4193,7 +4193,15 @@ function boot(){
     const qs = params.toString();
     history.replaceState({}, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
     openImport();
-  } else if (!STORE) openExampleNotice();
+  } else if (!STORE && !touchedExample()) openExampleNotice();
+}
+/* o aviso "esta playlist é só um exemplo" só vale pra quem ainda não mexeu em nada nos dados do exemplo:
+   qualquer decisão guardada (álbuns, duplicadas, covers, versões, nomes juntados, sugestões recusadas) já conta como mexida */
+const TOUCH_KEYS = ["album-merges", "dups-ignored", "dups-versions", "dups-confirmed", "artist-alias", "dups-joined", "apple-singles-ignored"];
+function touchedExample(){
+  try {
+    return TOUCH_KEYS.some(k => { const v = JSON.parse(localStorage.getItem("catalogo-musical:" + k) || "null"); return v && (Array.isArray(v) ? v.length : Object.keys(v).length); });
+  } catch (e) { return false; }
 }
 function openExampleNotice(){
   const foot = document.createElement("div"); foot.className = "mfrow";
