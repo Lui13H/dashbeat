@@ -4,9 +4,15 @@
    Nenhuma ação gasta busca sozinha: os botões só abrem as telas que já pedem confirmação. */
 (() => {
 "use strict";
-const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, an: 0};   // peso de cada verificação na nota (soma 105: nunca zera só por isso; peso 0 = só informa)
+const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, an: 0};   // peso de cada verificação na nota (soma 105: nunca zera só por isso; peso 0 = só informa)
 const FULL_AT = 0.25;                                                       // com 25% das faixas afetadas o item já custa o peso inteiro
 const MAX_SEC = 20 * 60;
+
+const DUR_CHECK_KEY = "catalogo-musical:dur-check";
+// { [trackKey]: { status: "ok"|"warn"|"mismatch", confirmed: bool, appleMs: number|null, mbMs: number|null } }
+const DUR_CHECK = (() => { try { return JSON.parse(localStorage.getItem(DUR_CHECK_KEY) || "null") || {}; } catch(e) { return {}; } })();
+const saveDurCheck = () => { try { localStorage.setItem(DUR_CHECK_KEY, JSON.stringify(DUR_CHECK)); } catch(e) {} };
+const durKey = t => `${normC(t.artist)}|${normC(t.title)}`;
 
 const uniq = list => [...new Set(list)];
 const plural = (n, um, varios) => `${nf(n)} ${n === 1 ? um : varios}`;
@@ -35,7 +41,14 @@ function healthChecks(list = BY_PLAYLIST){
   const genres = genreTargets(list.map(t => ({artist: t.artist, meta: t.m})));
   const ni = list.filter(t => t.artist === NI || t.albumRaw === NI || !t.dateRaw);
   const sim = similarTitles(), dupTracks = uniq(sim.dups.flatMap(x => x.rs));
-  const oddDur = list.filter(t => t.sec === 0 || t.sec > MAX_SEC);
+  // faixas com 0s continuam sendo "warn" simples (sem busca necessária)
+  const zeroDur = list.filter(t => t.sec === 0);
+  // faixas com >20min: split por status no DUR_CHECK
+  const longDur = list.filter(t => t.sec > MAX_SEC);
+  const longDurPending = longDur.filter(t => { const c = DUR_CHECK[durKey(t)]; return !c || (c.status === "mismatch" && !c.confirmed); }); // pesa na nota
+  const longDurWarn = longDur.filter(t => { const c = DUR_CHECK[durKey(t)]; return c && (c.status === "ok" || (c.status === "warn") || (c.status === "mismatch" && c.confirmed)); }); // só aviso, não pesa
+  const oddDur = [...zeroDur, ...longDurPending]; // o que pesa na nota
+  const oddDurWarn = longDurWarn; // só aviso
   const sugs = list.filter(t => t.m && t.m.ty && t.m.ty !== "album" && ASING[singleKey(t)] && ASING[singleKey(t)].album && !ASING_IGN.has(singleKey(t)));   // sugestão da Apple: não pesa na nota
   const altList = altAlbums(list), sameDay = sameDayAlbums(list), review = list.filter(t => t.dfix);   // dfix: data corrigida pelo site, à espera de conferência manual
   const spell = artistSpellings(list), ai = ALBUM_INFO, autoG = ai.groups.filter(g => !g.confirmed);
@@ -47,6 +60,7 @@ function healthChecks(list = BY_PLAYLIST){
     mk("e", ni.length, ni.length / N, "warn", {tracks: ni}),
     mk("f", sim.dups.length, dupTracks.length / N, "warn", {tracks: dupTracks, groups: sim.dups}),
     mk("g", oddDur.length, oddDur.length / N, "warn", {tracks: oddDur}),
+    mk("gw", oddDurWarn.length, 0, "help", {tracks: oddDurWarn, longDurWarn: true}),
     mk("cv", sim.covers.length, uniq(sim.covers.flatMap(x => x.rs)).length / N, "warn", {tracks: uniq(sim.covers.flatMap(x => x.rs))}),   // dúvida do site: pesa na nota até a pessoa classificar
     mk("ad", ai.doubts.length, Math.min(1, ai.doubts.reduce((n, e) => n + e.ca + e.cb, 0) / N), "warn", {}),
     mk("au", autoG.length, Math.min(1, autoG.reduce((n, g) => n + g.variants.reduce((m, v) => m + v.count, 0), 0) / N), "warn", {}),
@@ -74,7 +88,8 @@ const META = {
   ad: {t: "Álbuns em dúvida", ok: "Nenhum álbum em dúvida.", d: n => `${plural(n, "par de álbuns pode", "pares de álbuns podem")} ser o mesmo álbum. Escolha “É o mesmo” ou “São diferentes”.`, act: "adoubt"},
   au: {t: "Álbuns que o site acha iguais", ok: "Nenhum álbum aguardando confirmação.", d: n => `${plural(n, "grupo de álbuns", "grupos de álbuns")} que o site acha serem o mesmo (edições como remaster ou deluxe). Já contam como um só nos gráficos, mas esperam a sua confirmação.`, act: "aauto"},
   f: {t: "Prováveis duplicadas", ok: "Nenhuma música repetida.", d: n => `${plural(n, "caso de música provavelmente repetida", "casos de músicas provavelmente repetidas")} (mesmo título e artista principal).`, act: "dups"},
-  g: {t: "Duração suspeita", ok: "Nenhuma duração estranha.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração de 0 s ou de mais de 20 minutos.`, act: "list"},
+  g: {t: "Duração suspeita", ok: "Nenhuma duração estranha.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração de 0 s ou de mais de 20 minutos.`, act: "dur"},
+  gw: {t: "Duração longa confirmada", ok: "Nenhuma faixa com duração longa confirmada pendente.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração acima de 20 min confirmada. Você pode editar ou confirmar novamente.`, act: "dur"},
   sg: {t: "Faixas fora de álbum que são de álbum", ok: "Nenhuma faixa fora de álbum com sugestão de álbum.", d: n => `${plural(n, "faixa marcada como single, EP ou coletânea existe", "faixas marcadas como single, EP ou coletânea existem")} num álbum, segundo a Apple. É só uma sugestão: não pesa na nota.`, act: "singles"},
   dc: {t: "Álbuns próximos do mesmo artista", ok: "Nenhum álbum do mesmo artista lançado tão perto de outro.", d: n => `${plural(n, "álbum saiu", "álbuns saíram")} no mesmo ano ou a menos de 2 meses de outro álbum do mesmo artista. A Apple confere sozinha, mas se a suspeita continuar isso pesa na nota até você responder (está certo, editar a data ou reavaliar).`, act: "near"},
   dr: {t: "Datas para conferir à mão", ok: "Nenhuma data pendente de conferência.", d: n => `${plural(n, "faixa tem", "faixas têm")} uma data que o site montou (ano do Spotify com dia e mês da Apple) porque a Apple não confirmou. Confira em Editar: pesa na nota até você ajustar.`, act: "list"},
@@ -291,6 +306,72 @@ function pickNormalMB(j, art, core){
   return ok[0] ? {name: ok[0].title, date: ok[0]["first-release-date"] || "", src: "MusicBrainz"} : null;
 }
 const nap = ms => new Promise(r => setTimeout(r, ms));
+
+async function checkDurWithSources(t) {
+  const key = durKey(t);
+  const mainArtist = splitArtistsRaw(t.artist)[0] || t.artist;
+  let appleMs = null, mbMs = null;
+  const TOLERANCE = 30000; // 30s de tolerância
+
+  // 1) Apple Music via iTunes Search
+  try {
+    await new Promise(r => setTimeout(r, 400));
+    const res = await itunes(`search?entity=song&limit=5&term=${encodeURIComponent(mainArtist + " " + t.title)}`);
+    const match = (res || []).find(x => x.trackTimeMillis && normC(x.trackName || "") === normC(t.title) && normC(x.artistName || "").includes(normC(mainArtist)));
+    if (match) appleMs = match.trackTimeMillis;
+  } catch(e) {}
+
+  // 2) MusicBrainz
+  try {
+    await new Promise(r => setTimeout(r, 1200));
+    const j = await mbJSON("recording/?query=" + encodeURIComponent(`recording:"${t.title}" AND artist:"${mainArtist}"`) + "&limit=10");
+    const match = ((j && j.recordings) || []).find(r => r.length && normC(r.title || "") === normC(t.title) && normC((r["artist-credit"] || []).map(c => c.name || (c.artist && c.artist.name) || "").join("")).includes(normC(mainArtist)));
+    if (match) mbMs = match.length;
+  } catch(e) {}
+
+  const trackMs = t.sec * 1000;
+  const appleOk = appleMs !== null ? Math.abs(appleMs - trackMs) <= TOLERANCE : null;
+  const mbOk = mbMs !== null ? Math.abs(mbMs - trackMs) <= TOLERANCE : null;
+
+  // Se ambos falharam (null): status "warn" (aviso sem penalidade, nenhum confirmou nem negou)
+  // Se ao menos um confirmou (ok===true): status "ok" → vira "warn" (aviso sem penalidade)
+  // Se ao menos um negou (ok===false) e nenhum confirmou: status "mismatch" → pesa na nota até o usuário resolver
+
+  let status;
+  if (appleOk === true || mbOk === true) status = "ok";
+  else if (appleOk === false || mbOk === false) status = "mismatch";
+  else status = "warn"; // ambos null: não conseguiu verificar
+
+  DUR_CHECK[key] = { status, confirmed: false, appleMs, mbMs, lastSec: t.sec };
+  saveDurCheck();
+  return DUR_CHECK[key];
+}
+
+if (STORE) {
+  const longTracks = BY_PLAYLIST.filter(t => t.sec > MAX_SEC);
+  const needCheck = longTracks.filter(t => {
+    const c = DUR_CHECK[durKey(t)];
+    return !c; // ainda não checou
+  });
+  // Se a duração foi editada (sec mudou), reseta o confirmed e re-verifica
+  for (const t of longTracks) {
+    const c = DUR_CHECK[durKey(t)];
+    if (c && c.lastSec !== undefined && c.lastSec !== t.sec) {
+      DUR_CHECK[durKey(t)] = { status: undefined, confirmed: false, appleMs: null, mbMs: null, lastSec: t.sec };
+      saveDurCheck();
+      if (!needCheck.find(x => durKey(x) === durKey(t))) {
+        coverQueue.push({ job: async () => { await checkDurWithSources(t); } });
+      }
+    } else if (c) {
+      DUR_CHECK[durKey(t)] = { ...c, lastSec: t.sec };
+      saveDurCheck();
+    }
+  }
+  for (const t of needCheck) {
+    coverQueue.push({ job: async () => { await checkDurWithSources(t); } });
+  }
+  if (needCheck.length) pumpCovers();
+}
 if (STORE){
   const need = altAlbums(BY_PLAYLIST).filter(x => { const n = NORM[x.k]; return !n || (!n.name && !(n.tried || []).includes("auto2")); });
   for (const x of need) coverQueue.push({job: async () => {
@@ -373,6 +454,60 @@ function openAltSpotify(albums){
   }
 }
 
+function openDurReview(tracks) {
+  const body = document.createElement("div");
+  const fmt = ms => ms !== null ? durTxt(Math.round(ms / 1000)) : "—";
+  const statusLabel = t => {
+    const c = DUR_CHECK[durKey(t)];
+    if (!c) return '<span class="muted">aguardando verificação…</span>';
+    if (c.status === "ok") return '<span style="color:var(--emerald)">✓ Confirmada pela Apple/MusicBrainz</span>';
+    if (c.status === "mismatch") return '<span style="color:#F87171">✗ Duração diverge das fontes</span>';
+    return '<span class="muted">Fontes não encontraram a música</span>';
+  };
+  const srcInfo = t => {
+    const c = DUR_CHECK[durKey(t)];
+    if (!c || (!c.appleMs && !c.mbMs)) return "";
+    const parts = [];
+    if (c.appleMs !== null) parts.push(`Apple: ${fmt(c.appleMs)}`);
+    if (c.mbMs !== null) parts.push(`MusicBrainz: ${fmt(c.mbMs)}`);
+    return `<span class="muted" style="font-size:.82em">${parts.join(" · ")}</span>`;
+  };
+
+  body.innerHTML = `<div class="confirm"><p>Estas faixas têm mais de 20 min. Confirme se a duração está certa ou edite.</p>
+    <div class="du-rows">${tracks.map(t => `<div class="alb-row" data-n="${t.n}">
+      <div class="alb-main">
+        <div><strong>${esc(t.title)}</strong> · ${esc(t.artist)}</div>
+        <div class="alb-why">${durTxt(t.sec)} · ${statusLabel(t)}</div>
+        ${srcInfo(t) ? `<div>${srcInfo(t)}</div>` : ""}
+      </div>
+      <div class="alb-btns">
+        <button class="gbtn" type="button" data-confirm="${t.n}">Confirmar duração</button>
+        <button class="gbtn" type="button" data-edit="${t.n}">Editar</button>
+      </div>
+    </div>`).join("")}</div></div>`;
+
+  let changed = false;
+  const md = openModal({title: "Duração suspeita", body, size: "lg", onClose: () => { if (changed) openHealth(); }});
+
+  body.addEventListener("click", e => {
+    const cf = e.target.closest("[data-confirm]"), ed = e.target.closest("[data-edit]");
+    if (cf) {
+      const t = tracks.find(x => x.n === +cf.dataset.confirm);
+      if (t) {
+        const c = DUR_CHECK[durKey(t)] || {};
+        DUR_CHECK[durKey(t)] = { ...c, confirmed: true, status: c.status || "warn" };
+        saveDurCheck();
+        changed = true;
+        cf.closest(".alb-row").remove();
+        if (!body.querySelector(".alb-row")) md.close();
+      }
+    } else if (ed) {
+      const t = tracks.find(x => x.n === +ed.dataset.edit);
+      if (t) editTrack(t);
+    }
+  });
+}
+
 function openHealth(){
   const H = healthChecks(), bad = H.items.filter(i => i.count && i.w);
   const body = document.createElement("div"); body.className = "sd";
@@ -395,6 +530,7 @@ function openHealth(){
       : m.act === "aauto" ? `<button class="gbtn" type="button" data-act="dups" data-o="aauto">Revisar álbuns</button>`
       : m.act === "dups" ? `<button class="gbtn" type="button" data-act="dups" data-o="dups">Revisar duplicadas</button>`
       : m.act === "spell" ? `<button class="gbtn" type="button" data-act="spell" data-k="${it.k}">Juntar nomes (${nf(it.count)})</button>`
+      : m.act === "dur" ? `<button class="gbtn" type="button" data-act="dur" data-k="${it.k}">Revisar durações (${nf(it.count)})</button>`
       : `<button class="gbtn" type="button" data-act="list" data-k="${it.k}">Ver as ${nf(it.count)}</button>`;
     return `<li class="sd-i ${it.level}"><span class="sd-dot" aria-hidden="true">${it.level === "warn" ? "!" : "i"}</span><div class="sd-tx"><b>${m.t}</b><span>${m.d(it.count, it)}</span></div><span class="sd-lv">${LEVEL[it.level]}</span><div class="sd-act">${btn}</div></li>`;
   };
@@ -420,6 +556,7 @@ function openHealth(){
     else if (a === "near"){ md.close(); openNear(by("dc").albums); }
     else if (a === "reeval"){ md.close(); openReeval(by("dc").albums); }
     else if (a === "singles"){ md.close(); openSingles(by("sg").tracks); }
+    else if (a === "dur"){ md.close(); const it = by(b.dataset.k); openDurReview(it.tracks); }
     else if (a === "spell"){
       const groups = by("h").groups || [], keys = Object.keys(ALIAS);
       const sm = openModal({title: META.h.t, size: "md", sub: "Mesma banda escrita de jeitos diferentes",
