@@ -5,11 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashbeat — Painel</title>
 <link rel="icon" type="image/png" href="img/favicon.png">
+<meta name="description" content="Painel interativo da sua playlist do Spotify: gêneros, anos, artistas, saúde da playlist e insights.">
+<meta name="theme-color" content="#030605">
+<link rel="canonical" href="https://painel-musical.vercel.app/painel_musical.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dashbeat">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Dashbeat — Painel">
+<meta property="og:description" content="Painel interativo da sua playlist do Spotify: gêneros, anos, artistas, saúde da playlist e insights.">
+<meta property="og:url" content="https://painel-musical.vercel.app/painel_musical.html">
+<meta property="og:image" content="https://painel-musical.vercel.app/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Dashbeat — Sinta a batida. Revele o impacto.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dashbeat — Painel">
+<meta name="twitter:description" content="Painel interativo da sua playlist do Spotify: gêneros, anos, artistas, saúde da playlist e insights.">
+<meta name="twitter:image" content="https://painel-musical.vercel.app/img/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=1.5.5">
-<link rel="stylesheet" href="css/scrollfx.css?v=1.5.5">
+<link rel="stylesheet" href="css/style.css?v=1.5.6">
+<link rel="stylesheet" href="css/scrollfx.css?v=1.5.6">
 </head>
 <body data-fx="dashboard">
 <div class="wrap">
@@ -21,7 +38,10 @@
         <p id="srcline"></p>
       </div>
     </div>
-    <a class="dbtn" href="index.html" title="Voltar para os tutoriais"><span>← Tutoriais</span></a>
+    <div style="display:flex;align-items:center;gap:10px">
+      <a class="dbtn" href="index.html" title="Voltar para os tutoriais"><span>← Tutoriais</span></a>
+      <div class="sp-chip" id="sp-account-bar" style="display:none"></div>
+    </div>
   </header>
 
   <div class="toolbar rise" style="--d:0">
@@ -178,9 +198,9 @@
 <div class="tip" id="tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/script.js?v=1.5.5"></script>
-<script src="js/cartoes.js?v=1.5.5"></script>
-<script src="js/saude.js?v=1.5.5"></script>
-<script src="js/scrollfx.js?v=1.5.5"></script>
+<script src="js/script.js?v=1.5.6"></script>
+<script src="js/cartoes.js?v=1.5.6"></script>
+<script src="js/saude.js?v=1.5.6"></script>
+<script src="js/scrollfx.js?v=1.5.6"></script>
 </body>
 </html>

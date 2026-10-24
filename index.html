@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashbeat — Dashboard de Playlist do Spotify</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
+    <meta name="description" content="Transforme sua playlist do Spotify em um painel de estatísticas: gêneros, anos, artistas e insights. Escolha o método e gere o seu.">
+    <meta name="theme-color" content="#030605">
+    <link rel="canonical" href="https://painel-musical.vercel.app/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Dashbeat">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Dashbeat — Dashboard de Playlist do Spotify">
+    <meta property="og:description" content="Transforme sua playlist do Spotify em um painel de estatísticas: gêneros, anos, artistas e insights. Escolha o método e gere o seu.">
+    <meta property="og:url" content="https://painel-musical.vercel.app/">
+    <meta property="og:image" content="https://painel-musical.vercel.app/img/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Dashbeat — Sinta a batida. Revele o impacto.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Dashbeat — Dashboard de Playlist do Spotify">
+    <meta name="twitter:description" content="Transforme sua playlist do Spotify em um painel de estatísticas: gêneros, anos, artistas e insights. Escolha o método e gere o seu.">
+    <meta name="twitter:image" content="https://painel-musical.vercel.app/img/og-image.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -81,7 +98,7 @@
             transition: all 0.2s;
         }
     </style>
-    <link rel="stylesheet" href="css/scrollfx.css?v=1.5.5">
+    <link rel="stylesheet" href="css/scrollfx.css?v=1.5.6">
 </head>
 <body data-fx="guide" class="bg-base-100 text-white font-sans antialiased min-h-screen flex flex-col selection:bg-spotify selection:text-white">
 
@@ -434,6 +451,7 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
 
         // Tab switching logic
         function switchTab(tabId) {
+            document.title = tabId === 'manual' ? 'Método manual — Dashbeat' : 'Dashbeat — Dashboard de Playlist do Spotify';
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
@@ -505,6 +523,6 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
         // Tab styling is already correct in initial HTML, but we can enforce it:
         switchTab('premium');
     </script>
-    <script src="js/scrollfx.js?v=1.5.5"></script>
+    <script src="js/scrollfx.js?v=1.5.6"></script>
 </body>
 </html>

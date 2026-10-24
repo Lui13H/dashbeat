@@ -1852,6 +1852,7 @@ function showTab(id){
   tabs.forEach(t => t.setAttribute("aria-selected", t.getAttribute("aria-controls") === id));
   document.querySelectorAll(".tabpanel").forEach(p => p.classList.toggle("on", p.id === id));
   placePill(); hideTip();
+  document.title = id === "insights" ? "Dashbeat — Insights" : "Dashbeat — Painel";
   try { history.replaceState(null, "", id === "insights" ? "#insights" : "#"); } catch (e) {}
   if (id === "insights") animateInsights(); else requestAnimationFrame(() => { renderTree(); renderYears(rows()); drawEvo(); });
   dispatchEvent(new Event("fx:refresh"));
@@ -2779,6 +2780,179 @@ const SPOTIFY_ID_RE = /^[0-9a-f]{32}$/i; // Client ID e Client Secret do Spotify
 function loadSpotifyCreds(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_CREDS_KEY) || "null") || {}; } catch (e) { return {}; } }
 function saveSpotifyCreds(id, secret){ try { localStorage.setItem(SPOTIFY_CREDS_KEY, JSON.stringify({id, secret})); } catch (e) {} }
 function clearSpotifyCreds(){ try { localStorage.removeItem(SPOTIFY_CREDS_KEY); } catch (e) {} }
+
+/* ---------- login com Spotify (Authorization Code + PKCE): controle de acesso a links de playlist ---------- */
+const SPOTIFY_OAUTH_KEY = "catalogo-musical:spotify-oauth";
+const SPOTIFY_PKCE_KEY = "catalogo-musical:spotify-pkce";
+const SPOTIFY_PENDING_KEY = "catalogo-musical:spotify-pending-import";
+function spotifyRedirectUri(){ return location.origin + location.pathname; }
+
+function isAllowedSpotifyUser(name){
+  if (!name || typeof name !== "string") return false;
+  // normaliza removendo acentos, espaços extras e deixando em minúsculas
+  const norm = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
+  return ["crowd goes wild", "juia", "arthur ambrosio"].includes(norm);
+}
+function currentSpotifyUser(){
+  const oauth = loadSpotifyOAuth();
+  if (oauth && oauth.profile && (oauth.profile.name || oauth.profile.id)) return oauth.profile.name || oauth.profile.id;
+  return spotifyUserDisplay;
+}
+
+function b64url(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function spotifyRandToken(len = 64){ const a = new Uint8Array(len); crypto.getRandomValues(a); return b64url(a); }
+async function spotifyPkceChallenge(verifier){ return b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))); }
+function loadSpotifyOAuth(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_OAUTH_KEY) || "null"); } catch (e) { return null; } }
+function saveSpotifyOAuth(j, clientId){
+  const prev = loadSpotifyOAuth();
+  const obj = {access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + ((j.expires_in || 3600) * 1000) - 30000, client_id: clientId, profile: (prev && prev.profile) || null};
+  try { localStorage.setItem(SPOTIFY_OAUTH_KEY, JSON.stringify(obj)); } catch (e) {}
+  return obj;
+}
+function saveSpotifyProfile(profile){
+  const oauth = loadSpotifyOAuth();
+  if (!oauth) return;
+  oauth.profile = {name: profile.display_name || profile.id || "", avatar: (profile.images && profile.images[0] && profile.images[0].url) || ""};
+  try { localStorage.setItem(SPOTIFY_OAUTH_KEY, JSON.stringify(oauth)); } catch (e) {}
+}
+function clearSpotifyOAuth(){ try { localStorage.removeItem(SPOTIFY_OAUTH_KEY); } catch (e) {} }
+async function spotifyFetchProfile(token){
+  let r; try { r = await fetch("https://api.spotify.com/v1/me", {headers: {Authorization: `Bearer ${token}`}}); } catch (e) { return null; }
+  return r.ok ? r.json() : null;
+}
+const SPOTIFY_GLYPH = `<svg width="16" height="16" viewBox="0 0 24 24" fill="#1DB954" style="flex:none"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.503 17.308c-.217.356-.677.469-1.033.252-2.829-1.729-6.39-2.12-10.584-1.162-.407.094-.813-.158-.906-.566-.094-.407.158-.813.566-.906 4.593-1.05 8.528-.604 11.705 1.349.356.217.469.677.252 1.033zm1.472-3.272c-.273.444-.855.586-1.299.313-3.238-1.99-8.175-2.566-12.003-1.404-.499.152-1.025-.133-1.176-.631-.152-.499.133-1.025.631-1.176 4.38-1.33 9.814-.687 13.534 1.644.443.273.586.855.313 1.298zm.126-3.41c-3.882-2.305-10.292-2.518-14.004-1.391-.595.181-1.223-.157-1.404-.752-.181-.595.157-1.223.752-1.404 4.269-1.296 11.344-1.045 15.82 1.613.535.317.709 1.012.392 1.547-.317.535-1.012.709-1.547.392z"/></svg>`;
+function spotifyChipHtml(profile){
+  const avatar = profile.avatar ? `<img src="${esc(profile.avatar)}" alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none">`
+    : `<span style="width:22px;height:22px;border-radius:50%;background:var(--mint);color:#06140f;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none">${esc((profile.name || "?").slice(0, 1).toUpperCase())}</span>`;
+  return `${SPOTIFY_GLYPH}${avatar}<span class="sp-name">${esc(profile.name || "Conta Spotify")}</span><button type="button" class="sp-logout-x" title="Sair da conta Spotify" aria-label="Sair da conta Spotify">${ICON.x}</button>`;
+}
+function renderSpAccountBar(){
+  const bar = $("#sp-account-bar");
+  if (!bar) return;
+  const oauth = loadSpotifyOAuth();
+  if (!oauth || !oauth.profile){ bar.style.display = "none"; bar.innerHTML = ""; return; }
+  bar.innerHTML = spotifyChipHtml(oauth.profile);
+  bar.style.display = "";
+  const btn = bar.querySelector(".sp-logout-x");
+  if (btn) btn.addEventListener("click", () => {
+    clearSpotifyOAuth();
+    spotifyUserDisplay = null;
+    renderSpAccountBar();
+    toast("Você saiu da conta Spotify.");
+  });
+}
+async function spotifyLogin(clientId, pendingText, pendingMode){
+  const verifier = spotifyRandToken(), state = spotifyRandToken(16);
+  const challenge = await spotifyPkceChallenge(verifier);
+  try { sessionStorage.setItem(SPOTIFY_PKCE_KEY, JSON.stringify({verifier, state, clientId})); } catch (e) {}
+  try { sessionStorage.setItem(SPOTIFY_PENDING_KEY, JSON.stringify({text: pendingText || "", mode: pendingMode || "add"})); } catch (e) {}
+  const p = new URLSearchParams({client_id: clientId, response_type: "code", redirect_uri: spotifyRedirectUri(), code_challenge_method: "S256", code_challenge: challenge, scope: "playlist-read-private playlist-read-collaborative user-read-private", state});
+  location.href = "https://accounts.spotify.com/authorize?" + p.toString();
+}
+async function spotifyExchangeCode(code, verifier, clientId){
+  const body = new URLSearchParams({grant_type: "authorization_code", code, redirect_uri: spotifyRedirectUri(), client_id: clientId, code_verifier: verifier});
+  let r; try { r = await fetch("https://accounts.spotify.com/api/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body}); }
+  catch (e) { throw new Error("Não foi possível conectar ao Spotify para concluir o login."); }
+  const j = await r.json();
+  if (!r.ok || !j.access_token) throw new Error(j.error_description || "Falha ao concluir o login com o Spotify.");
+  return j;
+}
+async function spotifyRefreshToken(oauth){
+  const body = new URLSearchParams({grant_type: "refresh_token", refresh_token: oauth.refresh_token, client_id: oauth.client_id});
+  let r; try { r = await fetch("https://accounts.spotify.com/api/token", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body}); }
+  catch (e) { throw new Error("Não foi possível renovar o login do Spotify."); }
+  const j = await r.json();
+  if (!r.ok || !j.access_token){ clearSpotifyOAuth(); throw new Error("Sua sessão do Spotify expirou; entre novamente."); }
+  if (!j.refresh_token) j.refresh_token = oauth.refresh_token;
+  return saveSpotifyOAuth(j, oauth.client_id);
+}
+async function spotifyUserToken(){
+  let oauth = loadSpotifyOAuth();
+  if (!oauth) return null;
+  if (Date.now() >= oauth.expires_at) oauth = await spotifyRefreshToken(oauth);
+  return oauth.access_token;
+}
+async function handleSpotifyRedirectAndResume(){
+  const url = new URL(location.href);
+  const code = url.searchParams.get("code"), state = url.searchParams.get("state"), err = url.searchParams.get("error");
+  if (!code && !err) return;
+  let pkce = null; try { pkce = JSON.parse(sessionStorage.getItem(SPOTIFY_PKCE_KEY) || "null"); } catch (e) {}
+  try { sessionStorage.removeItem(SPOTIFY_PKCE_KEY); } catch (e) {}
+  url.searchParams.delete("code"); url.searchParams.delete("state"); url.searchParams.delete("error");
+  history.replaceState({}, "", url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "") + url.hash);
+  let pending = null; try { pending = JSON.parse(sessionStorage.getItem(SPOTIFY_PENDING_KEY) || "null"); } catch (e) {}
+  try { sessionStorage.removeItem(SPOTIFY_PENDING_KEY); } catch (e) {}
+  if (err){
+    toast(`Login com o Spotify cancelado ou recusado (${err}).`);
+    if (pending) openImport(pending.text);
+    return;
+  }
+  if (!pkce || pkce.state !== state){
+    toast("Não foi possível concluir o login do Spotify (sessão expirada); tente novamente.");
+    if (pending) openImport(pending.text);
+    return;
+  }
+  try {
+    const j = await spotifyExchangeCode(code, pkce.verifier, pkce.clientId);
+    saveSpotifyOAuth(j, pkce.clientId);
+    const prof = await spotifyFetchProfile(j.access_token);
+    if (prof) saveSpotifyProfile(prof);
+    const dispName = (prof && (prof.display_name || prof.id)) || "";
+    spotifyUserDisplay = dispName;
+    renderSpAccountBar();
+    if (isAllowedSpotifyUser(dispName) || (prof && isAllowedSpotifyUser(prof.id))){
+      toast(`Login concluído! Bem-vindo(a), ${dispName} ✓ (acesso a links de playlist liberado)`);
+    } else {
+      toast(`Conectado como ${dispName}. Sua conta não tem permissão para links de playlist.`);
+    }
+  } catch (e) {
+    toast(e.message || "Falha ao concluir login com o Spotify.");
+    if (pending) openImport(pending.text);
+    return;
+  }
+  openImport(pending ? pending.text : null);
+}
+
+function openPlaylistAuthModal(pendingText = "", pendingMode = "add"){
+  const creds = loadSpotifyCreds();
+  let clientId = creds.id || "";
+  const body = document.createElement("div");
+  body.innerHTML = `<div class="confirm">
+    <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:var(--ink)">Apenas alguns usuários são habilitados a usar links de playlist.</p>
+    <p class="muted" style="margin:0 0 16px">Faça login com a sua conta do Spotify para verificar se você está apto:</p>
+    <div style="margin:16px 0">
+      <label for="pl-auth-cid" style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Client ID do seu app Spotify</label>
+      <input type="text" id="pl-auth-cid" value="${esc(clientId)}" placeholder="Ex: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box">
+      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+        <small class="muted" id="pl-auth-cid-st"></small>
+        <button type="button" class="lnk" id="pl-auth-help" style="font-size:12px">Não sei meu Client ID</button>
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px 12px;margin:12px 0;font-size:12px" class="muted">
+      <strong>Redirect URI cadastrada no app:</strong><br>
+      <code style="word-break:break-all">${esc(spotifyRedirectUri())}</code>
+      <button type="button" class="lnk" id="pl-auth-copy-uri" style="margin-left:8px;font-size:12px">Copiar</button>
+    </div>
+    <p class="sp-status" id="pl-auth-status" style="margin:8px 0 0"></p>
+  </div>`;
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  foot.innerHTML = `<button class="gbtn" type="button" id="pl-auth-manual">Usar método manual</button><span class="sp"></span><button class="pbtn" type="button" id="pl-auth-go">Entrar com Spotify</button>`;
+  const md = openModal({title: "Acesso a links de playlist", body, foot, size: "sm"});
+
+  body.querySelector("#pl-auth-copy-uri").onclick = () => copyText(spotifyRedirectUri());
+  body.querySelector("#pl-auth-help").onclick = () => openSpotifyAppHelp();
+  foot.querySelector("#pl-auth-manual").onclick = () => { md.close(); openPlaylistLinkHelp(); };
+  foot.querySelector("#pl-auth-go").onclick = () => {
+    const cid = body.querySelector("#pl-auth-cid").value.trim();
+    const st = body.querySelector("#pl-auth-status");
+    st.classList.remove("err");
+    if (!cid){ st.classList.add("err"); st.textContent = "Informe o Client ID do seu app no Spotify."; return; }
+    if (!SPOTIFY_ID_RE.test(cid)){ st.classList.add("err"); st.textContent = "O Client ID deve ter 32 letras/números."; return; }
+    saveSpotifyCreds(cid, creds.secret || "");
+    md.close();
+    spotifyLogin(cid, pendingText, pendingMode);
+  };
+}
 /* metadados já buscados, por ID da faixa: links repetidos não gastam requisição (o limite do Spotify é o gargalo) */
 const SPOTIFY_TRACK_CACHE_KEY = "catalogo-musical:spotify-tracks";
 function loadTrackCache(){ try { return JSON.parse(localStorage.getItem(SPOTIFY_TRACK_CACHE_KEY) || "null") || {}; } catch (e) { return {}; } }
@@ -2888,6 +3062,71 @@ async function spotifyFetchTracks(ids, token, onProgress, onWait, ctl){
   }
   return {rows, warnings};
 }
+async function spotifyFetchPlaylistTracks(playlistIds, token, onProgress, onWait, ctl){
+  const rows = [], warnings = [];
+  let backoff = 0, attempt = 0;
+  for (let pi = 0; pi < playlistIds.length; pi++){
+    const pid = playlistIds[pi];
+    const plRows = [];
+    let offset = 0, total = Infinity;
+    while (offset < total){
+      let r;
+      for (;;){
+        if (ctl) ctl.gate();
+        try {
+          r = await fetch(`https://api.spotify.com/v1/playlists/${pid}/items?limit=100&offset=${offset}&fields=total,items(added_at,item(id,name,artists(id,name),album(name,release_date,images,album_type,total_tracks),duration_ms,is_local,explicit,track_number),track(id,name,artists(id,name),album(name,release_date,images,album_type,total_tracks),duration_ms,is_local,explicit,track_number))`, {headers: {Authorization: `Bearer ${token}`}});
+          if (r.status === 404){
+            r = await fetch(`https://api.spotify.com/v1/playlists/${pid}/tracks?limit=100&offset=${offset}&fields=total,items(added_at,track(id,name,artists(id,name),album(name,release_date,images,album_type,total_tracks),duration_ms,is_local,explicit,track_number))`, {headers: {Authorization: `Bearer ${token}`}});
+          }
+        } catch (e) { throw new Error("Não foi possível buscar a playlist no Spotify."); }
+        if (r.status === 429){
+          attempt++;
+          if (attempt > 40) throw new Error("O Spotify manteve o limite de requisições por tempo demais seguidas; tente de novo em alguns minutos.");
+          const headerWait = parseInt(r.headers.get("Retry-After") || "", 10);
+          backoff = Math.min(90, Math.max(Number.isFinite(headerWait) && headerWait > 0 ? headerWait : 2, backoff ? backoff * 1.7 : 2));
+          const wait = Math.max(1, Math.round(backoff));
+          onWait && await onWait(wait, rows.length + plRows.length, total === Infinity ? rows.length + plRows.length : total, attempt);
+          continue;
+        }
+        backoff = Math.max(0, backoff - 3); attempt = 0;
+        if (r.status === 404) throw new Error("Playlist não encontrada (verifique o link).");
+        if (r.status === 403) throw new Error("Spotify recusou o acesso à playlist (HTTP 403). Confira se a conta tem acesso a ela.");
+        if (!r.ok) throw new Error(`Falha ao buscar a playlist no Spotify (HTTP ${r.status}).`);
+        break;
+      }
+      const j = await r.json();
+      total = typeof j.total === "number" ? j.total : offset + (j.items || []).length;
+      for (const it of (j.items || [])){
+        const t = it.item || it.track;
+        if (!t || t.is_local){ warnings.push({line: rows.length + plRows.length + warnings.length + 1, msg: "faixa local ou indisponível ignorada"}); continue; }
+        plRows.push({
+          n: null,
+          id: t.id || "",
+          title: t.name,
+          artist: (t.artists || []).map(a => a.name).join(", "),
+          album: t.album ? t.album.name : "",
+          sec: Math.round(t.duration_ms / 1000),
+          date: spotifyDate(t.album),
+          cover: spotifyCover(t.album && t.album.images),
+          meta: spotifyMeta(t, t.album),
+          addedAt: it.added_at || null
+        });
+      }
+      offset += 100;
+      onProgress && onProgress(Math.min(offset, total), total, pi + 1, playlistIds.length);
+    }
+    plRows.sort((a, b) => {
+      if (a.addedAt && b.addedAt) return a.addedAt < b.addedAt ? -1 : a.addedAt > b.addedAt ? 1 : 0;
+      if (a.addedAt) return -1;
+      if (b.addedAt) return 1;
+      return 0;
+    });
+    const noDate = plRows.filter(r => !r.addedAt).length;
+    if (noDate) warnings.push({line: rows.length + 1, msg: `${noDate} faixa${noDate > 1 ? "s" : ""} dessa playlist sem data de adição registrada pelo Spotify; foram colocadas no fim`});
+    plRows.forEach(r => rows.push(r));
+  }
+  return {rows, warnings};
+}
 async function spotifyFetchAlbumTracks(albumIds, token, onProgress, onWait, ctl){
   /* álbum é catálogo público (como uma faixa avulsa), não precisa de login — e GET /albums/{id}
      já devolve o nome/data do álbum junto com a primeira página de faixas numa única chamada */
@@ -2953,7 +3192,7 @@ function copyText(text){
 }
 function openSpotifyAppHelp({id = "", secret = "", onDone, returning = false} = {}){
   /* o Spotify exige uma Redirect URI no cadastro do app, mas o fluxo Client Credentials nunca a usa */
-  const redirect = location.protocol === "https:" ? location.origin + "/callback" : "http://127.0.0.1:8080/callback";
+  const redirect = spotifyRedirectUri();
   const vals = {name: "Dashbeat", desc: "Busca dados das faixas para o meu painel de playlist", redirect};
   const copyRow = (label, key) => `<div class="wz-copy"><span>${label}</span><code>${esc(vals[key])}</code><button class="gbtn" type="button" data-copy="${key}">Copiar</button></div>`;
   const steps = [
@@ -3067,10 +3306,10 @@ function openRateLimitModal({done, total, update = false}){
   });
 }
 // known = músicas da mesma colagem que já vieram do que está salvo (não passam pelo Spotify, mas contam como "carregadas")
-async function spotifyRunFetch({token, ids, albumIds, status, btn, known = 0, ctl}){
+async function spotifyRunFetch({token, ids, plIds = [], albumIds, status, btn, known = 0, ctl}){
   status.classList.remove("err");
   btn.disabled = true;
-  status.textContent = albumIds.length ? `Buscando álbum${albumIds.length > 1 ? "ns" : ""}…` : `Buscando ${faixas(ids.length)}…`;
+  status.textContent = plIds.length ? `Buscando playlist${plIds.length > 1 ? "s" : ""}…` : albumIds.length ? `Buscando álbum${albumIds.length > 1 ? "ns" : ""}…` : `Buscando ${faixas(ids.length)}…`;
   /* cronômetro: sempre recalcula o restante a partir de "quando deve terminar" (timestamp real),
      em vez de só subtrair 1s por tick — assim não trava/atrasa mesmo se o navegador atrasar
      o timer (ex.: aba em segundo plano) */
@@ -3101,7 +3340,16 @@ async function spotifyRunFetch({token, ids, albumIds, status, btn, known = 0, ct
   try {
     startTick();
     const results = [];
-    if (albumIds.length){
+    if (plIds.length){
+      const base = results.reduce((s, r) => s + r.rows.length + r.warnings.length, 0);
+      results.push(await spotifyFetchPlaylistTracks(plIds, token, (d, t, pi, pn) => {
+        done = base + d; total = base + t;
+        etaEndTs = performance.now() + ((performance.now() - t0) / Math.max(done, 1)) * (total - done);
+        status.textContent = `Buscando faixa ${done} de ${total}${pn > 1 ? ` (playlist ${pi} de ${pn})` : ""}…${etaEndTs != null ? ` cerca de ${fmtEta(etaEndTs - performance.now())} restante` : ""}`;
+      }, onWait, ctl));
+    }
+    const stoppedPl = results.length && results[results.length - 1].partial;
+    if (albumIds.length && !stoppedPl){
       const base = results.reduce((s, r) => s + r.rows.length + r.warnings.length, 0);
       results.push(await spotifyFetchAlbumTracks(albumIds, token, (d, t, ai, an) => {
         done = base + d; total = base + t;
@@ -3378,7 +3626,7 @@ function openImport(prefillText = null){
     <div id="im-prev" class="prev"></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `${STORE ? `<button class="lnk" type="button" id="im-restore">Restaurar playlist original</button>` : ""}<span class="sp"></span><button class="gbtn" type="button" id="im-cancel">Cancelar</button><button class="gbtn" type="button" id="im-cancel-fetch" style="display:none">Cancelar busca</button><button class="pbtn" type="button" id="im-go" disabled>Importar</button>`;
-  const isAllowedUser = spotifyUserDisplay === "Crowd Goes Wild" || spotifyUserDisplay === "juia";
+  const isAllowedUser = isAllowedSpotifyUser(currentSpotifyUser());
   const headerExtra = `<div class="seg" role="tablist" id="im-mode-seg"><button type="button" data-m="add"${STORE || isAllowedUser ? "" : ` disabled title="A playlist atual é só um exemplo: primeiro substitua pela sua"`}>Adicionar músicas</button><button type="button" data-m="replace">Substituir playlist</button></div>`;
   const md = openModal({title: "Importar músicas", sub: `Playlist atual: ${faixas(NN)} · ${IS.art.length} artistas`, body, foot, size: "md", headerExtra,
     onClose: () => {
@@ -3417,11 +3665,42 @@ function openImport(prefillText = null){
     if (!parsed || !parsed.rows.length){
       go.style.display = "";
       if (spOn){ go.disabled = false; go.textContent = preNeed === 0 ? "Conferir com a playlist" : "Buscar dados no Spotify"; go.classList.remove("danger"); }
+      else if (parsed && parsed.playlistAuthNeeded){ go.disabled = false; go.textContent = "Entrar com Spotify para verificar"; go.classList.remove("danger"); }
       else { go.disabled = true; go.textContent = mode === "add" ? "Adicionar" : "Substituir playlist"; go.classList.toggle("danger", mode === "replace"); }
-      q("#im-prev").innerHTML = parsed && parsed.error
-        ? `<div class="pv bad">${esc(parsed.error)}${parsed.playlistBlocked ? ` <button type="button" class="lnk" id="im-pl-help" style="padding:0;font:inherit;vertical-align:baseline">Veja como</button>` : ""}</div>`
+      q("#im-prev").innerHTML = parsed && parsed.playlistAuthNeeded
+        ? `<div class="pv info" style="text-align:left;border-left:4px solid var(--mint);padding:14px;background:rgba(29,185,84,0.08);border-radius:8px">
+            <div style="font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ink)">Apenas alguns usuários são habilitados a usar links de playlist.</div>
+            <p style="margin:0 0 12px;font-size:13px;color:var(--ink-2)">Faça login com a sua conta do Spotify para verificar se você está apto:</p>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <button type="button" class="pbtn" id="im-pl-login-btn">Entrar com Spotify</button>
+              <button type="button" class="gbtn" id="im-pl-manual-btn">Como copiar pelo PC</button>
+            </div>
+          </div>`
+        : parsed && parsed.playlistBlocked
+        ? `<div class="pv bad" style="text-align:left">
+            <div>${esc(parsed.error)}</div>
+            <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+              ${parsed.notAllowed ? `<button type="button" class="pbtn" id="im-pl-switch-btn">Trocar conta Spotify</button>` : ""}
+              <button type="button" class="gbtn" id="im-pl-help">Ver método manual</button>
+            </div>
+          </div>`
+        : parsed && parsed.error
+        ? `<div class="pv bad">${esc(parsed.error)}</div>`
         : "";
-      if (parsed && parsed.playlistBlocked){ const b = q("#im-pl-help"); b && b.addEventListener("click", openPlaylistLinkHelp); }
+      if (parsed && parsed.playlistAuthNeeded){
+        const lb = q("#im-pl-login-btn"), mb = q("#im-pl-manual-btn");
+        lb && lb.addEventListener("click", () => openPlaylistAuthModal(ta.value, mode));
+        mb && mb.addEventListener("click", openPlaylistLinkHelp);
+      }
+      if (parsed && parsed.playlistBlocked){
+        const b = q("#im-pl-help"), sb = q("#im-pl-switch-btn");
+        b && b.addEventListener("click", openPlaylistLinkHelp);
+        sb && sb.addEventListener("click", () => {
+          clearSpotifyOAuth();
+          renderSpAccountBar();
+          openPlaylistAuthModal(ta.value, mode);
+        });
+      }
       return;
     }
     go.style.display = "";
@@ -3445,22 +3724,24 @@ function openImport(prefillText = null){
       ${fresh.slice(0, 8).map(r => `<tr>${songCells(songView(r))}</tr>`).join("")}</tbody></table>
       ${fresh.length > 8 ? `<div class="more">+ ${fresh.length - 8} faixas</div>` : ""}</div>`;
   }
-  function setSpotifyMode(on, n, an, ids){
+  function setSpotifyMode(on, n, an, ids, plIds = []){
     q("#sp-fields").style.display = on ? "" : "none";
     preNeed = null;
     if (!on) return;
     const parts = [];
+    if (plIds && plIds.length) parts.push(`${plIds.length} playlist${plIds.length > 1 ? "s" : ""}`);
     if (an) parts.push(`${an} álbu${an > 1 ? "ns" : "m"}`);
     if (n) parts.push(faixas(n));
-    const single = n === 1 && !an;
-    // quantos desses links o site já conhece (ID guardado ou cache): esses não gastam busca
+    const single = n === 1 && !an && !plIds.length;
     let known = "";
-    if (ids && ids.length && !an){
+    if (ids && ids.length && !an && !plIds.length){
       const own = ownTracksById(), cache = loadTrackCache(), k = ids.filter(id => own[id] || cache[id]).length;
       preNeed = ids.length - k;
       known = ` <strong>${k}</strong> já ${k === 1 ? "é conhecida" : "são conhecidas"} (não ${k === 1 ? "gasta" : "gastam"} busca)${preNeed ? ` · <strong>${preNeed}</strong> ${preNeed === 1 ? "precisa" : "precisam"} ser buscada${preNeed > 1 ? "s" : ""} no Spotify` : " · nenhuma precisa de busca: é só conferir com a playlist"}.`;
     }
-    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.${known}${single ? ` <button type="button" class="lnk" id="sp-whole-pl" style="padding:0;font:inherit;vertical-align:baseline">Quer adicionar a playlist inteira?</button>` : ""}`;
+    const user = currentSpotifyUser();
+    const userBadge = user && isAllowedSpotifyUser(user) ? ` · Conectado como <strong>${esc(user)}</strong> ✓ (usuário autorizado)` : "";
+    q("#sp-detect-msg").innerHTML = `Detectei ${parts.join(" e ")} do Spotify nessa lista.${known}${userBadge}${single ? ` <button type="button" class="lnk" id="sp-whole-pl" style="padding:0;font:inherit;vertical-align:baseline">Quer adicionar a playlist inteira?</button>` : ""}`;
     if (single) q("#sp-whole-pl").addEventListener("click", openPlaylistLinkHelp);
   }
   const fromText = () => {
@@ -3470,12 +3751,22 @@ function openImport(prefillText = null){
     const plIds = parseSpotifyPlaylistIds(t);
     const albIds = parseSpotifyAlbumIds(t);
     if (plIds.length){
-      parsed = {rows: [], warnings: [], playlistBlocked: true, error: "Links de playlist não são aceitos: o Spotify só garante a ordem de exibição atual da playlist, que pode não ser a ordem real em que as músicas foram adicionadas."};
-      setSpotifyMode(false);
-      return update();
+      const oauth = loadSpotifyOAuth();
+      const user = oauth && oauth.profile ? (oauth.profile.name || oauth.profile.id || "") : "";
+      const allowed = user && (isAllowedSpotifyUser(user) || (oauth.profile.id && isAllowedSpotifyUser(oauth.profile.id)));
+      if (!oauth || !oauth.profile){
+        parsed = {rows: [], warnings: [], playlistAuthNeeded: true, error: "Apenas alguns usuários são habilitados a usar links de playlist. Faça login com a sua conta do Spotify para verificar se você está apto."};
+        setSpotifyMode(false);
+        return update();
+      }
+      if (!allowed){
+        parsed = {rows: [], warnings: [], playlistBlocked: true, notAllowed: true, userName: user, error: `Conectado como "${user}". Apenas usuários autorizados têm acesso a links diretos de playlist.`};
+        setSpotifyMode(false);
+        return update();
+      }
     }
     const lines = t.split(/\r?\n/).filter(l => l.trim());
-    if ((ids.length || albIds.length) && (ids.length + albIds.length) / lines.length >= 0.5){ parsed = null; setSpotifyMode(true, ids.length, albIds.length, ids); return update(); }
+    if ((ids.length || plIds.length || albIds.length) && (ids.length + plIds.length + albIds.length) / lines.length >= 0.5){ parsed = null; setSpotifyMode(true, ids.length, albIds.length, ids, plIds); return update(); }
     setSpotifyMode(false);
     try {
       parsed = cellsToRows(textToCells(t));
@@ -3521,21 +3812,21 @@ function openImport(prefillText = null){
   }});
   async function runCcFetch(){
     const id = q("#sp-id").value.trim(), secret = q("#sp-secret").value.trim();
-    const ids = parseSpotifyIds(ta.value), albumIds = parseSpotifyAlbumIds(ta.value);
+    const ids = parseSpotifyIds(ta.value), albumIds = parseSpotifyAlbumIds(ta.value), plIds = parseSpotifyPlaylistIds(ta.value);
     const status = q("#sp-status"), btn = q("#im-go");
     status.classList.remove("err");
-    if (!ids.length && !albumIds.length){ status.classList.add("err"); status.textContent = "Nenhum link do Spotify reconhecido."; return; }
+    if (!ids.length && !albumIds.length && !plIds.length){ status.classList.add("err"); status.textContent = "Nenhum link do Spotify reconhecido."; return; }
     const cache = {...ownTracksById(), ...loadTrackCache()}, toFetch = ids.filter(x => !cache[x]), known = ids.length - toFetch.length;
     let res = {rows: [], warnings: []};
-    if (toFetch.length || albumIds.length){
-      res = await fetchFromSpotify(id, secret, toFetch, albumIds, status, btn, known);
+    if (toFetch.length || albumIds.length || plIds.length){
+      res = await fetchFromSpotify(id, secret, toFetch, albumIds, plIds, status, btn, known);
       if (lastStop === "suspend") return;
       if (!res){ parsed = null; update(); return; }
     }
     const fetchedSet = new Set(toFetch), got = new Map(res.rows.filter(r => fetchedSet.has(r.id)).map(r => [r.id, r]));
-    const albumRows = res.rows.filter(r => !fetchedSet.has(r.id));
+    const nonTrackRows = res.rows.filter(r => !fetchedSet.has(r.id));
     const trackRows = ids.map(x => cache[x] ? {n: null, id: x, ...cache[x]} : got.get(x)).filter(Boolean);
-    parsed = {rows: [...albumRows, ...trackRows], warnings: res.warnings};
+    parsed = {rows: [...nonTrackRows, ...trackRows], warnings: res.warnings};
     parsed.rows.forEach(r => { if (r.id && r.meta && !r.meta.id) r.meta = {...r.meta, id: r.id}; });
     rememberSpotifyCovers(parsed.rows);
     if (known){
@@ -3578,12 +3869,23 @@ function openImport(prefillText = null){
     setTimeout(() => { lastToken = null; }, 50 * 60 * 1000);   // token do Spotify vale 1h
     return lastToken;
   }
-  async function fetchFromSpotify(id, secret, ids, albumIds, status, btn, known = 0){
-    const token = await getToken(id, secret, status);
-    if (!token) return;
+  async function fetchFromSpotify(id, secret, ids, albumIds, plIds = [], status, btn, known = 0){
+    let token = null;
+    const oauth = loadSpotifyOAuth();
+    if (oauth && oauth.profile){
+      try { token = await spotifyUserToken(); } catch (e) {}
+    }
+    if (!token){
+      if (plIds && plIds.length){
+        openPlaylistAuthModal(ta.value, mode);
+        return null;
+      }
+      token = await getToken(id, secret, status);
+      if (!token) return null;
+    }
     fetchCtl = makeFetchCtl(); syncFetchUI();
     const ctl = fetchCtl;
-    try { return await spotifyRunFetch({token, ids, albumIds, status, btn, known, ctl}); }
+    try { return await spotifyRunFetch({token, ids, plIds, albumIds, status, btn, known, ctl}); }
     finally { lastStop = ctl.stop; fetchCtl = null; syncFetchUI(); }
   }
   q("#im-cancel-fetch").addEventListener("click", async () => {
@@ -3625,6 +3927,7 @@ function openImport(prefillText = null){
     if (fetchCtl) return;
     if (pendingResume){ pendingResume = false; syncFetchUI(); return runCcFetch(); }
     if (!parsed || !parsed.rows.length){
+      if (parsed && parsed.playlistAuthNeeded) return openPlaylistAuthModal(ta.value, mode);
       if (q("#sp-fields").style.display !== "none") return runCcFetch();
       return;
     }
@@ -4220,6 +4523,7 @@ addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { pla
 function boot(){
   placePill();
   render();
+  renderSpAccountBar();
   queueAppleGenres();
   if (STORE){ queueAppleDates(); queueAppleSingles(); }
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
@@ -4258,4 +4562,4 @@ function openExampleNotice(){
   foot.querySelector("[data-ex]").onclick = () => md.close();
   foot.querySelector("[data-mine]").onclick = () => { md.close(); openImport(); };
 }
-(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(boot);
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(boot).then(handleSpotifyRedirectAndResume);
