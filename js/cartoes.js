@@ -10,12 +10,21 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 const FD = "Sora, 'Segoe UI', system-ui, sans-serif", FB = "Manrope, 'Segoe UI', system-ui, sans-serif";
 const font = (w, s, f) => `${w} ${s}px ${f}`;
 
-const THEMES = {
-  escuro: {label: "Escuro verde", bg0: "#04100C", bg1: "#020504", glow: "rgba(16,185,129,.24)", glow2: "rgba(5,95,70,.38)", ink: "#ECFDF5", ink2: "#A9C9BC", muted: "#6E8F82",
-    accent: "#6EE7B7", accent2: "#10B981", deep: "#047857", track: "rgba(110,231,183,.12)", tile: "rgba(18,44,35,.78)", line: "rgba(110,231,183,.22)", onAccent: "#022C22", light: false},
-  claro: {label: "Claro", bg0: "#F5FCF8", bg1: "#D9F2E6", glow: "rgba(16,185,129,.20)", glow2: "rgba(110,231,183,.34)", ink: "#06281D", ink2: "#2F5A4A", muted: "#5B7F70",
-    accent: "#059669", accent2: "#10B981", deep: "#047857", track: "rgba(5,150,105,.14)", tile: "rgba(255,255,255,.78)", line: "rgba(5,150,105,.28)", onAccent: "#FFFFFF", light: true}
-};
+function buildThemes(h){
+  const hsl = (s, l) => `hsl(${h},${s}%,${l}%)`;
+  const hsla = (s, l, a) => `hsla(${h},${s}%,${l}%,${a})`;
+  return {
+    escuro: {label: "Escuro", bg0: hsl(50,3), bg1: hsl(50,2), glow: hsla(84,40,.24), glow2: hsla(93,24,.38),
+      ink: hsl(80,97), ink2: hsl(20,73), muted: hsl(14,55),
+      accent: hsl(60,64), accent2: hsl(82,38), deep: hsl(93,24),
+      track: hsla(60,67,.12), tile: hsla(42,12,.78), line: hsla(60,67,.22), onAccent: hsl(90,8), light: false},
+    claro: {label: "Claro", bg0: hsl(85,97), bg1: hsl(55,90), glow: hsla(84,40,.20), glow2: hsla(60,67,.34),
+      ink: hsl(90,8), ink2: hsl(35,35), muted: hsl(20,48),
+      accent: hsl(82,38), accent2: hsl(84,40), deep: hsl(93,24),
+      track: hsla(82,38,.14), tile: "rgba(255,255,255,.78)", line: hsla(82,38,.28), onAccent: "#FFFFFF", light: true}
+  };
+}
+const THEMES = buildThemes(153);
 const FORMATS = {retrato: {label: "Vertical", sub: "1080×1350", w: 1080, h: 1350}, paisagem: {label: "Horizontal", sub: "1920×1080", w: 1920, h: 1080}};
 /* opções de estilo do mapa de bandas: as mesmas do gráfico do painel (caixa marcada = ligado). Começam iguais às do painel e depois ficam salvas à parte */
 const TOPTS = [["nomes", "Mostrar nomes", "nolabels"], ["numeros", "Mostrar números", "nonums"], ["bordas", "Bordas redondas", "flush"]];
@@ -253,8 +262,8 @@ const DRAW = {
       const rad = to.bordas ? Math.max(3, Math.min(14, w / 5, h / 5)) : 0;
       ctx.save(); rr(ctx, x, y, w, h, rad); ctx.clip();
       const k = Math.sqrt(tl.value / max), bg = ctx.createLinearGradient(x, y, x + w, y + h);
-      if (info.other){ bg.addColorStop(0, t.light ? "#D3F0E1" : "hsl(160,36%,9%)"); bg.addColorStop(1, t.light ? "#B6E4CD" : "hsl(160,42%,6%)"); }   // "+N bandas": mais escuro no tema escuro, mais claro no claro
-      else { bg.addColorStop(0, `hsl(156,62%,${16 + 26 * k}%)`); bg.addColorStop(1, `hsl(162,70%,${10 + 18 * k}%)`); }
+      if (info.other){ bg.addColorStop(0, t.light ? `hsl(${cardH},60%,86%)` : `hsl(${cardH},36%,9%)`); bg.addColorStop(1, t.light ? `hsl(${cardH},50%,80%)` : `hsl(${cardH},42%,6%)`); }   // "+N bandas": mais escuro no tema escuro, mais claro no claro
+      else { bg.addColorStop(0, `hsl(${cardH},62%,${16 + 26 * k}%)`); bg.addColorStop(1, `hsl(${cardH},70%,${10 + 18 * k}%)`); }
       ctx.fillStyle = bg; ctx.fillRect(x, y, w, h);
       if (im){
         drawCover(ctx, im, x, y, w, h);
@@ -269,12 +278,12 @@ const DRAW = {
         const lbl = to.nomes ? `+${info.n} bandas` : "";
         if (!to.nomes && to.numeros){
           ctx.font = font(700, cs, FD); setLS(ctx, 0); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
-          if (inW >= ctx.measureText(`+${info.n}`).width && h >= cs + pad * 1.6){ ctx.fillStyle = lightTxt ? t.ink : "#ECFDF5"; ctx.globalAlpha = .85; put(`+${info.n}`, x + pad, y + h - pad); }
+          if (inW >= ctx.measureText(`+${info.n}`).width && h >= cs + pad * 1.6){ ctx.fillStyle = t.ink; ctx.globalAlpha = .85; put(`+${info.n}`, x + pad, y + h - pad); }
         } else if (lbl){
           let s = Math.min(44, Math.max(12, Math.sqrt(w * h) / 4));
           ctx.textAlign = "center"; ctx.textBaseline = "middle";
           for (; s >= 11; s -= 1){ ctx.font = font(700, s, FD); setLS(ctx, -.2); if (ctx.measureText(lbl).width <= inW && s * 1.2 <= h - 2 * pad) break; }
-          if (s >= 11){ ctx.fillStyle = lightTxt ? t.ink : "#ECFDF5"; put(lbl, x + w / 2, y + h / 2); }
+          if (s >= 11){ ctx.fillStyle = t.ink; put(lbl, x + w / 2, y + h / 2); }
         }
         ctx.restore(); continue;
       }
@@ -283,7 +292,7 @@ const DRAW = {
         ctx.font = font(600, s, FD); setLS(ctx, -.2);
         if (ctx.measureText(info.k).width <= inW && h - 2 * pad >= s * 1.1 + cs * 1.2){ nameSize = s; break; }
       }
-      ctx.fillStyle = lightTxt ? t.ink : "#ECFDF5"; ctx.textAlign = "left";
+      ctx.fillStyle = t.ink; ctx.textAlign = "left";
       if (nameSize){ ctx.font = font(600, nameSize, FD); setLS(ctx, -.2); put(info.k, x + pad, y + pad + nameSize * .9); }
       ctx.font = font(700, cs, FD); setLS(ctx, 0);
       if (to.numeros && inW >= ctx.measureText(String(tl.value)).width && h >= cs + pad * 1.6){ ctx.globalAlpha = .85; put(String(tl.value), x + pad, y + h - pad); }
@@ -358,7 +367,9 @@ const fontsReady = () => document.fonts && document.fonts.load
   ? Promise.all(["800 80px Sora", "700 40px Sora", "700 30px Manrope", "600 30px Manrope"].map(f => document.fonts.load(f).catch(() => {}))) : Promise.resolve();
 async function paint(canvas, id, themeKey, fmt, d, name, tree){
   await fontsReady();
-  const L = layout(fmt), t = THEMES[themeKey] || THEMES.escuro;
+  const cardH = +(getComputedStyle(document.documentElement).getPropertyValue('--h').trim()) || 153;
+  const themes = buildThemes(cardH);
+  const L = layout(fmt), t = themes[themeKey] || themes.escuro;
   canvas.width = L.W; canvas.height = L.H;
   const ctx = canvas.getContext("2d");
   paintBg(ctx, t, L);

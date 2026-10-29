@@ -508,7 +508,8 @@ const wave = $("#wave");
     const r = document.createElementNS(ns, "rect");
     const h = Math.max(6, 100 * t.sec / maxS);
     r.setAttribute("x", i + .18); r.setAttribute("width", .64); r.setAttribute("y", 100 - h); r.setAttribute("height", h); r.setAttribute("rx", .3);
-    r.setAttribute("fill", `hsl(${158 - 10 * (t.sec / maxS)}, 70%, ${38 + 34 * (t.sec / maxS)}%)`);
+    const ratio = t.sec / maxS;
+    r.style.fill = `hsl(calc(var(--h) + ${Math.round(5 - 10 * ratio)}), 70%, ${Math.round(28 + 30 * (1 - ratio))}%)`;
     r.style.transform = "scaleY(0)"; r.style.transitionDelay = (i * 2.2) + "ms";
     wave.appendChild(r); t._w = r;
   });
@@ -1147,10 +1148,10 @@ function renderTree(){
     const sel = selSet.has(d.k);
     el.classList.toggle("sel", sel);
     el.classList.toggle("dim", hasSel && !sel);
-    el.style.background = sel ? "linear-gradient(150deg,rgba(209,250,229,.4),rgba(52,211,153,.3))" :
-      `linear-gradient(150deg, hsl(156,62%,${16 + 26 * k}%), hsl(162,70%,${10 + 18 * k}%))`;
+    el.style.background = sel ? "linear-gradient(150deg,hsla(var(--h),80%,90%,.4),hsla(var(--h),65%,52%,.3))" :
+      `linear-gradient(150deg, hsl(var(--h),62%,${16 + 26 * k}%), hsl(var(--h),70%,${10 + 18 * k}%))`;
     const lbl = el.querySelector(".lbl");
-    lbl.style.color = sel ? "#ECFDF5" : "#ECFDF5";
+    lbl.style.color = "hsl(var(--h),80%,98%)";
     el.querySelector("span").textContent = d.value;
     const album = byAlbum ? (d.k === NI ? null : d.k) : topAlbumOf(g.get(d.k));
     const coverBand = byAlbum ? modeOf(g.get(d.k), "artist").best : d.k;   // álbum: a capa vem da banda que mais aparece nele
@@ -1572,10 +1573,10 @@ function renderProfile(R){
                      dur.long   >= dur.normal && dur.long   >= dur.short && dur.long   >= dur.epic  ? `${pct(dur.long,   dTotal, 0)} são longas`  :
                      `${pct(dur.epic, dTotal, 0)} são épicas`;
     html += profStack("Duração das faixas", domLabel,
-      [[dur.short, "#A3E635", "Curtas < 3min"], [dur.normal, "#34D399", "Normais 3–5min"], [dur.long, "#047857", "Longas 5–8min"], [dur.epic, "#065F46", "Épicas > 8min"]], dTotal);
+      [[dur.short, "hsl(var(--h),60%,72%)", "Curtas < 3min"], [dur.normal, "hsl(var(--h),65%,52%)", "Normais 3–5min"], [dur.long, "hsl(var(--h),93%,24%)", "Longas 5–8min"], [dur.epic, "hsl(var(--h),85%,20%)", "Épicas > 8min"]], dTotal);
     const longest = [...withSec].sort((a, b) => b.sec - a.sec).slice(0, 3);
     if (longest.length) html += `<div class="pf"><div class="pf-h"><span>Músicas mais longas</span><b>Duração</b></div>
-      ${longest.map(t => `<div class="hrow"><div class="hl"><span>${esc(t.title)} <em>${esc(t.artist)}</em></span><b>${durTxt(t.sec)}</b></div><div class="ht"><i style="width:${Math.max(2, t.sec / longest[0].sec * 100)}%;background:linear-gradient(90deg,#6D28D9,#A78BFA)"></i></div></div>`).join("")}</div>`;
+      ${longest.map(t => `<div class="hrow"><div class="hl"><span>${esc(t.title)} <em>${esc(t.artist)}</em></span><b>${durTxt(t.sec)}</b></div><div class="ht"><i style="width:${Math.max(2, t.sec / longest[0].sec * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) + 75),65%,38%),hsl(calc(var(--h) + 75),60%,62%))"></i></div></div>`).join("")}</div>`;
   }
 
   // --- décadas (t.date sempre disponível) ---
@@ -1592,7 +1593,18 @@ function renderProfile(R){
       const sorted = [...decades].sort((a, b) => a[0] - b[0]);
       const decMax = Math.max(...sorted.map(([, n]) => n));
       html += `<div class="pf"><div class="pf-h"><span>Por década</span><b>Faixas</b></div>
-        ${sorted.map(([d, n]) => `<div class="hrow"><div class="hl"><span>${d}s</span><b>${n} <em>${pct(n, withYear.length, 0)}</em></b></div><div class="ht"><i style="width:${Math.max(2, n / decMax * 100)}%;background:linear-gradient(90deg,#B45309,#FCD34D)"></i></div></div>`).join("")}</div>`;
+        ${sorted.map(([d, n]) => `<div class="hrow"><div class="hl"><span>${d}s</span><b>${n} <em>${pct(n, withYear.length, 0)}</em></b></div><div class="ht"><i style="width:${Math.max(2, n / decMax * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) + 30),70%,35%),hsl(calc(var(--h) + 30),65%,58%))"></i></div></div>`).join("")}</div>`;
+    }
+  }
+
+  // --- artistas mais explícitos (aqui para manter sequência fria→quente com os outros cards de barras) ---
+  if (M.length){
+    const exA = M.filter(t => t.m.x).length;
+    if (exA){
+      const artsA = [...groupBy(M, "artist")].map(([k, rs]) => ({k, n: rs.length, e: rs.filter(t => t.m.x).length}))
+        .filter(a => a.n >= 3 && a.e).sort((a, b) => b.e / b.n - a.e / a.n || b.e - a.e).slice(0, 4);
+      if (artsA.length) html += `<div class="pf"><div class="pf-h"><span>Artistas mais explícitos</span><b>% das faixas</b></div>
+        ${artsA.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) - 45),75%,32%),hsl(calc(var(--h) - 45),65%,58%))"></i></div></div>`).join("")}</div>`;
     }
   }
 
@@ -1601,14 +1613,8 @@ function renderProfile(R){
     const ex = M.filter(t => t.m.x).length;
     const ty = {album: 0, single: 0, compilation: 0}; M.forEach(t => { if (t.m.ty in ty) ty[t.m.ty]++; });
     const tyN = ty.album + ty.single + ty.compilation;
-    html += tyN ? profStack("De onde vêm", pct(ty.album, tyN, 0) + " de álbuns", [[ty.album, "#34D399", "Álbum"], [ty.single, "#A3E635", "Single/EP"], [ty.compilation, "#047857", "Coletânea"]], tyN) : "";
-    html += profStack("Explícitas", pct(ex, M.length, 0), [[ex, "#F0FDF7", "Explícitas"], [M.length - ex, "#047857", "Sem palavrão"]], M.length);
-    if (ex){
-      const arts = [...groupBy(M, "artist")].map(([k, rs]) => ({k, n: rs.length, e: rs.filter(t => t.m.x).length}))
-        .filter(a => a.n >= 3 && a.e).sort((a, b) => b.e / b.n - a.e / a.n || b.e - a.e).slice(0, 4);
-      if (arts.length) html += `<div class="pf"><div class="pf-h"><span>Artistas mais explícitos</span><b>% das faixas</b></div>
-        ${arts.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%;background:linear-gradient(90deg,#9F1239,#FB7185)"></i></div></div>`).join("")}</div>`;
-    }
+    html += tyN ? profStack("De onde vêm", pct(ty.album, tyN, 0) + " de álbuns", [[ty.album, "hsl(var(--h),65%,52%)", "Álbum"], [ty.single, "hsl(var(--h),60%,72%)", "Single/EP"], [ty.compilation, "hsl(var(--h),93%,24%)", "Coletânea"]], tyN) : "";
+    html += profStack("Explícitas", pct(ex, M.length, 0), [[ex, "hsl(var(--h),80%,98%)", "Explícitas"], [M.length - ex, "hsl(var(--h),93%,24%)", "Sem palavrão"]], M.length);
   } else if (!html){
     html = `<div class="empty-in"><p>Explícitas e singles aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
   }
@@ -1977,8 +1983,30 @@ function tmPlay(){
 // as 8 primeiras linhas usam as cores categóricas validadas (versão escura), em ordem fixa; da 9ª em diante
 // (dá pra marcar todas) as cores são geradas espalhando o matiz. Cada linha mantém a cor enquanto está marcada
 const EVO_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+// 9 paletas categóricas — uma por preset de tema (ordem: Vermelho, Laranja, Amarelo, Lima, Verde, Ciano, Azul, Roxo, Rosa)
+const EVO_PALETTES = [
+  ["#e05555","#e07830","#d4c040","#60c860","#4898e0","#a050d0","#d060a8","#40b8c0"], // 0 Vermelho
+  ["#e0782a","#e0c038","#c0d840","#40c870","#4080e0","#9040d0","#e04080","#40c8c8"], // 1 Laranja
+  ["#d8c030","#e08820","#a0d840","#38b870","#3878d8","#9838d0","#d84888","#38c8c0"], // 2 Amarelo
+  ["#80c830","#c8d020","#e08020","#38a870","#3878d8","#9838d0","#d84888","#e05050"], // 3 Lima
+  ["#3987e5","#d95926","#199e70","#c98500","#d55181","#008300","#9085e9","#e66767"], // 4 Verde (padrão)
+  ["#30b8c8","#3870d0","#70d838","#d0c830","#e07820","#d04080","#9040d0","#e05050"], // 5 Ciano
+  ["#3878d8","#30b8d0","#7830d0","#d04080","#d87020","#c0d030","#38b840","#e05050"], // 6 Azul
+  ["#9040d0","#c030a0","#3870d8","#30b8c8","#38b840","#d0c030","#e08020","#e05050"], // 7 Roxo
+  ["#d040a0","#e05050","#d86020","#3878d8","#30b0c0","#9030c8","#78c030","#c0d030"], // 8 Rosa
+];
+function getThemePaletteIdx(){
+  const h = +(getComputedStyle(document.documentElement).getPropertyValue('--h').trim()) || 153;
+  const hues = [0, 25, 50, 100, 153, 185, 210, 265, 320];
+  let best = 4, bestDist = 999;
+  hues.forEach((ph, i) => {
+    const dist = Math.abs(((ph - h + 180 + 360) % 360) - 180);
+    if (dist < bestDist){ bestDist = dist; best = i; }
+  });
+  return best;
+}
 const EVO_DEFAULT = 10, EVO_TOPS = [1, 3, 5, 10, 25, 50, 100, 250, 500, 750, 1000];
-const evoCol = s => s < EVO_COLORS.length ? EVO_COLORS[s] : `hsl(${Math.round(((s - EVO_COLORS.length) * 137.5 + 20) % 360)}, 62%, 62%)`;
+const evoCol = s => { const pal = EVO_PALETTES[getThemePaletteIdx()]; return s < pal.length ? pal[s] : `hsl(${Math.round(((s - pal.length) * 137.5 + 20) % 360)}, 62%, 62%)`; };
 const evo = {mode: "band", dyn: {band: null, genre: null}, sel: {band: null, genre: null}, slot: {band: new Map(), genre: new Map()}, list: [], map: new Map(), R: [], N: 0};
 const evoName = k => evo.mode === "genre" ? capFirst(k) : k;
 function evoBuild(R){
@@ -2020,7 +2048,7 @@ const evoOptHtml = s => { const on = evoSel().has(s.k); return `<button type="bu
 function openEvoSingles(){
   const body = document.createElement("div");
   body.innerHTML = `<p class="mdesc">${evo.mode === "band" ? "Artistas" : "Gêneros"} com <strong>só 1 faixa</strong> na playlist. Uma linha de 1 faixa é só um degrau no gráfico, por isso ficam escondidos da lista principal. Clique para ligar ou desligar a linha.</p>
-    <input type="search" id="evs-q" placeholder="Buscar…" aria-label="Buscar" style="width:100%;max-width:340px;border:1px solid var(--line-2);background:rgba(8,26,20,.8);color:var(--ink);font:500 13px var(--body);padding:9px 12px;border-radius:12px;outline:none">
+    <input type="search" id="evs-q" placeholder="Buscar…" aria-label="Buscar" style="width:100%;max-width:340px;border:1px solid var(--line-2);background:hsla(var(--h),55%,9%,.8);color:var(--ink);font:500 13px var(--body);padding:9px 12px;border-radius:12px;outline:none">
     <div class="evo-opts big" id="evs-list"></div>`;
   const md = openModal({title: `${evo.mode === "band" ? "Artistas" : "Gêneros"} com 1 faixa`, body, size: "md"});
   const list = md.m.querySelector("#evs-list"), inp = md.m.querySelector("#evs-q");
@@ -2083,7 +2111,7 @@ function drawEvo(){
   const top = Math.ceil(mx / step) * step;
   const Y = v => Tp + (1 - v / top) * (H - Tp - Bt);
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução acumulada de faixas por ${evo.mode === "band" ? "banda" : "gênero"}, pela ordem de adição">`;
-  for (let v = 0; v <= top; v += step) svg += `<line x1="${L}" x2="${W - Rm}" y1="${Y(v)}" y2="${Y(v)}" stroke="rgba(110,231,183,.08)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+  for (let v = 0; v <= top; v += step) svg += `<line x1="${L}" x2="${W - Rm}" y1="${Y(v)}" y2="${Y(v)}" stroke="hsla(var(--h),60%,67%,.08)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
   [0, .25, .5, .75, 1].forEach((f, j, arr) => { const i = Math.round(f * (NA - 1)); svg += `<text x="${X(i)}" y="${H - 6}" text-anchor="${j === 0 ? "start" : j === arr.length - 1 ? "end" : "middle"}">#${(evo.full[i] || evo.R[Math.min(i, N - 1)]).n}</text>`; });
   const every = Math.max(1, Math.ceil(N / 500));
   // pré-computa pontos e cores para os dois passes
@@ -2101,7 +2129,7 @@ function drawEvo(){
   const circOrd = lineData.map((_, j) => j).sort((a, b) => lineData[a].final - lineData[b].final);
   for (const j of circOrd) {
     const {a, col} = lineData[j];
-    svg += `<circle cx="${X(N - 1)}" cy="${Y(a[N - 1])}" r="4" fill="${col}" stroke="#071a14" stroke-width="2"/>`;
+    svg += `<circle cx="${X(N - 1)}" cy="${Y(a[N - 1])}" r="4" fill="${col}" stroke="hsl(var(--h),55%,9%)" stroke-width="2"/>`;
   }
   /* rótulos na ponta das linhas: empurrados à direita quando colidirem verticalmente (mesma altura),
      prioridade ao de maior contagem (fica mais perto do ponto); 2+ colisões truncam para 5 chars */
@@ -2164,7 +2192,7 @@ function drawEvo(){
     if (lines.length === 1) { svg += `<text class="evo-end" x="${x}" y="${y}" style="fill:${e.col}">${esc(lines[0])}</text>`; }
     else { svg += `<text class="evo-end" x="${x}" y="${y}" style="fill:${e.col}"><tspan x="${x}" dy="0">${esc(lines[0])}</tspan><tspan x="${x}" dy="13">${esc(lines[1])}</tspan></text>`; }
   });
-  svg += `<g id="evo-hot" style="display:none"><line y1="${Tp}" y2="${H - Bt}" stroke="rgba(240,253,247,.35)" stroke-dasharray="3 3"/>${cum.map((a, j) => `<circle r="4.5" fill="${evoCol(evo.slot[evo.mode].get(shown[j]))}" stroke="#071a14" stroke-width="2"/>`).join("")}</g>`;
+  svg += `<g id="evo-hot" style="display:none"><line y1="${Tp}" y2="${H - Bt}" stroke="hsla(var(--h),80%,98%,.35)" stroke-dasharray="3 3"/>${cum.map((a, j) => `<circle r="4.5" fill="${evoCol(evo.slot[evo.mode].get(shown[j]))}" stroke="hsl(var(--h),55%,9%)" stroke-width="2"/>`).join("")}</g>`;
   svg += `<rect id="evo-hit" x="${L}" y="0" width="${W - L - Rm}" height="${H - Bt}" fill="transparent"/></svg>`;
   box.innerHTML = svg;
   const s = box.querySelector("svg"), hot = s.querySelector("#evo-hot"), line = hot.querySelector("line"), dots = [...hot.querySelectorAll("circle")];
@@ -2313,7 +2341,7 @@ const V = {
   topAlb(list){
     const mx = list[0].c;
     return list.map(a => `<div class="sb" style="margin:8px 0"><div class="l" style="display:flex;justify-content:space-between;gap:12px;font-size:13px"><span>${esc(a.k)} <span style="color:var(--ink-3)">· ${esc(a.artist)}</span></span><em style="font-style:normal;color:var(--ink-2);white-space:nowrap">${faixas(a.c)}</em></div>
-      <div style="height:6px;border-radius:6px;background:rgba(110,231,183,.08);margin-top:5px;overflow:hidden"><i data-w="${(a.c / mx) * 100}" style="display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#047857,#6EE7B7);transition:width 1.1s cubic-bezier(.2,.75,.15,1)"></i></div></div>`).join("");
+      <div style="height:6px;border-radius:6px;background:hsla(var(--h),60%,67%,.08);margin-top:5px;overflow:hidden"><i data-w="${(a.c / mx) * 100}" style="display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,hsl(var(--h),93%,24%),hsl(var(--h),60%,64%));transition:width 1.1s cubic-bezier(.2,.75,.15,1)"></i></div></div>`).join("");
   },
   stack(seg, tot = NN){
     return `<div class="stack">${seg.filter(s => s[0] > 0).map(([n, c]) => `<i style="background:${c};flex-grow:0" data-g="${n}"></i>`).join("")}</div>
@@ -2323,27 +2351,27 @@ const V = {
     return rows.map(([label, sub, v]) => `<div class="hrow"><div class="hl"><span>${esc(label)} <em>${esc(sub)}</em></span><b>${v}</b></div><div class="ht"><i style="width:${Math.max(2, v / max * 100)}%"></i></div></div>`).join("");
   },
   decComp(arts){
-    const decs = IS.dec.map(d => d.d).slice(-5), shade = ["#065F46", "#047857", "#10B981", "#6EE7B7", "#D1FAE5"].slice(-decs.length);
+    const decs = IS.dec.map(d => d.d).slice(-5), shade = ["hsl(var(--h),85%,20%)", "hsl(var(--h),93%,24%)", "hsl(var(--h),82%,38%)", "hsl(var(--h),60%,64%)", "hsl(var(--h),72%,92%)"].slice(-decs.length);
     return arts.map(a => {
       const rs = a.rs.filter(t => t.year !== NI);
       const seg = decs.map(d => rs.filter(t => Math.floor(t.year / 10) * 10 === d).length);
-      return `<div class="drow"><span class="dn">${esc(a.k)}</span><div class="dbar">${seg.map((v, i) => v ? `<i style="flex:${v};background:${shade[i]};color:${i >= decs.length - 2 ? "#022C22" : "#ECFDF5"}" title="${decs[i]}s: ${v}">${rs.length && v / rs.length >= .14 ? v : ""}</i>` : "").join("")}</div></div>`;
+      return `<div class="drow"><span class="dn">${esc(a.k)}</span><div class="dbar">${seg.map((v, i) => v ? `<i style="flex:${v};background:${shade[i]};color:${i >= decs.length - 2 ? "hsl(var(--h),90%,8%)" : "hsl(var(--h),80%,98%)"}" title="${decs[i]}s: ${v}">${rs.length && v / rs.length >= .14 ? v : ""}</i>` : "").join("")}</div></div>`;
     }).join("") + `<div class="lg">${decs.map((d, i) => `<span><i style="background:${shade[i]}"></i>${String(d).slice(2)}s</span>`).join("")}<span class="r">faixas por década de lançamento</span></div>`;
   },
   strips(names){
     const bounds = IS.chap.slice(1).map(seg => seg[0].n - 1);
     return names.map(nm => {
       const a = IS.artMap.get(nm); if (!a) return "";
-      const ticks = a.rs.map(t => `<rect x="${t.n - 1}" y="0" width="1" height="14" fill="#6EE7B7"/>`).join("");
-      const seps = bounds.map(x => `<rect x="${x}" y="0" width=".6" height="14" fill="rgba(240,253,247,.18)"/>`).join("");
+      const ticks = a.rs.map(t => `<rect x="${t.n - 1}" y="0" width="1" height="14" fill="hsl(var(--h),60%,64%)"/>`).join("");
+      const seps = bounds.map(x => `<rect x="${x}" y="0" width=".6" height="14" fill="hsla(var(--h),80%,98%,.18)"/>`).join("");
       return `<div class="strip"><div class="sl"><span>${esc(nm)}</span><em>#${a.rs[0].n} → #${a.rs[a.rs.length - 1].n} · ${faixas(a.c)}</em></div>
-        <svg viewBox="0 0 ${NN} 14" preserveAspectRatio="none" class="strip-svg" aria-hidden="true"><rect width="${NN}" height="14" rx="3" fill="rgba(110,231,183,.06)"/>${seps}${ticks}</svg></div>`;
+        <svg viewBox="0 0 ${NN} 14" preserveAspectRatio="none" class="strip-svg" aria-hidden="true"><rect width="${NN}" height="14" rx="3" fill="hsla(var(--h),60%,67%,.06)"/>${seps}${ticks}</svg></div>`;
     }).join("") + `<div class="sx"><span>#1</span><span>início → fim</span><span>#${NN}</span></div>`;
   },
   cells(win, a1, a2){
-    const col = t => hasBand(t, a1) ? "#F0FDF7" : hasBand(t, a2) ? "#10B981" : "rgba(110,231,183,.14)";
+    const col = t => hasBand(t, a1) ? "hsl(var(--h),80%,98%)" : hasBand(t, a2) ? "hsl(var(--h),82%,38%)" : "hsla(var(--h),60%,67%,.14)";
     return `<div class="cells">${win.map(t => `<i style="background:${col(t)}" title="#${t.n} ${esc(t.title)} — ${esc(t.artist)}"></i>`).join("")}</div>
-      <div class="lg"><span><i style="background:#F0FDF7"></i>${esc(a1)}</span>${a2 ? `<span><i style="background:#10B981"></i>${esc(a2)}</span>` : ""}<span><i style="background:rgba(110,231,183,.14)"></i>outros</span><span class="r">primeiras ${win.length} adições</span></div>`;
+      <div class="lg"><span><i style="background:hsl(var(--h),80%,98%)"></i>${esc(a1)}</span>${a2 ? `<span><i style="background:hsl(var(--h),82%,38%)"></i>${esc(a2)}</span>` : ""}<span><i style="background:hsla(var(--h),60%,67%,.14)"></i>outros</span><span class="r">primeiras ${win.length} adições</span></div>`;
   },
   mbars(vals, labels, cap){
     const pm = Math.max(1, ...vals);
@@ -2443,7 +2471,7 @@ rule(() => {
   if (IS.art.length < 6) return null;
   const c = IS.art.map(a => a.c), top = n => sum(c.slice(0, n), x => x);
   const t5 = top(5), singles = IS.art.filter(a => a.c === 1).length, hhi = sum(c, x => (x / NN) ** 2);
-  const seg = [[c[0], "#F0FDF7", "Líder"], [t5 - c[0], "#34D399", "2º ao 5º"], [top(10) - t5, "#047857", "6º ao 10º"], [NN - top(10), "rgba(110,231,183,.16)", `Demais ${Math.max(0, IS.art.length - 10)}`]];
+  const seg = [[c[0], "hsl(var(--h),80%,98%)", "Líder"], [t5 - c[0], "hsl(var(--h),65%,52%)", "2º ao 5º"], [top(10) - t5, "hsl(var(--h),93%,24%)", "6º ao 10º"], [NN - top(10), "hsla(var(--h),60%,67%,.16)", `Demais ${Math.max(0, IS.art.length - 10)}`]];
   const f5 = t5 / NN;
   return {tech: true, kind: "cat", theme: 4, score: 70, wide: true,
     title: f5 >= .5 ? "Metade do catálogo está em cinco artistas" : f5 >= .35 ? "Cinco artistas respondem por mais de um terço do catálogo" : "Um catálogo pulverizado entre muitos artistas",
@@ -2654,7 +2682,7 @@ rule(() => {
   return {extra: true, kind: "cat", theme: 5, score: f >= .4 || f <= .05 ? 64 : 50,
     title: f >= .5 ? "Mais da metade da playlist tem palavrão" : f >= .25 ? "Uma playlist de linguagem pesada" : f <= .05 ? "Uma playlist quase sem palavrão" : "Explícitas são minoria",
     body: `<ul>${li.join("")}</ul>${covNote(MT)}`,
-    viz: V.stack([[ex, "#F0FDF7", "Explícitas"], [MT.length - ex, "#047857", "Sem palavrão"]], MT.length),
+    viz: V.stack([[ex, "hsl(var(--h),80%,98%)", "Explícitas"], [MT.length - ex, "hsl(var(--h),93%,24%)", "Sem palavrão"]], MT.length),
     kick: [pc0(ex, MT.length), "das faixas são marcadas como explícitas no Spotify"]};
 });
 
@@ -2671,7 +2699,7 @@ rule(() => {
   return {extra: true, kind: "cat", theme: 3, score: fs >= .35 || fs <= .08 ? 63 : 49,
     title: fs >= .35 ? "Você é de single, não de álbum" : fs <= .08 ? "Você é de álbum: quase nada vem de single solto" : "Álbuns na base, singles no tempero",
     body: `<ul>${li.join("")}</ul>${covNote(M)}`,
-    viz: V.stack([[c.album, "#34D399", "Álbum"], [c.single, "#A3E635", "Single/EP"], [c.compilation, "#047857", "Coletânea"]], M.length),
+    viz: V.stack([[c.album, "hsl(var(--h),65%,52%)", "Álbum"], [c.single, "hsl(var(--h),60%,72%)", "Single/EP"], [c.compilation, "hsl(var(--h),93%,24%)", "Coletânea"]], M.length),
     kick: [pc0(c.single, M.length), "das faixas vieram de singles ou EPs"]};
 });
 
@@ -2813,8 +2841,8 @@ function renderJourney(){
     let html = "";
     top.forEach((a, ai) => {
       html += `<div class="hn">${esc(a)}</div>`;
-      grid[ai].forEach((rs, bi) => { const k = rs.length / mx; const bg = rs.length ? `hsla(156, 70%, ${18 + 50 * k}%, ${.35 + .65 * k})` : "rgba(110,231,183,.04)";
-        html += `<div class="hc" data-a="${ai}" data-b="${bi}" data-bg="${bg}" style="background:rgba(110,231,183,.04);color:${k > .55 ? "#022C22" : "var(--ink)"}">${rs.length || ""}</div>`; });
+      grid[ai].forEach((rs, bi) => { const k = rs.length / mx; const bg = rs.length ? `hsla(var(--h), 70%, ${18 + 50 * k}%, ${.35 + .65 * k})` : "hsla(var(--h),60%,67%,.04)";
+        html += `<div class="hc" data-a="${ai}" data-b="${bi}" data-bg="${bg}" style="background:hsla(var(--h),60%,67%,.04);color:${k > .55 ? "hsl(var(--h),90%,8%)" : "var(--ink)"}">${rs.length || ""}</div>`; });
     });
     html += `<div></div>` + BL.map((seg, i) => `<div class="hx">${i % 3 === 0 ? "#" + seg[0].n : ""}</div>`).join("");
     const heat = $("#heat"); heat.style.gridTemplateColumns = `auto repeat(${BL.length},minmax(0,1fr))`; heat.innerHTML = html;
@@ -2847,18 +2875,18 @@ function drawScatter(){
   const Y = y => Tp + (1 - (y - y0) / (y1 - y0)) * (H - Tp - Bt);
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ano de lançamento de cada faixa pela ordem de entrada na playlist">`;
   CHI.forEach((c, i) => { const xa = X(c.seg[0].n), xb = X(c.seg[c.seg.length - 1].n);
-    if (i % 2) svg += `<rect x="${xa}" y="${Tp - 16}" width="${xb - xa}" height="${H - Tp - Bt + 16}" fill="rgba(110,231,183,.04)" rx="6"/>`;
+    if (i % 2) svg += `<rect x="${xa}" y="${Tp - 16}" width="${xb - xa}" height="${H - Tp - Bt + 16}" fill="hsla(var(--h),60%,67%,.04)" rx="6"/>`;
     svg += `<text x="${(xa + xb) / 2}" y="${Tp - 6}" text-anchor="middle">${i + 1}</text>`; });
   const step = (y1 - y0) > 60 ? 20 : 10;
-  for (let y = y0; y <= y1; y += step) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="rgba(110,231,183,.07)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(y) + 3}" text-anchor="end">${y}</text>`;
+  for (let y = y0; y <= y1; y += step) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="hsla(var(--h),60%,67%,.07)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(y) + 3}" text-anchor="end">${y}</text>`;
   const ticks = [1, Math.round(NN / 4), Math.round(NN / 2), Math.round(NN * 3 / 4), NN];
   ticks.forEach((n, i, arr) => svg += `<text x="${X(n)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === arr.length - 1 ? "end" : "middle"}">#${n}</text>`);
   const pivot = IS.dec.length > 1 ? IS.dec[Math.floor(IS.dec.length / 2)].d : 2000;
-  pts.forEach(t => svg += `<circle cx="${X(t.n)}" cy="${Y(t.year)}" r="3" fill="${t.year < pivot ? "#6EE7B7" : "#10B981"}" opacity=".55"/>`);
+  pts.forEach(t => svg += `<circle cx="${X(t.n)}" cy="${Y(t.year)}" r="3" fill="${t.year < pivot ? "hsl(var(--h),60%,64%)" : "hsl(var(--h),82%,38%)"}" opacity=".55"/>`);
   const win = Math.max(5, Math.min(41, Math.floor(pts.length / 8) | 1));
   const med = pts.map((t, i) => { const w = pts.slice(Math.max(0, i - (win >> 1)), i + (win >> 1) + 1).map(x => x.year); return [X(t.n), Y(median(w))]; });
-  svg += `<path d="M${med.map(p => p.map(v => v.toFixed(1)).join(",")).join("L")}" fill="none" stroke="#F0FDF7" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(167,243,208,.6))"/>`;
-  svg += `<circle id="sc-hot" r="6" fill="none" stroke="#F0FDF7" stroke-width="2" opacity="0"/></svg>`;
+  svg += `<path d="M${med.map(p => p.map(v => v.toFixed(1)).join(",")).join("L")}" fill="none" stroke="hsl(var(--h),80%,98%)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0 0 6px hsla(var(--h),75%,82%,.6))"/>`;
+  svg += `<circle id="sc-hot" r="6" fill="none" stroke="hsl(var(--h),80%,98%)" stroke-width="2" opacity="0"/></svg>`;
   box.innerHTML = svg;
   const s = box.querySelector("svg"), hot = s.querySelector("#sc-hot");
   s.addEventListener("pointermove", e => {
@@ -2883,9 +2911,9 @@ function renderDisc(){
   const P = cum.map((c, i) => `${(i / Math.max(1, n - 1) * W).toFixed(1)},${(H - 4 - (c / mx) * (H - 8)).toFixed(1)}`).join("L");
   const half = cum.findIndex(c => c >= Math.ceil(mx / 2));
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;flex:1;min-height:${H}px;display:block;overflow:visible" aria-label="Artistas acumulados ao longo da playlist">
-    <defs><linearGradient id="dg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="rgba(16,185,129,.35)"/><stop offset="1" stop-color="rgba(16,185,129,0)"/></linearGradient></defs>
-    <path d="M0,${H}L${P}L${W},${H}Z" fill="url(#dg)"/><path d="M${P}" fill="none" stroke="#6EE7B7" stroke-width="2" vector-effect="non-scaling-stroke"/>
-    <line x1="${half / Math.max(1, n - 1) * W}" x2="${half / Math.max(1, n - 1) * W}" y1="0" y2="${H}" stroke="rgba(240,253,247,.5)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/></svg>
+    <defs><linearGradient id="dg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="hsla(var(--h),84%,40%,.35)"/><stop offset="1" stop-color="hsla(var(--h),84%,40%,0)"/></linearGradient></defs>
+    <path d="M0,${H}L${P}L${W},${H}Z" fill="url(#dg)"/><path d="M${P}" fill="none" stroke="hsl(var(--h),60%,64%)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    <line x1="${half / Math.max(1, n - 1) * W}" x2="${half / Math.max(1, n - 1) * W}" y1="0" y2="${H}" stroke="hsla(var(--h),80%,98%,.5)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/></svg>
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--ink-3);margin-top:6px"><span>artistas acumulados</span><span>metade em #${BY_PLAYLIST[half].n}</span><span>${mx} no total</span></div>`;
   el.style.display = "flex"; el.style.flexDirection = "column"; el.style.flex = "1";
 }
@@ -2927,7 +2955,8 @@ const ICON = {
   up: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V2.5M4.5 6 8 2.5 11.5 6M2.5 13.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   down: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5M2.5 13.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   x: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
-  sync: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 6.5A5.5 5.5 0 0 0 3.3 4.6M2.5 9.5a5.5 5.5 0 0 0 10.2 1.9M3 2v3h3M13 14v-3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
+  sync: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 6.5A5.5 5.5 0 0 0 3.3 4.6M2.5 9.5a5.5 5.5 0 0 0 10.2 1.9M3 2v3h3M13 14v-3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  palette: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 4.4 11.4c.6-.5.5-1.4-.2-1.7a1 1 0 0 1 .8-1.8h.8c.7 0 1.2-.6 1.2-1.4A6.5 6.5 0 0 0 8 1.5z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="5.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="8" cy="4" r=".95" fill="currentColor"/><circle cx="10.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="5" cy="9.5" r=".95" fill="currentColor"/></svg>'
 };
 const pad2 = n => String(n).padStart(2, "0");
 const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
@@ -3191,7 +3220,7 @@ async function spotifyFetchProfile(token){
 const SPOTIFY_GLYPH = `<svg width="16" height="16" viewBox="0 0 24 24" fill="#1DB954" style="flex:none"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.503 17.308c-.217.356-.677.469-1.033.252-2.829-1.729-6.39-2.12-10.584-1.162-.407.094-.813-.158-.906-.566-.094-.407.158-.813.566-.906 4.593-1.05 8.528-.604 11.705 1.349.356.217.469.677.252 1.033zm1.472-3.272c-.273.444-.855.586-1.299.313-3.238-1.99-8.175-2.566-12.003-1.404-.499.152-1.025-.133-1.176-.631-.152-.499.133-1.025.631-1.176 4.38-1.33 9.814-.687 13.534 1.644.443.273.586.855.313 1.298zm.126-3.41c-3.882-2.305-10.292-2.518-14.004-1.391-.595.181-1.223-.157-1.404-.752-.181-.595.157-1.223.752-1.404 4.269-1.296 11.344-1.045 15.82 1.613.535.317.709 1.012.392 1.547-.317.535-1.012.709-1.547.392z"/></svg>`;
 function spotifyChipHtml(profile){
   const avatar = profile.avatar ? `<img src="${esc(profile.avatar)}" alt="" style="width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none">`
-    : `<span style="width:22px;height:22px;border-radius:50%;background:var(--mint);color:#06140f;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none">${esc((profile.name || "?").slice(0, 1).toUpperCase())}</span>`;
+    : `<span style="width:22px;height:22px;border-radius:50%;background:var(--mint);color:hsl(var(--h),50%,5%);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none">${esc((profile.name || "?").slice(0, 1).toUpperCase())}</span>`;
   return `${SPOTIFY_GLYPH}${avatar}<span class="sp-name">${esc(profile.name || "Conta Spotify")}</span><button type="button" class="sp-logout-x" title="Sair da conta Spotify" aria-label="Sair da conta Spotify">${ICON.x}</button>`;
 }
 function renderSpAccountBar(){
@@ -4040,7 +4069,7 @@ function openImport(prefillText = null){
       else if (parsed && parsed.playlistAuthNeeded){ go.disabled = false; go.textContent = "Entrar com Spotify para verificar"; go.classList.remove("danger"); }
       else { go.disabled = true; go.textContent = mode === "add" ? "Adicionar" : "Substituir playlist"; go.classList.toggle("danger", mode === "replace"); }
       q("#im-prev").innerHTML = parsed && parsed.playlistAuthNeeded
-        ? `<div class="pv info" style="text-align:left;border-left:4px solid var(--mint);padding:14px;background:rgba(29,185,84,0.08);border-radius:8px">
+        ? `<div class="pv info" style="text-align:left;border-left:4px solid var(--mint);padding:14px;background:hsla(var(--h),84%,40%,.08);border-radius:8px">
             <div style="font-weight:700;font-size:14px;margin-bottom:6px;color:var(--ink)">Apenas alguns usuários são habilitados a usar links de playlist.</div>
             <p style="margin:0 0 12px;font-size:13px;color:var(--ink-2)">Faça login com a sua conta do Spotify para verificar se você está apto:</p>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -4871,7 +4900,119 @@ function openDups(opt = {}){
   draw();
 }
 
+/* ---------- theme color ---------- */
+const THEME_KEY = "catalogo-musical:theme-hue";
+const THEME_DEFAULT = 153;
+const THEME_PRESETS = [
+  {h: 0,   label: "Vermelho"},
+  {h: 25,  label: "Laranja"},
+  {h: 50,  label: "Amarelo"},
+  {h: 100, label: "Lima"},
+  {h: 153, label: "Verde (padrão)"},
+  {h: 185, label: "Ciano"},
+  {h: 210, label: "Azul"},
+  {h: 265, label: "Roxo"},
+  {h: 320, label: "Rosa"},
+];
+function applyThemeHue(h){ document.documentElement.style.setProperty("--h", h); }
+function resetThemeHue(){ document.documentElement.style.removeProperty("--h"); }
+async function extractImgHue(url){
+  return new Promise(res => {
+    const img = new Image(); img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas"); c.width = c.height = 20;
+        c.getContext("2d").drawImage(img, 0, 0, 20, 20);
+        const d = c.getContext("2d").getImageData(0, 0, 20, 20).data;
+        const hist = new Float32Array(360);
+        for (let i = 0; i < d.length; i += 4){
+          const [r,g,b,a] = [d[i],d[i+1],d[i+2],d[i+3]]; if (a < 128) continue;
+          const max = Math.max(r,g,b), min = Math.min(r,g,b), df = max - min;
+          if (df < 25 || max < 30) continue;
+          const sat = df / max; if (sat < 0.25) continue;
+          let h;
+          if (max===r) h=((g-b)/df%6)*60;
+          else if (max===g) h=((b-r)/df+2)*60;
+          else h=((r-g)/df+4)*60;
+          h=((h%360)+360)%360;
+          hist[Math.round(h)%360] += sat;
+        }
+        let best = -1, bestV = 0;
+        for (let i = 0; i < 360; i++){
+          const v = hist[(i+359)%360] + hist[i]*2 + hist[(i+1)%360];
+          if (v > bestV){ bestV = v; best = i; }
+        }
+        res(best >= 0 ? best : null);
+      } catch { res(null); }
+    };
+    img.onerror = () => res(null);
+    img.src = url;
+  });
+}
+async function themeAutoDetect(){
+  const cnt = new Map();
+  for (const t of BY_PLAYLIST){ if (t.artist !== NI) cnt.set(t.artist, (cnt.get(t.artist)||0)+1); }
+  const top = [...cnt].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([a])=>a);
+  const urls = [];
+  for (const art of top){
+    const prefix = art + "|";
+    for (const k of Object.keys(COVERS)){ const v = COVERS[k]; if (k.startsWith(prefix) && typeof v === "string"){ urls.push(v); break; } }
+  }
+  if (!urls.length) return null;
+  const hues = (await Promise.all(urls.map(extractImgHue))).filter(h => h !== null);
+  if (!hues.length) return null;
+  // média circular para não confundir 359° e 1°
+  const sin = hues.reduce((s,h)=>s+Math.sin(h*Math.PI/180),0);
+  const cos = hues.reduce((s,h)=>s+Math.cos(h*Math.PI/180),0);
+  return Math.round(((Math.atan2(sin,cos)*180/Math.PI)+360)%360);
+}
+function openTheme(){
+  let saved; try { saved = localStorage.getItem(THEME_KEY); } catch {}
+  const curH = saved && saved !== "auto" ? +saved : THEME_DEFAULT;
+  const body = document.createElement("div");
+  body.innerHTML = `
+    <div class="thm-preview" id="thm-prev"></div>
+    <div class="thm-slider-row">
+      <span class="eyebrow">Matiz</span>
+      <input type="range" id="thm-sl" class="thm-sl" min="0" max="359" value="${curH}">
+    </div>
+    <div class="thm-swatches">${THEME_PRESETS.map(p=>`<button type="button" class="thm-sw" data-h="${p.h}" title="${p.label}" style="background:hsl(${p.h},75%,55%)"></button>`).join("")}</div>
+    <div class="thm-actions">
+      <button type="button" class="gbtn" id="thm-auto">${ICON.sync} Cor automática das capas</button>
+      <button type="button" class="gbtn" id="thm-def">Restaurar padrão</button>
+    </div>`;
+  const setPreview = h => { body.querySelector("#thm-prev").style.background = `linear-gradient(90deg,hsl(${h},82%,30%),hsl(${h},75%,64%),hsl(${h},75%,86%))`; };
+  setPreview(curH);
+  const md = openModal({title: "Cor do site", sub: "Ajusta a matiz de todas as cores", body});
+  body.querySelector("#thm-sl").addEventListener("input", e => {
+    const h = +e.target.value;
+    applyThemeHue(h); setPreview(h);
+    try { localStorage.setItem(THEME_KEY, String(h)); } catch {}
+  });
+  body.addEventListener("click", async e => {
+    const sw = e.target.closest(".thm-sw");
+    if (sw){ const h = +sw.dataset.h; applyThemeHue(h); setPreview(h); body.querySelector("#thm-sl").value = h; try { localStorage.setItem(THEME_KEY, String(h)); } catch {} return; }
+    if (e.target.id === "thm-def"){ resetThemeHue(); setPreview(THEME_DEFAULT); body.querySelector("#thm-sl").value = THEME_DEFAULT; try { localStorage.removeItem(THEME_KEY); } catch {} md.close(); return; }
+    if (e.target.id === "thm-auto"){
+      const btn = e.target; btn.textContent = "Detectando…"; btn.disabled = true;
+      const h = await themeAutoDetect();
+      btn.disabled = false; btn.innerHTML = `${ICON.sync} Cor automática das capas`;
+      if (h === null){ toast("Não foi possível extrair a cor. Tente com mais capas carregadas."); return; }
+      applyThemeHue(h); setPreview(h); body.querySelector("#thm-sl").value = h;
+      try { localStorage.setItem(THEME_KEY, String(h)); } catch {}
+      toast(`Cor ajustada automaticamente (matiz ${h}°)`);
+    }
+  });
+}
+function bootTheme(){
+  let saved; try { saved = localStorage.getItem(THEME_KEY); } catch {}
+  if (saved && saved !== "auto") applyThemeHue(+saved);
+}
+bootTheme();
+
 /* ---------- wire the header buttons ---------- */
+$("#dt-theme").innerHTML = `${ICON.palette}<span>Cor</span>`;
+$("#dt-theme").addEventListener("click", openTheme);
 $("#dt-clear").innerHTML = `${ICON.x}<span>Limpar filtros</span>`;
 $("#dt-clear").addEventListener("click", clearFilters);
 $("#dt-table").innerHTML = `${ICON.list}<span>Músicas</span>`;

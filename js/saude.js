@@ -189,8 +189,8 @@ const META = {
 const LEVEL = {ok: "ok", warn: "atenção", help: "ajuda"};
 
 function ring(score){
-  const r = 44, c = 2 * Math.PI * r, col = score >= 85 ? "var(--emerald)" : score >= 60 ? "#FBBF24" : "#F87171";
-  return `<svg class="sd-ring" viewBox="0 0 100 100" role="img" aria-label="Nota ${score} de 100"><circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(110,231,183,.12)" stroke-width="8"/>
+  const r = 44, c = 2 * Math.PI * r, col = healthScoreColor(score);
+  return `<svg class="sd-ring" viewBox="0 0 100 100" role="img" aria-label="Nota ${score} de 100"><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--line)" stroke-width="8"/>
     <circle cx="50" cy="50" r="${r}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(c * score / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 50 50)"/>
     <text x="50" y="52" text-anchor="middle" dominant-baseline="middle" class="sd-score">${score}</text><text x="50" y="68" text-anchor="middle" class="sd-of">de 100</text></svg>`;
 }
@@ -837,6 +837,6 @@ if (btn){
   btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 2.6 3.6v4.1c0 3.1 2.2 5.5 5.4 6.5 3.2-1 5.4-3.4 5.4-6.5V3.6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M4.8 8.2h1.9l1-2.1 1.5 3.8 1-1.7h1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>Saúde</span>`;
   btn.hidden = !STORE;   // na playlist de exemplo não há o que consertar
   btn.addEventListener("click", openHealth);
-  if (STORE){ const {score} = healthChecks(); btn.style.color = healthScoreColor(score); }
+  if (STORE){ const {score} = healthChecks(); if (score < 100) btn.style.color = healthScoreColor(score); }
 }
 })();
