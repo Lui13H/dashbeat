@@ -17,6 +17,10 @@ const TRACK_TITLE_IGN_KEY = "catalogo-musical:track-title-ign";
 const TRACK_TITLE_IGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(TRACK_TITLE_IGN_KEY) || "[]")); } catch(e) { return new Set(); } })();
 const saveTrackTitleIgn = () => { try { localStorage.setItem(TRACK_TITLE_IGN_KEY, JSON.stringify([...TRACK_TITLE_IGN])); } catch(e) {} };
 
+const ALB_CLEAN_KEY = "catalogo-musical:alb-clean";
+const ALB_CLEAN = (() => { try { return JSON.parse(localStorage.getItem(ALB_CLEAN_KEY) || "[]"); } catch(e) { return []; } })();
+const saveAlbClean = () => { try { localStorage.setItem(ALB_CLEAN_KEY, JSON.stringify(ALB_CLEAN)); } catch(e) {} };
+
 // detecta sufixos de edição/versão no final do nome do álbum e sugere o nome limpo
 const EDITION_RE1 = /\s+[-–—]\s*[(\[]?(?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|anniversary|special|limited|collector'?s|platinum)(?:\s+(?:edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]?\s*$/i;
 const EDITION_RE2 = /\s+[(\[](?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|anniversary|special|limited|collector'?s|platinum)(?:\s+(?:edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]\s*$/i;
@@ -615,10 +619,16 @@ function openAlbumNameClean(issues){
   const applyAll = () => {
     if (!pending.size) return;
     ssSet("health", "1");
+    pending.forEach((cleanName, rawName) => {
+      if (!ALB_CLEAN.some(e => e.raw === rawName)) ALB_CLEAN.push({raw: rawName, clean: cleanName});
+    });
+    saveAlbClean();
     commitRows(currentRows().map(r => {
       const t = BY_PLAYLIST.find(b => b.n === r[0]);
       const newName = t && pending.get(t.albumRaw);
-      return newName ? [r[0], r[1], r[2], newName, r[4], r[5], ...(r[6] ? [r[6]] : [])] : r;
+      if (!newName) return r;
+      const newTitle = suggestCleanTrackTitle(r[1]) || r[1];
+      return [r[0], newTitle, r[2], newName, r[4], r[5], ...(r[6] ? [r[6]] : [])];
     }), `${plural(pending.size, "álbum renomeado", "álbuns renomeados")} (sufixo removido)`);
   };
 
@@ -626,13 +636,12 @@ function openAlbumNameClean(issues){
     body.innerHTML = `<div class="confirm"><p>Estes álbuns têm sufixo de edição no nome. Você escolhe o que fazer com cada um — <strong>não pesa na nota</strong>.</p>
       <div class="du-rows">${list.map(x => `<div class="alb-row" data-raw="${esc(x.rawName)}">
         <div class="alb-main">
-          <span class="alb-old">${esc(x.rawName)}</span><br>
-          <strong class="alb-new">${esc(x.cleanName)}</strong> <span class="muted" style="font-size:12px">· ${faixas(x.tracks.length)}</span>
+          <span class="alb-old">${esc(x.rawName)}</span> <span class="alb-arrow">→</span> <strong class="alb-new">${esc(x.cleanName)}</strong> <span class="muted" style="font-size:12px">· ${faixas(x.tracks.length)}</span>
         </div>
         <div class="alb-btns">
-          <button class="gbtn nm-red" type="button" data-ign="${esc(x.rawName)}"    title="Ignorar sugestão">${ICON.x} Ignorar</button>
-          <button class="gbtn nm-amb" type="button" data-manual="${esc(x.rawName)}" title="Editar manualmente">${IC_PEN} Renomear</button>
-          <button class="pbtn nm-ok"  type="button" data-ok="${esc(x.rawName)}"     title="Aceitar nome sugerido">${IC_CHECK} Confirmar</button>
+          <button class="gbtn nm-red" type="button" data-ign="${esc(x.rawName)}"    title="Manter o nome como está">${ICON.x} Ignorar</button>
+          <button class="gbtn nm-amb" type="button" data-manual="${esc(x.rawName)}" title="Editar o nome manualmente">${IC_PEN} Editar</button>
+          <button class="pbtn nm-ok"  type="button" data-ok="${esc(x.rawName)}"     title="Confirmar a alteração sugerida">${IC_CHECK} Confirmar</button>
         </div>
       </div>`).join("")}</div></div>`;
   };
@@ -722,6 +731,11 @@ function openHealthHistory(){
   // nomes de álbuns ignorados na Saúde
   if (ALBUM_NAME_IGN.size){
     secs.push(`<div class="sh-sec"><div class="sh-h"><b>Álbuns ignorados na Saúde</b><small>${ALBUM_NAME_IGN.size}</small></div><ul class="sh-list">${[...ALBUM_NAME_IGN].map(n=>`<li><span class="sh-lbl">${esc(n)}</span><button class="gbtn" data-undo="aign" data-id="${esc(n)}">Desfazer</button></li>`).join("")}</ul></div>`);
+  }
+
+  // nomes de álbuns limpos (sufixo removido)
+  if (ALB_CLEAN.length){
+    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Nomes de álbuns limpos</b><small>${ALB_CLEAN.length} álbum${ALB_CLEAN.length!==1?"s":""}</small></div><ul class="sh-list">${ALB_CLEAN.map(e=>`<li><span class="sh-lbl"><span style="text-decoration:line-through;opacity:.55">${esc(e.raw)}</span> → <strong>${esc(e.clean)}</strong></span></li>`).join("")}</ul></div>`);
   }
 
   // datas preenchidas pela Apple (informativo)
