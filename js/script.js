@@ -2956,7 +2956,8 @@ const ICON = {
   down: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5V11M4.5 7.5 8 11l3.5-3.5M2.5 13.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   x: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
   sync: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 6.5A5.5 5.5 0 0 0 3.3 4.6M2.5 9.5a5.5 5.5 0 0 0 10.2 1.9M3 2v3h3M13 14v-3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
-  palette: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 4.4 11.4c.6-.5.5-1.4-.2-1.7a1 1 0 0 1 .8-1.8h.8c.7 0 1.2-.6 1.2-1.4A6.5 6.5 0 0 0 8 1.5z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="5.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="8" cy="4" r=".95" fill="currentColor"/><circle cx="10.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="5" cy="9.5" r=".95" fill="currentColor"/></svg>'
+  palette: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 4.4 11.4c.6-.5.5-1.4-.2-1.7a1 1 0 0 1 .8-1.8h.8c.7 0 1.2-.6 1.2-1.4A6.5 6.5 0 0 0 8 1.5z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="5.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="8" cy="4" r=".95" fill="currentColor"/><circle cx="10.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="5" cy="9.5" r=".95" fill="currentColor"/></svg>',
+  reset: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 .8-2.7M3 3.5V6h2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
 };
 const pad2 = n => String(n).padStart(2, "0");
 const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
@@ -4978,8 +4979,8 @@ function openTheme(){
     </div>
     <div class="thm-swatches">${THEME_PRESETS.map(p=>`<button type="button" class="thm-sw" data-h="${p.h}" title="${p.label}" style="background:hsl(${p.h},75%,55%)"></button>`).join("")}</div>
     <div class="thm-actions">
-      <button type="button" class="gbtn" id="thm-auto">${ICON.sync} Cor automática das capas</button>
-      <button type="button" class="gbtn" id="thm-def">Restaurar padrão</button>
+      <button type="button" class="gbtn" id="thm-auto">${ICON.palette} Cor automática das capas</button>
+      <button type="button" class="gbtn" id="thm-def">${ICON.reset} Restaurar padrão</button>
     </div>`;
   const setPreview = h => { body.querySelector("#thm-prev").style.background = `linear-gradient(90deg,hsl(${h},82%,30%),hsl(${h},75%,64%),hsl(${h},75%,86%))`; };
   setPreview(curH);
@@ -4996,7 +4997,7 @@ function openTheme(){
     if (e.target.id === "thm-auto"){
       const btn = e.target; btn.textContent = "Detectando…"; btn.disabled = true;
       const h = await themeAutoDetect();
-      btn.disabled = false; btn.innerHTML = `${ICON.sync} Cor automática das capas`;
+      btn.disabled = false; btn.innerHTML = `${ICON.palette} Cor automática das capas`;
       if (h === null){ toast("Não foi possível extrair a cor. Tente com mais capas carregadas."); return; }
       applyThemeHue(h); setPreview(h); body.querySelector("#thm-sl").value = h;
       try { localStorage.setItem(THEME_KEY, String(h)); } catch {}
