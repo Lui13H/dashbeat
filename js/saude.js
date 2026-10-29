@@ -4,7 +4,7 @@
    Nenhuma ação gasta busca sozinha: os botões só abrem as telas que já pedem confirmação. */
 (() => {
 "use strict";
-const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, nm: 0, tn: 0, gd: 0};   // peso de cada verificação na nota (soma 105: nunca zera só por isso; peso 0 = só informa)
+const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, dm: 5, dcr: 0, nm: 0, tn: 0, gd: 0};   // peso de cada verificação na nota (soma 110: nunca zera só por isso; peso 0 = só informa)
 const FULL_AT = 0.25;                                                       // com 25% das faixas afetadas o item já custa o peso inteiro
 const MAX_SEC = 20 * 60;
 
@@ -138,6 +138,7 @@ function healthChecks(list = BY_PLAYLIST){
   const oddDurWarn = longDurWarn; // só aviso
   const sugs = list.filter(t => t.m && t.m.ty && t.m.ty !== "album" && ASING[singleKey(t)] && ASING[singleKey(t)].album && !ASING_IGN.has(singleKey(t)));   // sugestão da Apple: não pesa na nota
   const sameDay = sameDayAlbums(list), review = list.filter(t => t.dfix);   // dfix: data corrigida pelo site, à espera de conferência manual
+  const missingDate = missingDateAlbums(list);
   const spell = artistSpellings(list), ai = ALBUM_INFO, autoG = ai.groups.filter(g => !g.confirmed);
   const nmIssues = albumNameIssues(list);
   const tnIssues = trackTitleIssues(list);
@@ -156,8 +157,10 @@ function healthChecks(list = BY_PLAYLIST){
     mk("cv", sim.covers.length, uniq(sim.covers.flatMap(x => x.rs)).length / N, "warn", {tracks: uniq(sim.covers.flatMap(x => x.rs))}),
     mk("ad", ai.doubts.length, Math.min(1, ai.doubts.reduce((n, e) => n + e.ca + e.cb, 0) / N), "warn", {}),
     mk("au", autoG.length, Math.min(1, autoG.reduce((n, g) => n + g.variants.reduce((m, v) => m + v.count, 0), 0) / N), "warn", {}),
-    mk("dc", sameDay.length, sameDay.filter(x => x.apple || ADATES[x.k] !== undefined).reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: sameDay}),
+    mk("dc", sameDay.filter(x => !x.reviewed).length, sameDay.filter(x => !x.reviewed && (x.apple || ADATES[x.k] !== undefined)).reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: sameDay.filter(x => !x.reviewed)}),
+    mk("dcr", sameDay.filter(x => x.reviewed).length, 0, "help", {albums: sameDay.filter(x => x.reviewed)}),
     mk("dr", review.length, review.length / N, "warn", {tracks: review}),
+    mk("dm", missingDate.length, missingDate.reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: missingDate}),
     // w:5 — help
     mk("b", noLink.length, noLink.length / N, "help", {tracks: noLink}),
     mk("h", spell.length, Math.min(1, spell.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {groups: spell}),
@@ -190,7 +193,9 @@ const META = {
   gw: {t: "Duração longa confirmada", ok: "Nenhuma faixa com duração longa confirmada pendente.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração acima de 20 min confirmada. Você pode editar ou confirmar novamente.`, act: "dur"},
   sg: {t: "Faixas fora de álbum que são de álbum", ok: "Nenhuma faixa fora de álbum com sugestão de álbum.", d: n => `${plural(n, "faixa marcada como single, EP ou coletânea existe", "faixas marcadas como single, EP ou coletânea existem")} num álbum, segundo a Apple. É só uma sugestão: não pesa na nota.`, act: "singles"},
   dc: {t: "Álbuns próximos do mesmo artista", ok: "Nenhum álbum do mesmo artista lançado tão perto de outro.", d: n => `${plural(n, "álbum saiu", "álbuns saíram")} no mesmo ano ou a menos de 2 meses de outro álbum do mesmo artista. A Apple confere sozinha, mas se a suspeita continuar isso pesa na nota até você responder (está certo, editar a data ou reavaliar).`, act: "near"},
+  dcr: {t: "Álbuns próximos confirmados", ok: "Nenhum álbum próximo confirmado.", d: n => `${plural(n, "álbum próximo foi", "álbuns próximos foram")} confirmados como certos por você. Não pesa na nota, mas ficam aqui para referência.`, act: "nearcfm"},
   dr: {t: "Datas para conferir à mão", ok: "Nenhuma data pendente de conferência.", d: n => `${plural(n, "faixa tem", "faixas têm")} uma data que o site montou (ano do Spotify com dia e mês da Apple) porque a Apple não confirmou. Confira em Editar: pesa na nota até você ajustar.`, act: "list"},
+  dm: {t: "Datas sem dia e mês (sem solução automática)", ok: "Nenhuma data indefinida.", d: n => `${plural(n, "álbum está", "álbuns estão")} só com o ano — o site tentou Apple Music, MusicBrainz, Deezer e TheAudioDB e não achou a data completa. Corrija manualmente para tirar da nota.`, act: "datefix"},
   nm: {t: "Nomes com sufixo de edição", ok: "Nenhum nome de álbum com sufixo de edição.", d: n => `${plural(n, "álbum tem", "álbuns têm")} sufixo de edição no nome (Remastered, Deluxe…). Limpar o nome é opcional e não pesa na nota.`, act: "nm"},
   tn: {t: "Títulos com sufixo de versão", ok: "Nenhum título de faixa com sufixo de versão.", d: n => `${plural(n, "faixa tem", "faixas têm")} sufixo de versão no título (Remix, Remastered, Live…). Você decide se limpa o nome, ignora ou verifica se tem outra versão na playlist. Não pesa na nota.`, act: "tn"},
   gd: {t: "Gênero divergente entre fontes", ok: "Nenhum gênero divergente detectado.", d: n => `${plural(n, "artista tem", "artistas têm")} gênero no Spotify que não bate com o que a Apple ou o MusicBrainz dizem. É só uma dica — não pesa na nota.`, act: "gd"},
@@ -291,6 +296,19 @@ function openSingles(tracks){
 
 /* ---------- álbuns do mesmo artista lançados no mesmo ano ou com menos de 2 meses de distância ---------- */
 const isFull = d => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
+// álbuns sem data completa após tentar todas as fontes automáticas: o site tentou e não achou → precisa de correção manual
+function missingDateAlbums(list){
+  const by = new Map();
+  for (const t of list){
+    if (t.artist === NI || t.albumRaw === NI) continue;
+    const k = adateKey(t.artist, t.albumRaw);
+    if (!Object.prototype.hasOwnProperty.call(ADATES, k) || ADATES[k]) continue;   // não tentou ainda, ou já tem data
+    if (isFull(t.date) && !yearOnly(t.date)) continue;   // já tem data real completa
+    if (!by.has(k)) by.set(k, {k, album: t.albumRaw, date: t.date, tracks: []});
+    by.get(k).tracks.push(t);
+  }
+  return [...by.values()];
+}
 // álbuns do mesmo artista que saíram no mesmo ano ou a menos de 2 meses um do outro (com a data vinda da Apple ou do próprio Spotify)
 const DAY = 864e5, near = (a, b) => a.slice(0, 4) === b.slice(0, 4) || Math.abs(Date.parse(a) - Date.parse(b)) < 61 * DAY;
 function sameDayAlbums(list){
@@ -306,11 +324,11 @@ function sameDayAlbums(list){
   const out = [];
   for (const al of by.values()){
     const arr = [...al.values()];
-    for (const x of arr) if (!DREV.has(x.k) && !(!x.apple && ADATES[x.k] === x.date)){   // Apple confirmou a mesma data: some sozinho
+    for (const x of arr) if (!(!x.apple && ADATES[x.k] === x.date)){   // Apple confirmou a mesma data: some sozinho
       // edições do mesmo álbum (o site juntou ou você confirmou) e pares ainda em dúvida na revisão de álbuns não contam: lá é que se decide
       const sameAlbum = y => y.canon === x.canon || ALBUM_INFO.doubts.some(e => (e.a === x.album && e.b === y.album) || (e.a === y.album && e.b === x.album));
       const others = arr.filter(y => y !== x && !sameAlbum(y) && near(x.date, y.date));
-      if (others.length) out.push({...x, other: others.map(y => y.album)});
+      if (others.length) out.push({...x, reviewed: DREV.has(x.k), other: others.map(y => y.album)});
     }
   }
   return out;
@@ -376,13 +394,63 @@ function openReeval(albums){
   }
 }
 
-// responder à suspeita: "Está certo" (as datas são essas mesmo) ou "Editar data" (vale para o álbum inteiro); some da nota quando respondido
+// busca a data original do álbum (não do remaster): MusicBrainz first-release-date → iTunes discografia (mais antiga) → Deezer
+async function findOriginalDate(artist, album){
+  const main = splitArtistsRaw(artist)[0];
+  // cleanTitle remove sufixos de remaster/live ("- 2011 Remaster", "(Remastered)"); albCore remove edições restantes
+  const albClean = albCore(cleanTitle(album)).join(" ");
+  try { const m = await mbAlbumDate(main, albClean); if (isFull(m)) return m; } catch(e) {}
+  await new Promise(r => setTimeout(r, 1200));
+  try {
+    const who = (await itunes(`search?entity=musicArtist&limit=5&term=${encodeURIComponent(main)}`)).find(r => normC(r.artistName || "") === normC(main));
+    if (who){
+      await new Promise(r => setTimeout(r, 3200));
+      const albs = (await itunes(`lookup?id=${who.artistId}&entity=album&limit=200`)).filter(r => r.wrapperType === "collection");
+      const ok = albs.filter(r => albCore(r.collectionName || "").join(" ") === albClean && r.releaseDate);
+      ok.sort((x, y) => String(x.releaseDate).localeCompare(String(y.releaseDate)));
+      if (ok[0] && isFull(String(ok[0].releaseDate).slice(0, 10))) return String(ok[0].releaseDate).slice(0, 10);
+    }
+  } catch(e) {}
+  try { const m = await deezerAlbumDate(main, albClean); if (isFull(m)) return m; } catch(e) {}
+  return null;
+}
+// responder à suspeita: "Está certo" / "Buscar originais para todos" / "Editar data"
+// busca todos os álbuns de uma vez e aplica em lote; modal só fecha depois de resolver tudo
 function openNear(albums){
   const body = document.createElement("div");
-  const row = (al, i) => `<div class="alb-row" data-i="${i}"><div class="alb-main"><div><strong>${esc(al.album)}</strong> <span class="alb-art">${esc(splitArtistsRaw(al.tracks[0].artist)[0])} · ${esc(al.date)}${al.apple ? " (data da Apple)" : ""}</span></div><div class="alb-why">perto de: ${esc(al.other.join(", "))}</div></div><div class="alb-btns"><button class="gbtn" type="button" data-ok="${i}">Está certo</button><button class="gbtn" type="button" data-edit="${i}">Editar data</button></div></div>`;
-  body.innerHTML = `<p class="mdesc">Álbuns do mesmo artista no mesmo ano ou a menos de 2 meses um do outro. <strong>Está certo</strong> mantém as datas e tira o aviso; <strong>Editar data</strong> troca a data do álbum inteiro. Enquanto não responder, pesa na nota.</p>${albums.map(row).join("")}`;
+  const row = (al, i) => `<div class="alb-row" data-i="${i}"><div class="alb-main"><div><strong>${esc(al.album)}</strong> <span class="alb-art">${esc(splitArtistsRaw(al.tracks[0].artist)[0])} · <span id="alb-date-${i}">${esc(al.date)}</span>${al.apple ? " (data da Apple)" : ""}</span></div><div class="alb-why">perto de: ${esc(al.other.join(", "))}</div><div class="alb-why" id="af-${i}" hidden></div></div><div class="alb-btns"><button class="gbtn" type="button" data-ok="${i}">Está certo</button><button class="gbtn" type="button" data-edit="${i}">Editar data</button></div></div>`;
+  body.innerHTML = `<p class="mdesc">Álbuns do mesmo artista no mesmo ano ou a menos de 2 meses um do outro. <strong>Está certo</strong> mantém as datas; <strong>Buscar originais para todos</strong> consulta todas as fontes e aplica em bloco (recomendado quando a data atual é de um remaster); <strong>Editar data</strong> troca manualmente. Enquanto não responder, pesa na nota.</p><div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="gbtn" type="button" id="btn-search-all">Buscar originais para todos</button><button class="pbtn" type="button" id="btn-apply-all" hidden></button></div>${albums.map(row).join("")}`;
   let changed = false;
   const md = openModal({title: "Álbuns próximos do mesmo artista", body, size: "lg", onClose: () => { if (changed) openHealth(); }});
+  const btnSearch = body.querySelector("#btn-search-all");
+  const btnApply = body.querySelector("#btn-apply-all");
+  const found = new Map(); // i → data encontrada
+  btnSearch.addEventListener("click", async () => {
+    btnSearch.disabled = true; btnSearch.textContent = "Buscando…";
+    for (let i = 0; i < albums.length; i++){
+      const al = albums[i];
+      const row = body.querySelector(`#af-${i}`); row.hidden = false; row.innerHTML = `<em>consultando MusicBrainz, iTunes, Deezer e TheAudioDB…</em>`;
+      try {
+        const d = await findOriginalDate(al.tracks[0].artist, al.album);
+        if (d && d !== al.date){ found.set(i, d); row.innerHTML = `<span style="color:var(--ok,#3c3)">Original encontrado: <strong>${esc(d)}</strong></span>`; }
+        else if (d){ row.innerHTML = `Data já está correta: <strong>${esc(d)}</strong>`; }
+        else { row.innerHTML = `Não encontrado — use "Editar data" para corrigir manualmente.`; }
+      } catch(e2){ row.innerHTML = `Erro na busca — tente "Editar data".`; }
+    }
+    btnSearch.hidden = true;
+    if (found.size){
+      btnApply.hidden = false;
+      btnApply.textContent = `Aplicar ${found.size} data${found.size > 1 ? "s" : ""} encontrada${found.size > 1 ? "s" : ""}`;
+    }
+  });
+  btnApply.addEventListener("click", () => {
+    const dateByTrack = new Map();
+    for (const [i, d] of found) for (const t of albums[i].tracks) dateByTrack.set(t.n, d);
+    for (const [i] of found) DREV.add(albums[i].k);
+    saveDFix(); ssSet("health", "1");
+    commitRows(currentRows().map(r => dateByTrack.has(r[0]) ? [r[0], r[1], r[2], r[3], r[4], dateByTrack.get(r[0]), ...(r[6] ? [r[6]] : [])] : r), `Datas originais corrigidas em ${found.size} álbum${found.size > 1 ? "ns" : ""}`);
+    changed = true; md.close();
+  });
   body.addEventListener("click", e => {
     const ok = e.target.closest("[data-ok]"), ed = e.target.closest("[data-edit]");
     if (ok){ const al = albums[+ok.dataset.ok]; DREV.add(al.k); saveDFix(); changed = true; ok.closest(".alb-row").remove(); if (!body.querySelector(".alb-row")) md.close(); }
@@ -405,6 +473,16 @@ function editAlbumDate(al){
 }
 
 
+function openDateFix(albums){
+  const body = document.createElement("div");
+  const row = (al, i) => `<div class="alb-row" data-i="${i}"><div class="alb-main"><div><strong>${esc(al.album)}</strong> <span class="alb-art">${esc(splitArtistsRaw(al.tracks[0].artist)[0])} · ${al.date ? esc(al.date.slice(0, 4)) : "sem data"}</span></div><div class="alb-why">O site tentou Apple Music, MusicBrainz, Deezer e TheAudioDB — nenhum retornou a data completa.</div></div><div class="alb-btns"><button class="gbtn" type="button" data-edit="${i}">Editar data</button></div></div>`;
+  body.innerHTML = `<p class="mdesc">Estes álbuns só têm o ano. O site já buscou automaticamente em todas as fontes e não achou o dia e mês. Informe a data manualmente para resolver: pesa ${HEALTH_W.dm} pontos na nota enquanto estiver pendente.</p>${albums.map(row).join("")}`;
+  const md = openModal({title: "Datas sem dia e mês", body, size: "lg"});
+  body.addEventListener("click", e => {
+    const ed = e.target.closest("[data-edit]");
+    if (ed) editAlbumDate(albums[+ed.dataset.edit]);
+  });
+}
 async function checkDurWithSources(t) {
   const key = durKey(t);
   const mainArtist = splitArtistsRaw(t.artist)[0] || t.artist;
@@ -764,6 +842,143 @@ function openHealthHistory(){
   });
 }
 
+function openRescanProgress(priorityKeys, total){
+  const SRC = ["iTunes", "MusicBrainz", "Deezer"];
+  const sid = s => s.toLowerCase().replace(/[^a-z]/g, "");
+  // estado compartilhado: sobrevive ao fechar/reabrir o modal
+  const state = {
+    sources: Object.fromEntries(SRC.map(s => [s, {album: "aguardando…", done: 0, finished: false}])),
+    changes: [],  // [{source, main, album, oldDate, newDate}]
+    notFound: null, // null = ainda processando; array = concluído
+    isDone: false,
+  };
+  let bubble = null, curMd = null, curHandlers = null;
+  // noDate: Map de k → {k,main,album} — álbuns sem data encontrada até agora (removido quando acha)
+  state.noDate = new Map();
+
+  const rowChange = c => `<li style="font-size:12px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;padding:3px 0;border-bottom:1px solid var(--line)"><strong style="flex-shrink:0">${esc(c.album)}</strong><span style="color:var(--ink-3)">${esc(c.main)}</span><span style="margin-left:auto;white-space:nowrap;color:var(--ink-3)">${esc(c.oldDate||"—")} → <strong style="color:var(--ok,#3a3)">${esc(c.newDate)}</strong></span><span style="font-size:10px;color:var(--ink-3);letter-spacing:.04em">[${esc(c.source)}]</span></li>`;
+
+  function buildBody(){
+    const body = document.createElement("div");
+    const ndList = [...state.noDate.values()];
+    body.innerHTML = `<style>.rp-spin{display:inline-block;animation:rp-rot .8s linear infinite}@keyframes rp-rot{to{transform:rotate(360deg)}}</style>
+      <div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:14px">
+        ${SRC.map((s, i) => { const st = state.sources[s]; return `<div style="display:grid;grid-template-columns:100px 1fr auto;align-items:center;gap:8px;padding:7px 12px;${i?"border-top:1px solid var(--line)":""}"><span style="font-size:12px;font-weight:700;color:var(--ink-3)">${s}</span><span id="rps-${sid(s)}-alb" style="font-size:12px;color:var(--ink-3);overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(st.finished?"concluído":st.album)}</span><span style="display:flex;align-items:center;gap:5px"><span id="rps-${sid(s)}-icon" class="${st.finished?"":"rp-spin"}" style="font-size:14px">${st.finished?"✓":"↺"}</span><span id="rps-${sid(s)}-cnt" style="font-size:11px;color:var(--ink-3);white-space:nowrap">${st.done}/${total}</span></span></div>`; }).join("")}
+      </div>
+      <div id="rp-cw"${state.changes.length?"":" hidden"}>
+        <div id="rp-ch" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px">Alterações encontradas (${state.changes.length})</div>
+        <ul id="rp-cl" style="list-style:none;padding:0;margin:0 0 12px;max-height:180px;overflow-y:auto;display:flex;flex-direction:column">${state.changes.map(rowChange).join("")}</ul>
+      </div>
+      <div id="rp-ew"${ndList.length?"":" hidden"}>
+        <div id="rp-eh" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px">Sem data encontrada (${ndList.length})</div>
+        <ul id="rp-el" style="list-style:none;padding:0;margin:0 0 12px;max-height:160px;overflow-y:auto;display:flex;flex-direction:column"></ul>
+      </div>`;
+    // popula a lista de erros com referências DOM guardadas no handler
+    const ndEls = new Map(); // k → li
+    const elList = body.querySelector("#rp-el");
+    for (const x of ndList){
+      const li = document.createElement("li");
+      li.style.cssText = "font-size:12px;padding:3px 0;border-bottom:1px solid var(--line);color:var(--ink-3)";
+      li.textContent = `${x.album} · ${x.main}`;
+      elList.appendChild(li); ndEls.set(x.k, li);
+    }
+    if (state.isDone){
+      const btn = document.createElement("button");
+      btn.className = "pbtn"; btn.style.cssText = "width:100%;margin-top:8px";
+      btn.textContent = `Fechar${state.changes.length ? ` · ${state.changes.length} alteração${state.changes.length!==1?"ões":""}` : ""}`;
+      btn.addEventListener("click", () => curMd && curMd.close());
+      body.appendChild(btn);
+    }
+    const h = {
+      srcUpdate({source, album, done: d, finished}){
+        const a = body.querySelector(`#rps-${sid(source)}-alb`), c = body.querySelector(`#rps-${sid(source)}-cnt`), ic = body.querySelector(`#rps-${sid(source)}-icon`);
+        if (!a) return;
+        a.textContent = finished ? "concluído" : album;
+        c.textContent = `${d}/${total}`;
+        if (finished){ ic.classList.remove("rp-spin"); ic.textContent = "✓"; }
+      },
+      addChange(c){
+        const wrap = body.querySelector("#rp-cw"), list = body.querySelector("#rp-cl"), hdr = body.querySelector("#rp-ch");
+        wrap.hidden = false;
+        const tmp = document.createElement("ul"); tmp.innerHTML = rowChange(c);
+        list.prepend(tmp.firstElementChild);
+        if (hdr) hdr.textContent = `Alterações encontradas (${state.changes.length})`;
+      },
+      addNoDate({k, main, album}){
+        if (ndEls.has(k)) return;
+        const ew = body.querySelector("#rp-ew"), eh = body.querySelector("#rp-eh");
+        ew.hidden = false;
+        const li = document.createElement("li");
+        li.style.cssText = "font-size:12px;padding:3px 0;border-bottom:1px solid var(--line);color:var(--ink-3)";
+        li.textContent = `${album} · ${main}`;
+        elList.appendChild(li); ndEls.set(k, li);
+        if (eh) eh.textContent = `Sem data encontrada (${state.noDate.size})`;
+      },
+      removeNoDate(k){
+        const li = ndEls.get(k);
+        if (li){ li.remove(); ndEls.delete(k); }
+        const ew = body.querySelector("#rp-ew"), eh = body.querySelector("#rp-eh");
+        if (eh) eh.textContent = `Sem data encontrada (${state.noDate.size})`;
+        if (!state.noDate.size) ew.hidden = true;
+      },
+      finish(){
+        const btn = document.createElement("button");
+        btn.className = "pbtn"; btn.style.cssText = "width:100%;margin-top:8px";
+        btn.textContent = `Fechar${state.changes.length ? ` · ${state.changes.length} alteração${state.changes.length!==1?"ões":""}` : ""}`;
+        btn.addEventListener("click", () => curMd && curMd.close());
+        body.appendChild(btn);
+      }
+    };
+    return {body, h};
+  }
+
+  function showBubble(){
+    if (bubble || state.isDone) return;
+    bubble = document.createElement("button");
+    bubble.id = "rescan-bubble";
+    bubble.style.cssText = "position:fixed;bottom:24px;right:24px;z-index:9999;background:var(--accent,#5b50e8);color:#fff;border:none;border-radius:24px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.35);display:flex;align-items:center;gap:8px";
+    bubble.innerHTML = `<span class="rp-spin" style="display:inline-block;animation:rp-rot .8s linear infinite">↺</span><span id="bubble-lbl">Revisando…</span>`;
+    bubble.addEventListener("click", () => { hideBubble(); openModal_(); });
+    document.body.appendChild(bubble);
+    if (!document.querySelector("#rp-kf")){ const st = document.createElement("style"); st.id = "rp-kf"; st.textContent = ".rp-spin{display:inline-block;animation:rp-rot .8s linear infinite}@keyframes rp-rot{to{transform:rotate(360deg)}}"; document.head.appendChild(st); }
+  }
+  function hideBubble(){ if (bubble){ bubble.remove(); bubble = null; } }
+  function updateBubble(){ const lbl = bubble && bubble.querySelector("#bubble-lbl"); if (lbl) lbl.textContent = `Revisando${state.changes.length ? ` · ${state.changes.length} ✓` : "…"}`; }
+
+  function openModal_(){
+    const {body, h} = buildBody();
+    curHandlers = h;
+    curMd = openModal({title: state.isDone ? "Revisão concluída" : "Revisando dados…", body, size: "md",
+      onClose(){ curHandlers = null; curMd = null; if (!state.isDone) showBubble(); }});
+  }
+
+  startFullRescan(priorityKeys, {
+    onSourceUpdate(data){
+      Object.assign(state.sources[data.source], data);
+      if (curHandlers) curHandlers.srcUpdate(data);
+    },
+    onProgress(c){
+      state.changes.push(c);
+      // se essa fonte achou data para um álbum que estava na lista de erro → remove
+      if (state.noDate.has(c.k)){ state.noDate.delete(c.k); if (curHandlers) curHandlers.removeNoDate(c.k); }
+      updateBubble();
+      if (curHandlers) curHandlers.addChange(c);
+    },
+    onNoDate({k, main, album}){
+      // só adiciona se o álbum ainda não tem data (outra fonte pode ter achado em paralelo)
+      if (state.noDate.has(k) || ADATES[k]) return;
+      state.noDate.set(k, {k, main, album});
+      if (curHandlers) curHandlers.addNoDate({k, main, album});
+    },
+    onDone(){
+      state.isDone = true;
+      hideBubble();
+      if (curHandlers) curHandlers.finish();
+    }
+  });
+
+  openModal_();
+}
 function openHealth(){
   const H = healthChecks(), bad = H.items.filter(i => i.count && i.w);
   const body = document.createElement("div"); body.className = "sd";
@@ -783,22 +998,25 @@ function openHealth(){
       : m.act === "nm" ? `<button class="gbtn" type="button" data-act="nm">Revisar nomes (${nf(it.count)})</button>`
       : m.act === "tn" ? `<button class="gbtn" type="button" data-act="tn">Revisar títulos (${nf(it.count)})</button>`
       : m.act === "near" ? `<button class="gbtn" type="button" data-act="near">Responder (${nf(it.count)})</button><button class="gbtn" type="button" data-act="reeval">Reavaliar datas</button>`
+      : m.act === "nearcfm" ? `<button class="gbtn" type="button" data-act="nearcfm">Ver confirmados (${nf(it.count)})</button>`
       : m.act === "singles" ? `<button class="gbtn" type="button" data-act="singles">Ver sugestões (${nf(it.count)})</button>`
       : m.act === "aauto" ? `<button class="gbtn" type="button" data-act="dups" data-o="aauto">Revisar álbuns</button>`
       : m.act === "dups" ? `<button class="gbtn" type="button" data-act="dups" data-o="dups">Revisar duplicadas</button>`
       : m.act === "spell" ? `<button class="gbtn" type="button" data-act="spell" data-k="${it.k}">Juntar nomes (${nf(it.count)})</button>`
       : m.act === "dur" ? `<button class="gbtn" type="button" data-act="dur" data-k="${it.k}">Revisar durações (${nf(it.count)})</button>`
       : m.act === "gd" ? `<button class="gbtn" type="button" data-act="gd">Revisar gêneros (${nf(it.count)})</button>`
+      : m.act === "datefix" ? `<button class="gbtn" type="button" data-act="datefix">Corrigir manualmente (${nf(it.count)})</button>`
       : `<button class="gbtn" type="button" data-act="list" data-k="${it.k}">Ver as ${nf(it.count)}</button>`;
     return `<li class="sd-i ${it.level}"><span class="sd-dot" aria-hidden="true">${it.level === "warn" ? "!" : "i"}</span><div class="sd-tx"><b>${m.t}</b><span>${m.d(it.count, it)}</span></div><span class="sd-lv">${LEVEL[it.level]}</span><div class="sd-act">${btn}</div></li>`;
   };
   const order = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">i</span><div class="sd-tx"><b>Conferir a ordem</b><span>O site não consegue saber sozinho se a ordem de entrada está certa (#1 = a primeira adicionada). Confira com os links do Spotify.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="fix">Conferir/Consertar ordem</button><button class="gbtn" type="button" data-act="rev">Inverter ordem</button></div></li>`;
+  const rescan = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">↺</span><div class="sd-tx"><b>Revisar todos os dados</b><span>Re-busca as datas de todos os álbuns em Apple Music, MusicBrainz, Deezer e TheAudioDB. Útil quando suspeitar que datas vieram de remasters. Não usa o Spotify.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="rescan">Revisar dados</button></div></li>`;
   const head = bad.length
     ? `<div class="sd-top">${ring(H.score)}<div><h4>${H.score >= 85 ? "Quase tudo certo" : H.score >= 60 ? "Dá pra melhorar" : "Precisa de atenção"}</h4><p>${plural(bad.length, "verificação encontrou", "verificações encontraram")} algo em ${faixas(H.N)}.</p></div></div>`
     : `<div class="sd-top good">${ring(100)}<div><h4>Tudo certo!</h4><p>Nenhum problema encontrado nas ${faixas(H.N)}.</p><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button></div></div>`;
   const hero = H.noSpotify ? `<div class="sd-hero"><p><strong>Nenhuma música tem dados do Spotify ainda.</strong> Um único <strong>Atualizar dados</strong> resolve o que falta de dados, links e gêneros de uma vez (você confirma as buscas antes).</p><button class="pbtn" type="button" data-act="upd">Atualizar dados</button></div>` : "";
   const shown = H.noSpotify ? H.items.filter(i => !["a", "b", "c"].includes(i.k)) : (bad.length ? H.items : H.items.filter(i => i.count && !i.w));
-  body.innerHTML = `${head}${hero}<ul class="sd-list">${shown.map(row).join("")}${order}</ul>`;
+  body.innerHTML = `${head}${hero}<ul class="sd-list">${shown.map(row).join("")}${order}${rescan}</ul>`;
   const md = openModal({title: "Saúde da playlist", sub: `${faixas(H.N)}`, body, size: "md"});
   const by = k => H.items.find(i => i.k === k);
   body.addEventListener("click", e => {
@@ -814,9 +1032,30 @@ function openHealth(){
     else if (a === "gd"){ md.close(); openGenreDivergence(by("gd").artists); }
     else if (a === "near"){ md.close(); openNear(by("dc").albums); }
     else if (a === "reeval"){ md.close(); openReeval(by("dc").albums); }
+    else if (a === "nearcfm"){ md.close(); openNear(by("dcr").albums); }
+    else if (a === "datefix"){ md.close(); openDateFix(by("dm").albums); }
     else if (a === "singles"){ md.close(); openSingles(by("sg").tracks); }
     else if (a === "dur"){ md.close(); const it = by(b.dataset.k); openDurReview(it.tracks); }
     else if (a === "hist"){ openHealthHistory(); }
+    else if (a === "rescan"){
+      const H2 = healthChecks();
+      const byK = k => H2.items.find(i => i.k === k);
+      const priorityKeys = new Set([
+        ...(byK("dc")?.albums || []).map(x => x.k),
+        ...(byK("dcr")?.albums || []).map(x => x.k),
+        ...(byK("dm")?.albums || []).map(x => x.k),
+        ...(byK("dr")?.tracks || []).map(t => adateKey(t.artist, t.albumRaw)),
+      ]);
+      const albumKeys = new Set();
+      for (const r of RAW){ const a2 = String(r[2]||"").trim(), al2 = String(r[3]||"").trim(); if (a2 && al2) albumKeys.add(adateKey(a2, al2)); }
+      const total = albumKeys.size;
+      const est = Math.max(1, Math.round(total * 3.2 / 60));
+      const confBody = document.createElement("div"); confBody.className = "confirm";
+      confBody.innerHTML = `<p>O site vai re-buscar datas em <strong>${total} álbum${total !== 1 ? "ns" : ""}</strong> usando Apple Music, MusicBrainz, Deezer e TheAudioDB — <strong>sem usar o Spotify</strong>.</p>${priorityKeys.size ? `<p>Os <strong>${priorityKeys.size} álbun${priorityKeys.size !== 1 ? "s" : ""} com alertas abertos</strong> vão primeiro na fila.</p>` : ""}<p class="muted" style="font-size:13px">A fila respeita os limites de cada API (~3s por álbum). Estimativa: ~${est} min. O site continua funcionando normalmente enquanto processa.</p><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="gbtn" type="button" id="rc-cancel">Cancelar</button><button class="pbtn" type="button" id="rc-go">Iniciar varredura</button></div>`;
+      const confMd = openModal({title: "Revisar todos os dados", body: confBody, size: "sm"});
+      confBody.querySelector("#rc-cancel").addEventListener("click", () => confMd.close());
+      confBody.querySelector("#rc-go").addEventListener("click", () => { confMd.close(); md.close(); openRescanProgress(priorityKeys, total); });
+    }
     else if (a === "spell"){
       const groups = by("h").groups || [], keys = Object.keys(ALIAS);
       const sm = openModal({title: META.h.t, size: "md", sub: "Mesma banda escrita de jeitos diferentes",

@@ -227,7 +227,7 @@ const DFIX_KEY = "catalogo-musical:date-fix", DREV_KEY = "catalogo-musical:date-
 const DFIX = (() => { try { return JSON.parse(localStorage.getItem(DFIX_KEY) || "null") || {}; } catch (e) { return {}; } })();
 const DREV = (() => { try { return new Set(JSON.parse(localStorage.getItem(DREV_KEY) || "[]")); } catch (e) { return new Set(); } })();
 const saveDFix = () => { try { localStorage.setItem(DFIX_KEY, JSON.stringify(DFIX)); localStorage.setItem(DREV_KEY, JSON.stringify([...DREV])); } catch (e) {} };
-const adateFor = (artist, album, base) => { const d = ADATES[adateKey(artist, album)]; return yearOnly(base) && d && d.slice(0, 4) === base.slice(0, 4) ? d : base; };
+const adateFor = (artist, album, base) => { const d = ADATES[adateKey(artist, album)]; if (!d) return base; if (!base) return d; return yearOnly(base) && d.slice(0, 4) === base.slice(0, 4) ? d : base; };
 /* faixas que não são de álbum (single/EP, coletânea…) mas talvez sejam: busca na Apple (sem login). "artista principal|título" → {album, tn, tt} ("" = só existe como single).
    É só uma sugestão (não pesa na nota): a pessoa aceita ou recusa na Saúde; recusadas ficam em ASING_IGN */
 const ASING_KEY = "catalogo-musical:apple-singles", ASING_IGN_KEY = "catalogo-musical:apple-singles-ignored";
@@ -924,9 +924,51 @@ async function mbAlbumDate(art, album){
   const core = albCore(album).join(" "); if (!core) return "";
   await new Promise(r => setTimeout(r, 1200));
   const j = await mbJSON("release-group/?query=" + encodeURIComponent(`releasegroup:"${core}" AND artist:"${art}" AND primarytype:album`) + "&limit=15");
-  const ok = ((j && j["release-groups"]) || []).filter(g => g.title && albTokens(g.title).join(" ") === core && !(g["secondary-types"] || []).length && mbArtistOk(g["artist-credit"], art));
+  const rgs = (j && j["release-groups"]) || [];
+  const titleMatch = g => g.title && albTokens(g.title).join(" ") === core && mbArtistOk(g["artist-credit"], art);
+  let ok = rgs.filter(g => titleMatch(g) && !(g["secondary-types"] || []).length);
+  if (!ok.length) ok = rgs.filter(g => titleMatch(g) && !(g["secondary-types"] || []).some(t => /live|remix/i.test(t)));   // aceita compilação se não houver resultado sem tipo secundário
   ok.sort((x, y) => String(x["first-release-date"] || "9").localeCompare(String(y["first-release-date"] || "9")));
-  return ok[0] ? String(ok[0]["first-release-date"] || "") : "";
+  if (!ok[0]) return "";
+  const d = String(ok[0]["first-release-date"] || "");
+  if (/^\d{4}-\d{2}$/.test(d)) return d + "-01";   // YYYY-MM → YYYY-MM-01 (mês sem dia = primeiro do mês)
+  return d;
+}
+// data do álbum via Deezer (terceira fonte): API pública sem autenticação, devolve YYYY-MM-DD
+async function deezerAlbumDate(art, album){
+  const selfTitled = normC(art) === normC(album);
+  const term = selfTitled ? art : art + " " + album;
+  await new Promise(r => setTimeout(r, 800));
+  const res = await fetch(`https://api.deezer.com/search/album?q=${encodeURIComponent(term)}&limit=20`);
+  if (!res.ok) return "";
+  const j = await res.json();
+  const a = normC(art), alC = albCore(album).join(" "), alN = normC(album);
+  const ok = ((j && j.data) || []).filter(x => {
+    const ra = normC((x.artist && x.artist.name) || "");
+    if (!ra || !(ra.includes(a) || a.includes(ra))) return false;
+    const rc = albCore(x.title || "").join(" ");
+    return rc === alC || normC(x.title || "") === alN;
+  });
+  ok.sort((x, y) => String(x.release_date || "9").localeCompare(String(y.release_date || "9")));
+  const d = ok[0] && ok[0].release_date;
+  return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "";
+}
+// data do álbum via TheAudioDB (quarta fonte): devolve o ano aproximado como YYYY-01-01 (último recurso)
+async function tadbAlbumDate(art, album){
+  await new Promise(r => setTimeout(r, 400));
+  const res = await fetch(`https://www.theaudiodb.com/api/v1/json/2/searchalbum.php?s=${encodeURIComponent(art)}&a=${encodeURIComponent(album)}`);
+  if (!res.ok) return "";
+  const j = await res.json();
+  const a = normC(art), alC = albCore(album).join(" ");
+  const albs = (j && j.album) || [];
+  const ok = albs.filter(x => {
+    const ra = normC(x.strArtist || "");
+    if (!ra || !(ra.includes(a) || a.includes(ra))) return false;
+    return albCore(x.strAlbum || "").join(" ") === alC;
+  });
+  if (!ok.length) return "";
+  const year = ok[0].intYearReleased;
+  return year && /^\d{4}$/.test(String(year)) ? String(year) + "-01-01" : "";
 }
 // a faixa num álbum de verdade: release oficial de um release-group do tipo álbum (sem tipo secundário e sem marca de edição); o mais antigo
 async function mbTrackAlbum(art, title){
@@ -1008,20 +1050,109 @@ function queueAppleSingles(){
 }
 function queueAppleDates(){
   const need = new Map();
+  // detecta anos com múltiplos álbuns do mesmo artista (colisão: não dá pra ordenar sem a data completa)
+  const yearAlbs = new Map();
+  for (const r of RAW){
+    const [,, artist, album,, date] = r;
+    const a = String(artist || "").trim(), al = String(album || "").trim(); if (!a || !al) continue;
+    const yr = String(date || "").slice(0, 4); if (!/^\d{4}$/.test(yr)) continue;
+    const yk = splitArtistsRaw(a)[0].toLowerCase() + "\0" + yr;
+    if (!yearAlbs.has(yk)) yearAlbs.set(yk, new Set());
+    yearAlbs.get(yk).add(adateKey(a, al));
+  }
+  const collisionKeys = new Set();
+  for (const [, albs] of yearAlbs) if (albs.size > 1) for (const k of albs) collisionKeys.add(k);
   for (const r of RAW){
     const [, , artist, album, , date] = r, a = String(artist || "").trim(), al = String(album || "").trim();
-    if (!a || !al || !yearOnly(date)) continue;
+    if (!a || !al || (date && !yearOnly(date))) continue;   // pula só se já tem data completa; álbum sem data também entra
     const k = adateKey(a, al);
-    if (!(k in ADATES) && !need.has(k)) need.set(k, {main: splitArtistsRaw(a)[0], album: al});
+    const stored = ADATES[k];
+    // enfileira se: nunca buscou, ou buscou e não achou, ou está em colisão com data aproximada (só ano)
+    const needEnrich = !stored || (collisionKeys.has(k) && stored.endsWith("-01-01"));
+    if (needEnrich && !need.has(k)) need.set(k, {main: splitArtistsRaw(a)[0], album: al});
   }
   if (!need.size) return;
   for (const [k, x] of need) coverQueue.push({job: async () => {
-    const r = pickAlbum(await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(x.main + " " + x.album)}`), x.main, x.album, 3);   // só vale o mesmo álbum
+    const selfTitled = normC(x.main) === normC(x.album);
+    const term = selfTitled ? x.main : x.main + " " + x.album;
+    let r = pickAlbum(await itunes(`search?entity=album&limit=25&term=${encodeURIComponent(term)}`), x.main, x.album, 3);
+    if (!r){   // fallback: busca só pelo nome do álbum com critério mais rigoroso de artista
+      await coverSleep(3200);
+      r = pickAlbum(await itunes(`search?entity=album&limit=15&term=${encodeURIComponent(x.album)}`), x.main, x.album, 4);
+    }
     let d = r && r.releaseDate ? String(r.releaseDate).slice(0, 10) : "";
-    if (!d){ try { const m = await mbAlbumDate(x.main, x.album); if (/^\d{4}-\d{2}-\d{2}$/.test(m)) d = m; } catch (e) {} }   // 2ª fonte grátis: MusicBrainz (o ano precisa bater, como na Apple)
+    if (!d){ try { const m = await mbAlbumDate(x.main, x.album); if (/^\d{4}-\d{2}-\d{2}$/.test(m)) d = m; } catch (e) {} }     // 2ª fonte: MusicBrainz
+    if (!d){ try { const m = await deezerAlbumDate(x.main, x.album); if (/^\d{4}-\d{2}-\d{2}$/.test(m)) d = m; } catch (e) {} }  // 3ª fonte: Deezer
     ADATES[k] = d; saveADates();
   }});
   pumpCovers();
+}
+// varredura manual forçada: 4 fontes rodam em paralelo, cada uma serial na sua própria fila
+// opts.onProgress({k, source, main, album, oldDate, newDate}) — nova data encontrada (ou melhoria)
+// opts.onNoDate({k, main, album}) — fonte terminou o álbum sem achar data
+// opts.onSourceUpdate({source, main, album, done, total, finished}) — status por fonte
+// opts.onDone() — chamado quando todas as 4 fontes terminarem
+function startFullRescan(priorityKeys = new Set(), {onProgress, onNoDate, onSourceUpdate, onDone} = {}){
+  const seen = new Set();
+  const prior = [], rest = [];
+  for (const r of RAW){
+    const [,, artist, album] = r;
+    const a = String(artist || "").trim(), al = String(album || "").trim();
+    if (!a || !al) continue;
+    const k = adateKey(a, al);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const main = splitArtistsRaw(a)[0];
+    // cleanTitle remove sufixos de remaster/live/remix estilo "- 2011 Remaster" ou "(Remastered)"
+    // albCore remove marcas de edição restantes em parênteses/colchetes/após hífen (deluxe, anniversary…)
+    const albClean = albCore(cleanTitle(al)).join(" ");
+    if (priorityKeys.has(k)) prior.push({k, main, album: al, albClean}); else rest.push({k, main, album: al, albClean});
+  }
+  const jobs = [...prior, ...rest];
+  // salva datas antigas antes de limpar para exibir o que mudou
+  const oldDates = new Map();
+  for (const x of jobs){ oldDates.set(x.k, ADATES[x.k] || ""); delete ADATES[x.k]; }
+  saveADates();
+  // cada fonte varre todos os álbuns de forma independente
+  // grava apenas se for data melhor: full bate year-only; mesma categoria → mais antiga vence
+  const tryUpdate = (x, d, source) => {
+    if (!d) return;
+    const cur = ADATES[x.k];
+    const dFull = isFull(d), curFull = cur && isFull(cur);
+    if (!cur || (dFull && !curFull) || (dFull === curFull && d < cur)){
+      ADATES[x.k] = d; saveADates();
+      const old = oldDates.get(x.k) || "";
+      if (onProgress && d !== old) onProgress({k: x.k, source, main: x.main, album: x.album, oldDate: old, newDate: d});
+    }
+  };
+  const loop = async (source, fetchFn, gapMs) => {
+    let done = 0;
+    for (const x of jobs){
+      if (onSourceUpdate) onSourceUpdate({source, main: x.main, album: x.albClean, done, total: jobs.length});
+      try { tryUpdate(x, await fetchFn(x), source); } catch(e){}
+      // se após essa fonte o álbum ainda não tem data, sinaliza falha
+      if (!ADATES[x.k] && onNoDate) onNoDate({k: x.k, main: x.main, album: x.album});
+      done++;
+      if (gapMs > 0) await coverSleep(gapMs);
+    }
+    if (onSourceUpdate) onSourceUpdate({source, main: "", album: "", done, total: jobs.length, finished: true});
+  };
+  const itunesFetch = async x => {
+    const selfTitled = normC(x.main) === normC(x.albClean);
+    const term = selfTitled ? x.main : x.main + " " + x.albClean;
+    let r = pickAlbum(await itunes(`search?entity=album&limit=25&term=${encodeURIComponent(term)}`), x.main, x.album, 3);
+    if (!r){ await coverSleep(3200); r = pickAlbum(await itunes(`search?entity=album&limit=15&term=${encodeURIComponent(x.albClean)}`), x.main, x.album, 4); }
+    return r && r.releaseDate ? String(r.releaseDate).slice(0, 10) : "";
+  };
+  const mbFetch    = x => mbAlbumDate(x.main, x.albClean);
+  const deezerFetch = x => deezerAlbumDate(x.main, x.albClean);
+  // cada fonte tem seu próprio delay entre álbuns (as funções já têm sleep interno)
+  Promise.all([
+    loop("iTunes",      itunesFetch,  3200),
+    loop("MusicBrainz", mbFetch,       200),
+    loop("Deezer",      deezerFetch,   200),
+  ]).then(() => { if (onDone) onDone(); });
+  return jobs.length;
 }
 let rgT;
 function refreshShownGenres(){
