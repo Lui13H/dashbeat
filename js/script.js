@@ -1119,11 +1119,10 @@ document.addEventListener("fullscreenchange", () => {
   moveTree(home); body.remove();
 });
 $("#tree-expand").addEventListener("click", openTreeBig);
-// opções do gráfico (nomes, números, sombra, bordas, animação): caixa marcada = recurso ligado; valem pro card e pra tela cheia — e ficam salvas (vale depois do F5)
+// opções do gráfico (nomes, números, bordas, animação): caixa marcada = recurso ligado; valem pro card e pra tela cheia — e ficam salvas (vale depois do F5)
 const TREE_OPTS = [
   {opt: "nomes", cls: "nolabels", key: "catalogo-musical:tree-nonames", txt: "Mostrar nomes"},
   {opt: "numeros", cls: "nonums", key: "catalogo-musical:tree-nonums", txt: "Mostrar números"},
-  {opt: "sombra", cls: "noshadow", key: "catalogo-musical:tree-noshadow", txt: "Mostrar sombra"},
   {opt: "bordas", cls: "flush", key: "catalogo-musical:tree-flush", txt: "Bordas redondas"},
   {opt: "semanim", cls: "noanim", key: "catalogo-musical:tree-noanim", txt: "Animar a troca de lugar"}
 ];
@@ -1151,17 +1150,10 @@ function setTreeOpt(o, off){   // a caixa marcada = recurso LIGADO; a classe (no
   treeEl.classList.toggle(o.cls, off);
   document.querySelectorAll(`.tree-opt[data-opt="${o.opt}"]`).forEach(x => { x.checked = !off; });
 }
-let shadowAuto = false;   // a sombra foi desligada sozinha (nomes e números desmarcados): volta sozinha quando um deles é marcado de novo
 document.addEventListener("change", e => {
   const cb = e.target, o = cb.classList && cb.classList.contains("tree-opt") && TREE_OPTS.find(x => x.opt === cb.dataset.opt);
   if (!o) return;
   setTreeOpt(o, !cb.checked);
-  if (o.opt === "sombra") shadowAuto = false;
-  else if (o.opt === "nomes" || o.opt === "numeros"){
-    const shadow = TREE_OPTS.find(x => x.opt === "sombra"), both = treeEl.classList.contains("nolabels") && treeEl.classList.contains("nonums");
-    if (both && !treeEl.classList.contains(shadow.cls)){ setTreeOpt(shadow, true); shadowAuto = true; }
-    else if (!both && shadowAuto){ setTreeOpt(shadow, false); shadowAuto = false; }
-  }
   if (o.opt === "bordas"){ treeEl.classList.add("notrans"); renderTree(); setTimeout(() => treeEl.classList.remove("notrans"), 60); }   // muda o tamanho dos blocos
 });
 
@@ -2791,7 +2783,7 @@ function isAllowedSpotifyUser(name){
   if (!name || typeof name !== "string") return false;
   // normaliza removendo acentos, espaços extras e deixando em minúsculas
   const norm = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
-  return ["crowd goes wild", "juia", "arthur ambrosio"].includes(norm);
+  return ["crowd goes wild", "juia", "arthur ambrosio", "luis.tv"].includes(norm);
 }
 function currentSpotifyUser(){
   const oauth = loadSpotifyOAuth();

@@ -500,14 +500,12 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .tree-full{position:fixed;inset:0;z-index:500}
 .tree-big:fullscreen{background:#030B08;cursor:pointer}
 .tree-big:fullscreen .tile{cursor:pointer}
-/* opções do gráfico de bandas (cada uma liga/desliga sozinha): nomes, números e a sombra escura sobre as capas */
+/* opções do gráfico de bandas (cada uma liga/desliga sozinha): nomes, números e bordas */
 .tree.nolabels .lbl strong{visibility:hidden}
 .tree.nonums .lbl span{visibility:hidden}
-.tree .cov::after{transition:opacity .3s}
-.tree.noshadow .cov::after{opacity:0}
-/* sem sombra : nome e número ficam opacos, com um contorno finíssimo (quase imperceptível) pra continuarem legíveis */
-.tree.noshadow .lbl{text-shadow:0 0 1px #000, 0 0 1px #000, 0 0 1.5px #000, 0 0 2px rgba(0,0,0,.55) !important}
-.tree.noshadow .lbl span{opacity:1;-webkit-text-stroke:.6px #000;paint-order:stroke fill;
+.tree .cov::after{opacity:0}
+.tree .lbl{text-shadow:0 0 1px #000, 0 0 1px #000, 0 0 1.5px #000, 0 0 2px rgba(0,0,0,.55) !important}
+.tree .lbl span{opacity:1;-webkit-text-stroke:.6px #000;paint-order:stroke fill;
   text-shadow:1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 2px #000 !important}
 .hint-btn{display:flex;align-items:center;justify-content:flex-end;max-width:none !important}
 .tree-exp{padding:6px 11px;font-size:12px;border-radius:10px}

@@ -18,7 +18,7 @@ const THEMES = {
 };
 const FORMATS = {retrato: {label: "Vertical", sub: "1080×1350", w: 1080, h: 1350}, paisagem: {label: "Horizontal", sub: "1920×1080", w: 1920, h: 1080}};
 /* opções de estilo do mapa de bandas: as mesmas do gráfico do painel (caixa marcada = ligado). Começam iguais às do painel e depois ficam salvas à parte */
-const TOPTS = [["nomes", "Mostrar nomes", "nolabels"], ["numeros", "Mostrar números", "nonums"], ["sombra", "Mostrar sombra", "noshadow"], ["bordas", "Bordas redondas", "flush"]];
+const TOPTS = [["nomes", "Mostrar nomes", "nolabels"], ["numeros", "Mostrar números", "nonums"], ["bordas", "Bordas redondas", "flush"]];
 function loadTreeOpts(){
   const o = {};
   for (const [k, , cls] of TOPTS) o[k] = typeof treeEl !== "undefined" && treeEl ? !treeEl.classList.contains(cls) : true;
@@ -246,7 +246,7 @@ const DRAW = {
     const items = d.tiles.map(x => ({k: x.k, value: x.value}));
     const laid = squarify(items, aw, ah), by = new Map(d.tiles.map(x => [x.k, x]));
     const imgs = new Map(await Promise.all(d.tiles.map(async x => [x.k, x.url ? await loadImg(x.url) : null])));
-    const max = d.tiles[0].value, to = o.tree || {nomes: true, numeros: true, sombra: true, bordas: true}, G = to.bordas ? 3 : 0;
+    const max = d.tiles[0].value, to = o.tree || {nomes: true, numeros: true, bordas: true}, G = to.bordas ? 3 : 0;
     for (const tl of laid){
       const x = ax + tl.x + G / 2, y = ay + tl.y + G / 2, w = tl.w - G, h = tl.h - G, info = by.get(tl.k), im = imgs.get(tl.k);
       if (w < 2 || h < 2) continue;
@@ -258,14 +258,13 @@ const DRAW = {
       ctx.fillStyle = bg; ctx.fillRect(x, y, w, h);
       if (im){
         drawCover(ctx, im, x, y, w, h);
-        if (to.sombra){ const ov = ctx.createLinearGradient(x, y, x + w * .4, y + h); ov.addColorStop(0, "rgba(2,44,34,.45)"); ov.addColorStop(1, "rgba(2,20,15,.88)"); ctx.fillStyle = ov; ctx.fillRect(x, y, w, h); }
       }
       ctx.restore();
       if (info.other){ ctx.strokeStyle = t.line; ctx.lineWidth = 2; rr(ctx, x + 1, y + 1, w - 2, h - 2, rad); ctx.stroke(); }
       const lightTxt = info.other && t.light, pad = Math.max(5, Math.min(16, Math.min(w, h) / 9)), cs = Math.max(11, Math.min(30, Math.sqrt(w * h) / 9)), inW = w - 2 * pad;
       ctx.save(); ctx.textBaseline = "alphabetic";
-      if (to.sombra){ ctx.shadowColor = lightTxt ? "rgba(255,255,255,.7)" : "rgba(0,0,0,.65)"; ctx.shadowBlur = 5; } else { ctx.strokeStyle = lightTxt ? "rgba(255,255,255,.9)" : "rgba(0,0,0,.85)"; ctx.lineJoin = "round"; }   // sem sombra: o texto ganha um contorno fino
-      const put = (txt, tx, ty) => { if (!to.sombra){ ctx.lineWidth = Math.max(2, ctx.measureText(" ").width / 3); ctx.strokeText(txt, tx, ty); } ctx.fillText(txt, tx, ty); };
+      ctx.strokeStyle = lightTxt ? "rgba(255,255,255,.9)" : "rgba(0,0,0,.85)"; ctx.lineJoin = "round";
+      const put = (txt, tx, ty) => { ctx.lineWidth = Math.max(2, ctx.measureText(" ").width / 3); ctx.strokeText(txt, tx, ty); ctx.fillText(txt, tx, ty); };
       if (info.other){   // "+N bandas": só números = "+N" no cantinho, como a contagem dos outros; com nome (só ele ou os dois) = "+N bandas" centralizado
         const lbl = to.nomes ? `+${info.n} bandas` : "";
         if (!to.nomes && to.numeros){
@@ -429,15 +428,9 @@ function openCards(){
     const lb = e.target.closest(".cd-list button"); if (lb){ st.id = lb.dataset.id; ui(); render(); return; }
     if (e.target.closest(".cd-prev")) step(-1); else if (e.target.closest(".cd-next")) step(1);
   });
-  let shadowAuto = false;   // a sombra desligou sozinha (nomes e números desmarcados): volta sozinha quando um deles é marcado
   body.addEventListener("change", e => {
     const cb = e.target.closest(".cd-opt"); if (!cb) return;
     const k = cb.dataset.opt; st.tree[k] = cb.checked;
-    if (k === "sombra") shadowAuto = false;
-    else if (k === "nomes" || k === "numeros"){
-      const both = !st.tree.nomes && !st.tree.numeros;
-      if (both && st.tree.sombra){ st.tree.sombra = false; shadowAuto = true; } else if (!both && shadowAuto){ st.tree.sombra = true; shadowAuto = false; }
-    }
     lsSet(KEY_TREE, JSON.stringify(st.tree)); ui(); render();
   });
   body.querySelector("#cd-name").addEventListener("input", e => { st.name = e.target.value.slice(0, 40); lsSet(KEY_NAME, st.name); clearTimeout(render.t); render.t = setTimeout(render, 120); });
