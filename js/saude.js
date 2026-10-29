@@ -144,23 +144,29 @@ function healthChecks(list = BY_PLAYLIST){
   const gdIssues = genreDivergence(list);
   const mk = (k, count, frac, level, extra) => ({k, count, frac, level: count ? level : "ok", w: HEALTH_W[k], ...extra});
   const items = [
+    // w:25 — crítico
     mk("a", noData.length, noData.length / N, "warn", {tracks: noData}),
-    mk("b", noLink.length, noLink.length / N, "help", {tracks: noLink}),
-    mk("c", genres.length, Math.min(1, genres.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {artists: genres}),
+    // w:15
     mk("e", ni.length, ni.length / N, "warn", {tracks: ni}),
+    // w:10 — warn antes de help
     mk("f", sim.dups.length, dupTracks.length / N, "warn", {tracks: dupTracks, groups: sim.dups}),
     mk("g", oddDur.length, oddDur.length / N, "warn", {tracks: oddDur}),
-    mk("gw", oddDurWarn.length, 0, "help", {tracks: oddDurWarn, longDurWarn: true}),
-    mk("cv", sim.covers.length, uniq(sim.covers.flatMap(x => x.rs)).length / N, "warn", {tracks: uniq(sim.covers.flatMap(x => x.rs))}),   // dúvida do site: pesa na nota até a pessoa classificar
+    mk("c", genres.length, Math.min(1, genres.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {artists: genres}),
+    // w:5 — warn
+    mk("cv", sim.covers.length, uniq(sim.covers.flatMap(x => x.rs)).length / N, "warn", {tracks: uniq(sim.covers.flatMap(x => x.rs))}),
     mk("ad", ai.doubts.length, Math.min(1, ai.doubts.reduce((n, e) => n + e.ca + e.cb, 0) / N), "warn", {}),
     mk("au", autoG.length, Math.min(1, autoG.reduce((n, g) => n + g.variants.reduce((m, v) => m + v.count, 0), 0) / N), "warn", {}),
-    mk("sg", sugs.length, 0, "help", {tracks: sugs}),
-    mk("dc", sameDay.length, sameDay.filter(x => x.apple || ADATES[x.k] !== undefined).reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: sameDay}),   // pesa depois da checagem automática da Apple, até a pessoa responder
+    mk("dc", sameDay.length, sameDay.filter(x => x.apple || ADATES[x.k] !== undefined).reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: sameDay}),
     mk("dr", review.length, review.length / N, "warn", {tracks: review}),
-    mk("nm", nmIssues.length, 0, "help", {albums: nmIssues}),   // sugestão opcional: não pesa na nota
-    mk("tn", tnIssues.length, 0, "help", {tracks: tnIssues}),   // sufixo de versão no título da faixa: não pesa
-    mk("gd", gdIssues.length, 0, "help", {artists: gdIssues}),  // divergência de gênero entre fontes: não pesa
-    mk("h", spell.length, Math.min(1, spell.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {groups: spell})
+    // w:5 — help
+    mk("b", noLink.length, noLink.length / N, "help", {tracks: noLink}),
+    mk("h", spell.length, Math.min(1, spell.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {groups: spell}),
+    // w:0 — informativos
+    mk("gw", oddDurWarn.length, 0, "help", {tracks: oddDurWarn, longDurWarn: true}),
+    mk("sg", sugs.length, 0, "help", {tracks: sugs}),
+    mk("nm", nmIssues.length, 0, "help", {albums: nmIssues}),
+    mk("tn", tnIssues.length, 0, "help", {tracks: tnIssues}),
+    mk("gd", gdIssues.length, 0, "help", {artists: gdIssues}),
   ];
   for (const it of items) it.penalty = it.count ? Math.min(it.w, it.w * Math.min(1, it.frac / FULL_AT)) : 0;
   const total = items.reduce((s, it) => s + it.penalty, 0);
