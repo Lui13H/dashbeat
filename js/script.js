@@ -1575,7 +1575,7 @@ function renderProfile(R){
       [[dur.short, "#A3E635", "Curtas < 3min"], [dur.normal, "#34D399", "Normais 3–5min"], [dur.long, "#047857", "Longas 5–8min"], [dur.epic, "#065F46", "Épicas > 8min"]], dTotal);
     const longest = [...withSec].sort((a, b) => b.sec - a.sec).slice(0, 3);
     if (longest.length) html += `<div class="pf"><div class="pf-h"><span>Músicas mais longas</span><b>Duração</b></div>
-      ${longest.map(t => `<div class="hrow"><div class="hl"><span>${esc(t.title)} <em>${esc(t.artist)}</em></span><b>${durTxt(t.sec)}</b></div><div class="ht"><i style="width:${Math.max(2, t.sec / longest[0].sec * 100)}%"></i></div></div>`).join("")}</div>`;
+      ${longest.map(t => `<div class="hrow"><div class="hl"><span>${esc(t.title)} <em>${esc(t.artist)}</em></span><b>${durTxt(t.sec)}</b></div><div class="ht"><i style="width:${Math.max(2, t.sec / longest[0].sec * 100)}%;background:linear-gradient(90deg,#6D28D9,#A78BFA)"></i></div></div>`).join("")}</div>`;
   }
 
   // --- décadas (t.date sempre disponível) ---
@@ -1592,7 +1592,7 @@ function renderProfile(R){
       const sorted = [...decades].sort((a, b) => a[0] - b[0]);
       const decMax = Math.max(...sorted.map(([, n]) => n));
       html += `<div class="pf"><div class="pf-h"><span>Por década</span><b>Faixas</b></div>
-        ${sorted.map(([d, n]) => `<div class="hrow"><div class="hl"><span>${d}s</span><b>${n} <em>${pct(n, withYear.length, 0)}</em></b></div><div class="ht"><i style="width:${Math.max(2, n / decMax * 100)}%"></i></div></div>`).join("")}</div>`;
+        ${sorted.map(([d, n]) => `<div class="hrow"><div class="hl"><span>${d}s</span><b>${n} <em>${pct(n, withYear.length, 0)}</em></b></div><div class="ht"><i style="width:${Math.max(2, n / decMax * 100)}%;background:linear-gradient(90deg,#B45309,#FCD34D)"></i></div></div>`).join("")}</div>`;
     }
   }
 
@@ -1607,7 +1607,7 @@ function renderProfile(R){
       const arts = [...groupBy(M, "artist")].map(([k, rs]) => ({k, n: rs.length, e: rs.filter(t => t.m.x).length}))
         .filter(a => a.n >= 3 && a.e).sort((a, b) => b.e / b.n - a.e / a.n || b.e - a.e).slice(0, 4);
       if (arts.length) html += `<div class="pf"><div class="pf-h"><span>Artistas mais explícitos</span><b>% das faixas</b></div>
-        ${arts.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%"></i></div></div>`).join("")}</div>`;
+        ${arts.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%;background:linear-gradient(90deg,#9F1239,#FB7185)"></i></div></div>`).join("")}</div>`;
     }
   } else if (!html){
     html = `<div class="empty-in"><p>Explícitas e singles aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
@@ -2473,7 +2473,7 @@ rule(() => {
   const myRun = IS.runsSorted.find(r => hasBand(r[0], a1.k)), isBiggest = myRun && IS.runsSorted[0] === myRun;
   if (tail >= Math.max(15, NN * .15)){
     return {kind: "pl", theme: 1, score: 82,
-      title: pickV("faded", ["O líder do catálogo é passado na playlist", "O maior artista do catálogo parou de crescer"]),
+      title: pickV("faded", ["O líder do catálogo ficou no passado", "O maior artista do catálogo parou de crescer"]),
       body: `<p>${myRun && myRun.length >= 5 ? `${esc(a1.k)} tem ${isBiggest ? "a maior maratona da lista" : `uma maratona de ${myRun.length}`} (${B(`${myRun.length} seguidas, #${myRun[0].n} a #${myRun[myRun.length - 1].n}`)}) e depois some.` : `${esc(a1.k)} lidera o total, mas a última faixa entrou na ${B("#" + last)}.`}</p>`,
       viz: V.strips([a1.k]), kick: ["0", `faixas de ${a1.k} nas últimas ${nf(tail)} adições`]};
   }

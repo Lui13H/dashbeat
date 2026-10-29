@@ -679,6 +679,71 @@ function openAlbumNameClean(issues){
   });
 }
 
+function openHealthHistory(){
+  const body = document.createElement("div"); body.className = "sd sh";
+  const secs = [];
+  const capF = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
+  // álbuns unificados / separados manualmente
+  const albSim = Object.entries(ALBMERGE||{}).filter(([,v])=>v==="sim");
+  const albNao = Object.entries(ALBMERGE||{}).filter(([,v])=>v==="nao");
+  if (albSim.length||albNao.length){
+    let rows = "";
+    for (const [id] of albSim){
+      const [art,,a,,b] = id.split("|"); // id = "art|a|b" mas nomes com | usam encodeURIComponent — separamos pelo último |
+      const pts = id.split("|"); const bName = pts.pop(), aName = pts.pop(), artName = pts.join("|");
+      rows += `<li><span class="sh-lbl"><em>${esc(capF(artName))}</em> · ${esc(aName)} + ${esc(bName)}</span><button class="gbtn" data-undo="alb" data-id="${esc(id)}">Desfazer</button></li>`;
+    }
+    for (const [id] of albNao){
+      const pts = id.split("|"); const bName = pts.pop(), aName = pts.pop(), artName = pts.join("|");
+      rows += `<li><span class="sh-lbl sh-neg"><em>${esc(capF(artName))}</em> · ${esc(aName)} ≠ ${esc(bName)}</span><button class="gbtn" data-undo="alb" data-id="${esc(id)}">Desfazer</button></li>`;
+    }
+    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Álbuns unificados / separados</b><small>${albSim.length} iguais · ${albNao.length} diferentes</small></div><ul class="sh-list">${rows}</ul></div>`);
+  }
+
+  // artistas mesclados (ALIAS)
+  const aliases = Object.entries(ALIAS||{});
+  if (aliases.length){
+    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Artistas mesclados</b><small>${aliases.length} nome${aliases.length!==1?"s":""}</small></div><ul class="sh-list">${aliases.map(([k,v])=>`<li><span class="sh-lbl">${esc(k)} → <strong>${esc(v)}</strong></span><button class="gbtn" data-undo="alias" data-id="${esc(k)}">Desfazer</button></li>`).join("")}</ul></div>`);
+  }
+
+  // versões de faixas confirmadas (VERS)
+  const versions = Object.entries(typeof VERS!=="undefined"?VERS:{});
+  if (versions.length){
+    const VL = typeof VERS_LABEL!=="undefined"?VERS_LABEL:{};
+    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Versões confirmadas</b><small>${versions.length}</small></div><ul class="sh-list">${versions.map(([k,v])=>`<li><span class="sh-lbl">${esc(v.title||k)} <em>${esc(VL[v.type]||"outra versão")}</em></span><button class="gbtn" data-undo="vers" data-id="${esc(k)}">Desfazer</button></li>`).join("")}</ul></div>`);
+  }
+
+  // títulos ignorados na Saúde
+  if (TRACK_TITLE_IGN.size){
+    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Títulos ignorados na Saúde</b><small>${TRACK_TITLE_IGN.size}</small></div><ul class="sh-list">${[...TRACK_TITLE_IGN].map(k=>{ const [art,ttl]=k.split("|"); return `<li><span class="sh-lbl">${esc(ttl||k)}${art?` <em>${esc(art)}</em>`:""}</span><button class="gbtn" data-undo="tign" data-id="${esc(k)}">Desfazer</button></li>`; }).join("")}</ul></div>`);
+  }
+
+  // nomes de álbuns ignorados na Saúde
+  if (ALBUM_NAME_IGN.size){
+    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Álbuns ignorados na Saúde</b><small>${ALBUM_NAME_IGN.size}</small></div><ul class="sh-list">${[...ALBUM_NAME_IGN].map(n=>`<li><span class="sh-lbl">${esc(n)}</span><button class="gbtn" data-undo="aign" data-id="${esc(n)}">Desfazer</button></li>`).join("")}</ul></div>`);
+  }
+
+  // datas preenchidas pela Apple (informativo)
+  const adCount = Object.keys(typeof ADATES!=="undefined"?ADATES:{}).length;
+  if (adCount){
+    secs.push(`<div class="sh-sec sh-info"><div class="sh-h"><b>Datas completadas automaticamente</b><small>${adCount} pela Apple</small></div><p class="sh-note">Preenchidas em segundo plano. O dado original continua intacto na playlist.</p></div>`);
+  }
+
+  body.innerHTML = secs.length ? secs.join("") : `<p class="muted" style="padding:8px 0">Nenhuma alteração registrada ainda.</p>`;
+  const md = openModal({title: "Ajustes feitos", sub: "Automáticos e manuais — clique para desfazer", body, size: "md"});
+  body.addEventListener("click", e => {
+    const b = e.target.closest("[data-undo]"); if (!b) return;
+    const id = b.dataset.id, type = b.dataset.undo;
+    if (type === "alb"){ delete ALBMERGE[id]; saveAlbMerge(); b.closest("li").remove(); toast("Desfeito. O painel atualiza ao fechar."); }
+    else if (type === "alias"){ undoAlias(id); }
+    else if (type === "vers"){ if (typeof VERS!=="undefined"){ delete VERS[id]; saveVers(); } b.closest("li").remove(); toast("Versão desfeita."); }
+    else if (type === "tign"){ TRACK_TITLE_IGN.delete(id); saveTrackTitleIgn(); b.closest("li").remove(); toast("Faixa voltou à verificação."); }
+    else if (type === "aign"){ ALBUM_NAME_IGN.delete(id); saveAlbumNameIgn(); b.closest("li").remove(); toast("Álbum voltou à verificação."); }
+    if (!body.querySelector("li")) md.close();
+  });
+}
+
 function openHealth(){
   const H = healthChecks(), bad = H.items.filter(i => i.count && i.w);
   const body = document.createElement("div"); body.className = "sd";
@@ -710,7 +775,7 @@ function openHealth(){
   const order = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">i</span><div class="sd-tx"><b>Conferir a ordem</b><span>O site não consegue saber sozinho se a ordem de entrada está certa (#1 = a primeira adicionada). Confira com os links do Spotify.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="fix">Conferir/Consertar ordem</button><button class="gbtn" type="button" data-act="rev">Inverter ordem</button></div></li>`;
   const head = bad.length
     ? `<div class="sd-top">${ring(H.score)}<div><h4>${H.score >= 85 ? "Quase tudo certo" : H.score >= 60 ? "Dá pra melhorar" : "Precisa de atenção"}</h4><p>${plural(bad.length, "verificação encontrou", "verificações encontraram")} algo em ${faixas(H.N)}.</p></div></div>`
-    : `<div class="sd-top good">${ring(100)}<div><h4>Tudo certo!</h4><p>Nenhum problema encontrado nas ${faixas(H.N)}.</p></div></div>`;
+    : `<div class="sd-top good">${ring(100)}<div><h4>Tudo certo!</h4><p>Nenhum problema encontrado nas ${faixas(H.N)}.</p><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button></div></div>`;
   const hero = H.noSpotify ? `<div class="sd-hero"><p><strong>Nenhuma música tem dados do Spotify ainda.</strong> Um único <strong>Atualizar dados</strong> resolve o que falta de dados, links e gêneros de uma vez (você confirma as buscas antes).</p><button class="pbtn" type="button" data-act="upd">Atualizar dados</button></div>` : "";
   const shown = H.noSpotify ? H.items.filter(i => !["a", "b", "c"].includes(i.k)) : (bad.length ? H.items : H.items.filter(i => i.count && !i.w));
   body.innerHTML = `${head}${hero}<ul class="sd-list">${shown.map(row).join("")}${order}</ul>`;
@@ -731,6 +796,7 @@ function openHealth(){
     else if (a === "reeval"){ md.close(); openReeval(by("dc").albums); }
     else if (a === "singles"){ md.close(); openSingles(by("sg").tracks); }
     else if (a === "dur"){ md.close(); const it = by(b.dataset.k); openDurReview(it.tracks); }
+    else if (a === "hist"){ openHealthHistory(); }
     else if (a === "spell"){
       const groups = by("h").groups || [], keys = Object.keys(ALIAS);
       const sm = openModal({title: META.h.t, size: "md", sub: "Mesma banda escrita de jeitos diferentes",
