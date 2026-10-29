@@ -4,7 +4,7 @@
    Nenhuma ação gasta busca sozinha: os botões só abrem as telas que já pedem confirmação. */
 (() => {
 "use strict";
-const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, nm: 0};   // peso de cada verificação na nota (soma 105: nunca zera só por isso; peso 0 = só informa)
+const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, nm: 0, tn: 0, gd: 0};   // peso de cada verificação na nota (soma 105: nunca zera só por isso; peso 0 = só informa)
 const FULL_AT = 0.25;                                                       // com 25% das faixas afetadas o item já custa o peso inteiro
 const MAX_SEC = 20 * 60;
 
@@ -13,9 +13,16 @@ const ALBUM_NAME_IGN_KEY = "catalogo-musical:album-name-ign";
 const ALBUM_NAME_IGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(ALBUM_NAME_IGN_KEY) || "[]")); } catch(e) { return new Set(); } })();
 const saveAlbumNameIgn = () => { try { localStorage.setItem(ALBUM_NAME_IGN_KEY, JSON.stringify([...ALBUM_NAME_IGN])); } catch(e) {} };
 
+const TRACK_TITLE_IGN_KEY = "catalogo-musical:track-title-ign";
+const TRACK_TITLE_IGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(TRACK_TITLE_IGN_KEY) || "[]")); } catch(e) { return new Set(); } })();
+const saveTrackTitleIgn = () => { try { localStorage.setItem(TRACK_TITLE_IGN_KEY, JSON.stringify([...TRACK_TITLE_IGN])); } catch(e) {} };
+
 // detecta sufixos de edição/versão no final do nome do álbum e sugere o nome limpo
 const EDITION_RE1 = /\s+[-–—]\s*[(\[]?(?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|anniversary|special|limited|collector'?s|platinum)(?:\s+(?:edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]?\s*$/i;
 const EDITION_RE2 = /\s+[(\[](?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|anniversary|special|limited|collector'?s|platinum)(?:\s+(?:edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]\s*$/i;
+
+// detecta sufixos de versão no final do TÍTULO da faixa (remix, remaster, live, acústico, etc.)
+const TRACK_SUFFIX_RE = /\s*[(\[](?:(?:super\s+)?(?:deluxe|expanded|anniversary|special|limited|platinum|collector'?s|bonus\s+tracks?)(?:\s+(?:edition|version))?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|(?:club|radio|extended|dub|progressive|original|acoustic|chill)\s+mix|live(?:\s+(?:at|from|version|recording|session)[\w\s,.'()\[\]-]{0,50})?|acoustic(?:\s+(?:version|mix|session))?|instrumental(?:\s+version)?|(?:early\s+)?demo(?:\s+version)?|(?:radio|single|mono|extended|alternate(?:ive)?|original)\s+(?:edit|version|mix))[)\]]\s*$|\s+[-–—]\s*(?:(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|live(?:\s+(?:version|recording))?|acoustic(?:\s+version)?|instrumental(?:\s+version)?)\s*$/i;
 function suggestCleanName(name){
   if (!name || name === NI) return null;
   const c = name.replace(EDITION_RE1, '').replace(EDITION_RE2, '').trim();
@@ -35,6 +42,38 @@ function albumNameIssues(list){
   }
   return out;
 }
+
+function suggestCleanTrackTitle(title){
+  if (!title || title === NI) return null;
+  const c = title.replace(TRACK_SUFFIX_RE, '').trim();
+  return c && c !== title && c.length >= 2 ? c : null;
+}
+function trackTitleKey(t){ return normC(t.artist) + "|" + normC(t.title); }
+
+function trackTitleIssues(list){
+  // índice: normC(artist)|normC(title) → tracks com esse título limpo (para detectar gêmeo)
+  const byClean = new Map();
+  for (const t of list){
+    if (!t.title || t.title === NI) continue;
+    const k = normC(t.artist) + "|" + normC(t.title);
+    if (!byClean.has(k)) byClean.set(k, []);
+    byClean.get(k).push(t);
+  }
+  const seen = new Set(), out = [];
+  for (const t of list){
+    if (!t.title || t.title === NI) continue;
+    const ign = trackTitleKey(t);
+    if (TRACK_TITLE_IGN.has(ign)) continue;
+    const cleanTitle = suggestCleanTrackTitle(t.title);
+    if (!cleanTitle) continue;
+    if (seen.has(ign)) continue; seen.add(ign);
+    const twinKey = normC(t.artist) + "|" + normC(cleanTitle);
+    const twins = (byClean.get(twinKey) || []).filter(x => x.n !== t.n);
+    out.push({rawTitle: t.title, cleanTitle, t, twins});
+  }
+  return out;
+}
+
 // { [trackKey]: { status: "ok"|"warn"|"mismatch", confirmed: bool, appleMs: number|null, mbMs: number|null } }
 const DUR_CHECK = (() => { try { return JSON.parse(localStorage.getItem(DUR_CHECK_KEY) || "null") || {}; } catch(e) { return {}; } })();
 const saveDurCheck = () => { try { localStorage.setItem(DUR_CHECK_KEY, JSON.stringify(DUR_CHECK)); } catch(e) {} };
@@ -59,6 +98,24 @@ function artistSpellings(list){
   return [...g.values()].filter(v => v.size > 1).map(v => [...v.values()].sort((a, b) => b.count - a.count));
 }
 
+function genreDivergence(list){
+  const seen = new Set(), out = [];
+  for (const t of list){
+    if (t.artist === NI) continue;
+    for (const p of splitArtists(t.artist)){
+      if (seen.has(p)) continue; seen.add(p);
+      const bySource = allGenresBySource(p);
+      const sp = bySource.Spotify; if (!sp) continue;
+      const rSp = rootGenre(sp); if (!rSp) continue;
+      const conflicts = Object.entries(bySource)
+        .filter(([src]) => src !== "Spotify")
+        .map(([src, genres]) => ({src, genres, root: rootGenre(genres)}))
+        .filter(c => c.root && c.root !== rSp);
+      if (conflicts.length) out.push({artist: p, spGenres: sp, conflicts, tracks: list.filter(t2 => splitArtists(t2.artist).includes(p))});
+    }
+  }
+  return out;
+}
 function healthChecks(list = BY_PLAYLIST){
   const N = list.length;
   const noData = list.filter(t => !t.m && t.artist !== NI && !!t.title);
@@ -79,6 +136,8 @@ function healthChecks(list = BY_PLAYLIST){
   const sameDay = sameDayAlbums(list), review = list.filter(t => t.dfix);   // dfix: data corrigida pelo site, à espera de conferência manual
   const spell = artistSpellings(list), ai = ALBUM_INFO, autoG = ai.groups.filter(g => !g.confirmed);
   const nmIssues = albumNameIssues(list);
+  const tnIssues = trackTitleIssues(list);
+  const gdIssues = genreDivergence(list);
   const mk = (k, count, frac, level, extra) => ({k, count, frac, level: count ? level : "ok", w: HEALTH_W[k], ...extra});
   const items = [
     mk("a", noData.length, noData.length / N, "warn", {tracks: noData}),
@@ -95,6 +154,8 @@ function healthChecks(list = BY_PLAYLIST){
     mk("dc", sameDay.length, sameDay.filter(x => x.apple || ADATES[x.k] !== undefined).reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: sameDay}),   // pesa depois da checagem automática da Apple, até a pessoa responder
     mk("dr", review.length, review.length / N, "warn", {tracks: review}),
     mk("nm", nmIssues.length, 0, "help", {albums: nmIssues}),   // sugestão opcional: não pesa na nota
+    mk("tn", tnIssues.length, 0, "help", {tracks: tnIssues}),   // sufixo de versão no título da faixa: não pesa
+    mk("gd", gdIssues.length, 0, "help", {artists: gdIssues}),  // divergência de gênero entre fontes: não pesa
     mk("h", spell.length, Math.min(1, spell.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {groups: spell})
   ];
   for (const it of items) it.penalty = it.count ? Math.min(it.w, it.w * Math.min(1, it.frac / FULL_AT)) : 0;
@@ -121,6 +182,8 @@ const META = {
   dc: {t: "Álbuns próximos do mesmo artista", ok: "Nenhum álbum do mesmo artista lançado tão perto de outro.", d: n => `${plural(n, "álbum saiu", "álbuns saíram")} no mesmo ano ou a menos de 2 meses de outro álbum do mesmo artista. A Apple confere sozinha, mas se a suspeita continuar isso pesa na nota até você responder (está certo, editar a data ou reavaliar).`, act: "near"},
   dr: {t: "Datas para conferir à mão", ok: "Nenhuma data pendente de conferência.", d: n => `${plural(n, "faixa tem", "faixas têm")} uma data que o site montou (ano do Spotify com dia e mês da Apple) porque a Apple não confirmou. Confira em Editar: pesa na nota até você ajustar.`, act: "list"},
   nm: {t: "Nomes com sufixo de edição", ok: "Nenhum nome de álbum com sufixo de edição.", d: n => `${plural(n, "álbum tem", "álbuns têm")} sufixo de edição no nome (Remastered, Deluxe…). Limpar o nome é opcional e não pesa na nota.`, act: "nm"},
+  tn: {t: "Títulos com sufixo de versão", ok: "Nenhum título de faixa com sufixo de versão.", d: n => `${plural(n, "faixa tem", "faixas têm")} sufixo de versão no título (Remix, Remastered, Live…). Você decide se limpa o nome, ignora ou verifica se tem outra versão na playlist. Não pesa na nota.`, act: "tn"},
+  gd: {t: "Gênero divergente entre fontes", ok: "Nenhum gênero divergente detectado.", d: n => `${plural(n, "artista tem", "artistas têm")} gênero no Spotify que não bate com o que a Apple ou o MusicBrainz dizem. É só uma dica — não pesa na nota.`, act: "gd"},
   h: {t: "Grafias parecidas do mesmo artista", ok: "Nenhum artista escrito de duas formas.", d: n => `${plural(n, "artista aparece", "artistas aparecem")} escrito de mais de um jeito. Se for a mesma banda, junte os nomes.`, act: "spell"}
 };
 const LEVEL = {ok: "ok", warn: "atenção", help: "ajuda"};
@@ -161,22 +224,59 @@ function editTrack(t){
 
 // sugestão (não obrigatória): trocar single/EP/coletânea por "faixa de álbum", com o álbum que a Apple achou
 function openSingles(tracks){
+  let list = [...tracks];
+  const pending = new Map();   // t.n → ASING entry (acumula; só commita ao aplicar)
   const body = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
-  body.innerHTML = `<div class="confirm"><p>A Apple achou estas faixas dentro de um álbum. Marque as que quer <strong>transformar em faixa de álbum</strong>: o álbum passa a ser o da Apple e o tipo passa a ser álbum. Nada muda até você aplicar, e isso <strong>não pesa na nota</strong>.</p>
-    <div class="du-rows">${tracks.map(t => { const a = ASING[singleKey(t)]; return `<label class="chk"><input type="checkbox" data-n="${t.n}" checked><span><b>${esc(t.title)}</b> · ${esc(t.artist)}<br><span class="alb-old">${esc(t.albumRaw === NI ? "—" : t.albumRaw)} (${TYPE_PT[t.m.ty] || t.m.ty})</span><br><strong class="alb-new">${esc(a.album)}</strong>${a.tn && a.tt ? ` <span class="muted" style="font-size:12px">· faixa ${a.tn} de ${a.tt}</span>` : ""}</span></label>`; }).join("")}</div></div>`;
-  foot.innerHTML = `<button class="gbtn" type="button" data-keep>Manter como está</button><span class="sp"></span><button class="gbtn" type="button" data-c>Fechar</button><button class="pbtn" type="button" data-ok>Aplicar</button>`;
-  const md = openModal({title: "Faixas que são de álbum", sub: "Sugestão da Apple", body, foot, size: "md"});
-  const boxes = [...body.querySelectorAll("input")], picked = () => boxes.filter(b => b.checked).map(b => +b.dataset.n);
-  const sync = () => { const k = picked().length; foot.querySelector("[data-ok]").disabled = !k; foot.querySelector("[data-keep]").disabled = !k; foot.querySelector("[data-ok]").textContent = k ? `Aplicar ${plural(k, "faixa", "faixas")}` : "Aplicar"; };
-  body.addEventListener("change", sync); sync();
-  foot.querySelector("[data-c]").onclick = md.close;
-  // "Manter como está": a pessoa viu e quer assim, então não sugere de novo
-  foot.querySelector("[data-keep]").onclick = () => { const n = new Set(picked()); tracks.filter(t => n.has(t.n)).forEach(t => ASING_IGN.add(singleKey(t))); saveASingIgn(); toast("Mantidas como estão. Não vou sugerir de novo."); md.close(); };
-  foot.querySelector("[data-ok]").onclick = () => {
-    const sel = picked(), by = new Map(tracks.filter(t => sel.includes(t.n)).map(t => [t.n, ASING[singleKey(t)]]));
-    ssSet("health", "1");
-    commitRows(currentRows().map(r => { const a = by.get(r[0]); if (!a) return r; const m = {...(r[6] || {}), ty: "album"}; if (a.tn) m.tn = a.tn; if (a.tt) m.tt = a.tt; return [r[0], r[1], r[2], a.album, r[4], r[5], m]; }), `${plural(by.size, "faixa virou", "faixas viraram")} faixa${by.size > 1 ? "s" : ""} de álbum`);
+
+  const updateFoot = () => {
+    const n = pending.size;
+    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Fechar${n ? " sem aplicar" : ""}</button>${n ? `<button class="pbtn" type="button" data-apply>Aplicar ${plural(n, "faixa", "faixas")}</button>` : ""}`;
+    foot.querySelector("[data-c]").onclick = () => md.close();
+    const ap = foot.querySelector("[data-apply]");
+    if (ap) ap.onclick = applyAll;
   };
+
+  const applyAll = () => {
+    if (!pending.size) return;
+    ssSet("health", "1");
+    commitRows(currentRows().map(r => { const a = pending.get(r[0]); if (!a) return r; const m = {...(r[6] || {}), ty: "album"}; if (a.tn) m.tn = a.tn; if (a.tt) m.tt = a.tt; return [r[0], r[1], r[2], a.album, r[4], r[5], m]; }), `${plural(pending.size, "faixa virou", "faixas viraram")} faixa${pending.size > 1 ? "s" : ""} de álbum`);
+  };
+
+  const renderRows = () => {
+    body.innerHTML = `<div class="confirm"><p>A Apple achou estas faixas dentro de um álbum. Escolha o que fazer com cada uma — <strong>não pesa na nota</strong>.</p>
+      <div class="du-rows">${list.map(t => { const a = ASING[singleKey(t)]; return `<div class="alb-row" data-n="${t.n}">
+        <div class="alb-main">
+          <strong>${esc(t.title)}</strong> <span class="muted" style="font-size:12px">· ${esc(t.artist)}</span><br>
+          <span class="alb-old">${esc(t.albumRaw === NI ? "—" : t.albumRaw)} (${TYPE_PT[t.m.ty] || t.m.ty})</span><br>
+          <strong class="alb-new">${esc(a.album)}</strong>${a.tn && a.tt ? ` <span class="muted" style="font-size:12px">· faixa ${a.tn} de ${a.tt}</span>` : ""}
+        </div>
+        <div class="alb-btns">
+          <button class="gbtn nm-red"  type="button" data-skip="${t.n}" title="Confirmar que é single">É single</button>
+          <button class="pbtn nm-ok"   type="button" data-ok="${t.n}"   title="Aceitar álbum da Apple">${IC_CHECK} Converter</button>
+        </div>
+      </div>`; }).join("")}</div></div>`;
+  };
+
+  renderRows(); updateFoot();
+  const md = openModal({title: "Faixas que são de álbum", sub: "Sugestão da Apple", body, foot, size: "md"});
+
+  body.addEventListener("click", e => {
+    const skip = e.target.closest("[data-skip]"), ok = e.target.closest("[data-ok]");
+    if (skip){
+      const t = list.find(x => x.n === +skip.dataset.skip); if (!t) return;
+      ASING_IGN.add(singleKey(t)); saveASingIgn();
+      pending.delete(t.n);
+      list = list.filter(x => x.n !== t.n);
+      if (!list.length){ md.close(); return; }
+      renderRows(); updateFoot();
+    } else if (ok){
+      const t = list.find(x => x.n === +ok.dataset.ok); if (!t) return;
+      pending.set(t.n, ASING[singleKey(t)]);
+      list = list.filter(x => x.n !== t.n);
+      if (!list.length){ applyAll(); return; }
+      renderRows(); updateFoot();
+    }
+  });
 }
 
 /* ---------- álbuns do mesmo artista lançados no mesmo ano ou com menos de 2 meses de distância ---------- */
@@ -417,6 +517,87 @@ function openDurReview(tracks) {
 const IC_CHECK = '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.5 3.5 6.5-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
 const IC_PEN   = '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3 13 5.5 6 12.5 3 13l.5-3Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
 
+function openGenreDivergence(issues){
+  const body = document.createElement("div");
+  body.innerHTML = `<div class="confirm"><p>O Spotify classifica estes artistas num gênero diferente do que a Apple ou o MusicBrainz indicam. Pode ser que a classificação do Spotify esteja errada ou seja simplesmente mais específica — <strong>não pesa na nota</strong>.</p>
+    <div class="du-rows">${issues.map(x => `<div class="alb-row">
+      <div class="alb-main">
+        <strong>${esc(x.artist)}</strong> <span class="muted" style="font-size:12px">· ${faixas(x.tracks.length)}</span><br>
+        <span class="alb-new">Spotify: ${esc(x.spGenres.slice(0, 3).join(", "))}</span><br>
+        ${x.conflicts.map(c => `<span class="alb-old">${esc(c.src)}: ${esc(c.genres.slice(0, 3).join(", "))}</span>`).join("<br>")}
+      </div>
+    </div>`).join("")}</div></div>`;
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  foot.innerHTML = `<span class="sp"></span><button class="pbtn" type="button" data-c>Fechar</button>`;
+  const md = openModal({title: "Gênero divergente entre fontes", sub: "Opcional · não pesa na nota", body, foot, size: "lg"});
+  foot.querySelector("[data-c]").onclick = () => md.close();
+}
+function openTrackTitleClean(issues){
+  let list = [...issues];
+  const pending = new Map();   // trackTitleKey(t) → newTitle (acumula; só commita ao aplicar)
+  const body = document.createElement("div");
+  const foot = document.createElement("div"); foot.className = "mfrow";
+
+  const updateFoot = () => {
+    const n = pending.size;
+    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Fechar${n ? " sem aplicar" : ""}</button>${n ? `<button class="pbtn" type="button" data-apply>Aplicar ${plural(n, "alteração", "alterações")}</button>` : ""}`;
+    foot.querySelector("[data-c]").onclick = () => md.close();
+    const ap = foot.querySelector("[data-apply]");
+    if (ap) ap.onclick = applyAll;
+  };
+
+  const applyAll = () => {
+    if (!pending.size) return;
+    ssSet("health", "1");
+    commitRows(currentRows().map(r => {
+      const key = BY_PLAYLIST.find(b => b.n === r[0]);
+      const newTitle = key && pending.get(trackTitleKey(key));
+      return newTitle ? [r[0], newTitle, r[2], r[3], r[4], r[5], ...(r[6] ? [r[6]] : [])] : r;
+    }), `${plural(pending.size, "título de faixa limpo", "títulos de faixas limpos")} (sufixo removido)`);
+  };
+
+  const renderRows = () => {
+    body.innerHTML = `<div class="confirm"><p>Estas faixas têm sufixo de versão no título. Você decide o que fazer com cada uma — <strong>não pesa na nota</strong>.</p>
+      <div class="du-rows">${list.map(x => {
+        const twinNote = x.twins.length ? `<span class="muted" style="font-size:11px;display:block;margin-top:2px">⚠ versão limpa já na playlist: <em>${esc(x.twins.map(tw => `#${tw.n} ${tw.title}`).join(", "))}</em></span>` : "";
+        return `<div class="alb-row" data-raw="${esc(x.rawTitle)}" data-n="${x.t.n}">
+          <div class="alb-main">
+            <span class="alb-old">${esc(x.rawTitle)}</span><br>
+            <strong class="alb-new">${esc(x.cleanTitle)}</strong> <span class="muted" style="font-size:12px">· ${esc(x.t.artist)} · #${x.t.n}</span>
+            ${twinNote}
+          </div>
+          <div class="alb-btns">
+            <button class="gbtn nm-red" type="button" data-ign="${x.t.n}" title="Ignorar sugestão">${ICON.x} Ignorar</button>
+            <button class="pbtn nm-ok"  type="button" data-ok="${x.t.n}"  title="Aceitar nome limpo">${IC_CHECK} Limpar</button>
+          </div>
+        </div>`;
+      }).join("")}</div></div>`;
+  };
+
+  renderRows();
+  updateFoot();
+  const md = openModal({title: "Títulos com sufixo de versão", sub: "Opcional · não pesa na nota", body, foot, size: "lg"});
+
+  body.addEventListener("click", e => {
+    const ignBtn = e.target.closest("[data-ign]"), okBtn = e.target.closest("[data-ok]");
+    if (ignBtn){
+      const x = list.find(i => i.t.n === +ignBtn.dataset.ign); if (!x) return;
+      TRACK_TITLE_IGN.add(trackTitleKey(x.t));
+      saveTrackTitleIgn();
+      pending.delete(trackTitleKey(x.t));
+      list = list.filter(i => i.t.n !== x.t.n);
+      if (!list.length){ md.close(); return; }
+      renderRows(); updateFoot();
+    } else if (okBtn){
+      const x = list.find(i => i.t.n === +okBtn.dataset.ok); if (!x) return;
+      pending.set(trackTitleKey(x.t), x.cleanTitle);
+      list = list.filter(i => i.t.n !== x.t.n);
+      if (!list.length){ applyAll(); return; }
+      renderRows(); updateFoot();
+    }
+  });
+}
+
 function openAlbumNameClean(issues){
   let list = [...issues];
   const pending = new Map();   // rawName → newName (acumula; só commita ao fechar)
@@ -426,7 +607,7 @@ function openAlbumNameClean(issues){
   const updateFoot = () => {
     const n = pending.size;
     foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Fechar${n ? " sem aplicar" : ""}</button>${n ? `<button class="pbtn" type="button" data-apply>Aplicar ${plural(n, "alteração", "alterações")}</button>` : ""}`;
-    foot.querySelector("[data-c]").onclick = md.close;
+    foot.querySelector("[data-c]").onclick = () => md.close();
     const ap = foot.querySelector("[data-apply]");
     if (ap) ap.onclick = applyAll;
   };
@@ -515,12 +696,14 @@ function openHealth(){
       : m.act === "covers" ? `<button class="gbtn" type="button" data-act="dups" data-o="covers">Revisar covers</button>`
       : m.act === "adoubt" ? `<button class="gbtn" type="button" data-act="dups" data-o="adoubt">Revisar álbuns</button>`
       : m.act === "nm" ? `<button class="gbtn" type="button" data-act="nm">Revisar nomes (${nf(it.count)})</button>`
+      : m.act === "tn" ? `<button class="gbtn" type="button" data-act="tn">Revisar títulos (${nf(it.count)})</button>`
       : m.act === "near" ? `<button class="gbtn" type="button" data-act="near">Responder (${nf(it.count)})</button><button class="gbtn" type="button" data-act="reeval">Reavaliar datas</button>`
       : m.act === "singles" ? `<button class="gbtn" type="button" data-act="singles">Ver sugestões (${nf(it.count)})</button>`
       : m.act === "aauto" ? `<button class="gbtn" type="button" data-act="dups" data-o="aauto">Revisar álbuns</button>`
       : m.act === "dups" ? `<button class="gbtn" type="button" data-act="dups" data-o="dups">Revisar duplicadas</button>`
       : m.act === "spell" ? `<button class="gbtn" type="button" data-act="spell" data-k="${it.k}">Juntar nomes (${nf(it.count)})</button>`
       : m.act === "dur" ? `<button class="gbtn" type="button" data-act="dur" data-k="${it.k}">Revisar durações (${nf(it.count)})</button>`
+      : m.act === "gd" ? `<button class="gbtn" type="button" data-act="gd">Revisar gêneros (${nf(it.count)})</button>`
       : `<button class="gbtn" type="button" data-act="list" data-k="${it.k}">Ver as ${nf(it.count)}</button>`;
     return `<li class="sd-i ${it.level}"><span class="sd-dot" aria-hidden="true">${it.level === "warn" ? "!" : "i"}</span><div class="sd-tx"><b>${m.t}</b><span>${m.d(it.count, it)}</span></div><span class="sd-lv">${LEVEL[it.level]}</span><div class="sd-act">${btn}</div></li>`;
   };
@@ -542,6 +725,8 @@ function openHealth(){
     else if (a === "rev"){ md.close(); askReverse(); }
     else if (a === "list"){ const it = by(b.dataset.k); list(META[it.k].t, it.tracks, `${faixas(it.tracks.length)} · “—” é o que está em branco`); }
     else if (a === "nm"){ md.close(); openAlbumNameClean(by("nm").albums); }
+    else if (a === "tn"){ md.close(); openTrackTitleClean(by("tn").tracks); }
+    else if (a === "gd"){ md.close(); openGenreDivergence(by("gd").artists); }
     else if (a === "near"){ md.close(); openNear(by("dc").albums); }
     else if (a === "reeval"){ md.close(); openReeval(by("dc").albums); }
     else if (a === "singles"){ md.close(); openSingles(by("sg").tracks); }
@@ -577,10 +762,15 @@ if (STORE){
   if (need.size) pumpCovers();
 }
 window.healthChecks = healthChecks;   // usado nos testes
+function healthScoreColor(score){
+  if (score <= 50){ const t = score / 50; return `hsl(${Math.round(t * 38)},88%,${Math.round(60 - t * 2)}%)`; }
+  const t = (score - 50) / 50; return `hsl(${Math.round(38 + t * 114)},${Math.round(88 - t * 21)}%,${Math.round(58 - t * 18)}%)`;
+}
 const btn = $("#dt-health");
 if (btn){
   btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 2.6 3.6v4.1c0 3.1 2.2 5.5 5.4 6.5 3.2-1 5.4-3.4 5.4-6.5V3.6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M4.8 8.2h1.9l1-2.1 1.5 3.8 1-1.7h1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg><span>Saúde</span>`;
   btn.hidden = !STORE;   // na playlist de exemplo não há o que consertar
   btn.addEventListener("click", openHealth);
+  if (STORE){ const {score} = healthChecks(); btn.style.color = healthScoreColor(score); }
 }
 })();

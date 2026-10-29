@@ -135,17 +135,63 @@ function genresOf(artist){
 const AGENRE_KEY = "catalogo-musical:genres-apple";
 const AGENRES = (() => { try { return JSON.parse(localStorage.getItem(AGENRE_KEY) || "null") || {}; } catch (e) { return {}; } })();
 const saveAGenres = () => { try { localStorage.setItem(AGENRE_KEY, JSON.stringify(AGENRES)); } catch (e) {} };
+/* gênero do MusicBrainz (tags de artista, sem login, ~1 req/s): terceira fonte */
+const MBGENRE_KEY = "catalogo-musical:genres-mb";
+const MBGENRES = (() => { try { return JSON.parse(localStorage.getItem(MBGENRE_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveMBGenres = () => { try { localStorage.setItem(MBGENRE_KEY, JSON.stringify(MBGENRES)); } catch (e) {} };
+const mbHasGenre = p => Object.prototype.hasOwnProperty.call(MBGENRES, p);
+/* gênero do TheAudioDB (artista, sem login, público): quarta fonte */
+const TADB_KEY = "catalogo-musical:genres-tadb";
+const TADBGENRES = (() => { try { return JSON.parse(localStorage.getItem(TADB_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveTADBGenres = () => { try { localStorage.setItem(TADB_KEY, JSON.stringify(TADBGENRES)); } catch (e) {} };
+const tadbHasGenre = p => Object.prototype.hasOwnProperty.call(TADBGENRES, p);
+/* gênero do Deezer (artista, sem login, público): quinta fonte */
+const DEEZER_KEY = "catalogo-musical:genres-deezer";
+const DEEZERGENRES = (() => { try { return JSON.parse(localStorage.getItem(DEEZER_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveDeezerGenres = () => { try { localStorage.setItem(DEEZER_KEY, JSON.stringify(DEEZERGENRES)); } catch (e) {} };
+const deezerHasGenre = p => Object.prototype.hasOwnProperty.call(DEEZERGENRES, p);
 const spotifyHas = p => hasGenre(p) && GENRES[p].length > 0;
-// gênero que aparece: o do Spotify quando existe, senão o da Apple (por artista da faixa)
+// gênero que aparece: Spotify → MusicBrainz → TheAudioDB → Deezer → Apple
 function shownGenres(artist){
   if (artist === NI) return [];
   const out = new Set(); let any = false;
   for (const p of splitArtists(artist)){
-    const g = spotifyHas(p) ? GENRES[p] : Array.isArray(AGENRES[p]) ? AGENRES[p] : null;
+    const g = spotifyHas(p) ? GENRES[p]
+      : (Array.isArray(MBGENRES[p]) && MBGENRES[p].length ? MBGENRES[p]
+      : (Array.isArray(TADBGENRES[p]) && TADBGENRES[p].length ? TADBGENRES[p]
+      : (Array.isArray(DEEZERGENRES[p]) && DEEZERGENRES[p].length ? DEEZERGENRES[p]
+      : (Array.isArray(AGENRES[p]) ? AGENRES[p] : null))));
     if (g){ any = true; g.forEach(x => out.add(x)); }
   }
   return any ? [...out] : null;
 }
+/* allGenresByCover: coleta todas as fontes disponíveis pra um artista (para divergência) */
+function allGenresBySource(p){
+  const out = {};
+  if (spotifyHas(p)) out.Spotify = GENRES[p];
+  if (Array.isArray(MBGENRES[p]) && MBGENRES[p].length) out.MusicBrainz = MBGENRES[p];
+  if (Array.isArray(TADBGENRES[p]) && TADBGENRES[p].length) out.TheAudioDB = TADBGENRES[p];
+  if (Array.isArray(DEEZERGENRES[p]) && DEEZERGENRES[p].length) out.Deezer = DEEZERGENRES[p];
+  if (Array.isArray(AGENRES[p]) && AGENRES[p].length) out.Apple = AGENRES[p];
+  return out;
+}
+/* root genre: agrupa gêneros detalhados num balde simples para comparar fontes */
+const GENRE_ROOT_RULES = [
+  ["metal",      /\bmetal/],
+  ["rock",       /\brock\b/],
+  ["hip-hop",    /\bhip.?hop\b|\brap\b/],
+  ["jazz",       /\bjazz\b/],
+  ["classical",  /\bclassical\b/],
+  ["electronic", /\belectronic\b|\bedm\b|\btechno\b|\bhouse\b|\bdrum.?and.?bass\b/],
+  ["country",    /\bcountry\b/],
+  ["folk",       /\bfolk\b/],
+  ["r&b",        /\br.?b\b|\bsoul\b/],
+  ["punk",       /\bpunk\b/],
+  ["blues",      /\bblues\b/],
+  ["pop",        /\bpop\b/],
+];
+function rootGenre(genres){ const s = (genres||[]).join(" ").toLowerCase(); for (const [r,re] of GENRE_ROOT_RULES) if (re.test(s)) return r; return null; }
+function genreToRoot(g){ g = (g||"").toLowerCase(); for (const [r,re] of GENRE_ROOT_RULES) if (re.test(g)) return r; return null; }
 /* coluna 7 (opcional): dados extras que vêm de graça na resposta do Spotify —
    x explícita (0/1) · ty tipo do lançamento (album/single/compilation) · tn nº da faixa no álbum ·
    tt total de faixas do álbum · aid IDs dos artistas */
@@ -209,6 +255,7 @@ for (const t of T){
   }
 }
 const state = {bands: new Set(), albums: new Set(), genres: new Set(), years: new Set(), upTo: null};   // upTo: máquina do tempo (só faixas até a #n); null = playlist inteira
+let expandedGenreBucket = null;
 let tmBusy = false;   // tocando ou arrastando a máquina do tempo: sem animações caras nos gráficos
 let spotifyUserDisplay = null;  // nome do usuário logado no Spotify (preenchido ao obter token)
 const $ = s => document.querySelector(s);
@@ -898,6 +945,53 @@ async function mbTrackAlbum(art, title){
   cands.sort((x, y) => String(x.date || "9").localeCompare(String(y.date || "9")));
   return cands[0] ? {album: cands[0].album, tn: 0, tt: 0} : null;   // o nº de faixas do MusicBrainz varia por edição: não usa
 }
+async function mbArtistTags(name){
+  await new Promise(r => setTimeout(r, 1200));
+  const j = await mbJSON(`artist/?query=artist:${encodeURIComponent('"' + name + '"')}&limit=5`);
+  const best = ((j && j.artists) || []).find(a => normC(a.name || "") === normC(name));
+  if (!best || !best.id) return [];
+  await new Promise(r => setTimeout(r, 1200));
+  const j2 = await mbJSON(`artist/${best.id}?inc=tags`);
+  return ((j2 && j2.tags) || []).filter(t => t.count >= 2).sort((a, b) => b.count - a.count).slice(0, 6).map(t => t.name.toLowerCase());
+}
+function queueMBGenres(){
+  const need = new Map();
+  for (const t of T){
+    if (t.artist === NI) continue;
+    const raw = splitArtistsRaw(t.artist);
+    splitArtists(t.artist).forEach((p, i) => { if (!spotifyHas(p) && !mbHasGenre(p) && !need.has(p)) need.set(p, raw[i] || p); });
+  }
+  for (const [p, name] of need) coverQueue.push({job: async () => {
+    try { MBGENRES[p] = await mbArtistTags(name); } catch(e){ MBGENRES[p] = []; }
+    saveMBGenres(); refreshShownGenres();
+  }});
+  if (need.size) pumpCovers();
+}
+async function tadbArtistGenres(name){
+  await new Promise(r => setTimeout(r, 400));
+  const r = await fetch(`https://www.theaudiodb.com/api/v1/json/2/search.php?s=${encodeURIComponent(name)}`);
+  if (!r.ok) return [];
+  const j = await r.json();
+  const a = j && j.artists && j.artists[0];
+  if (!a) return [];
+  const found = normC(a.strArtist || "") === normC(name);
+  if (!found) return [];
+  return [a.strGenre, a.strStyle, a.strMood].filter(Boolean).map(g => g.toLowerCase());
+}
+function queueTADBGenres(){
+  const need = new Map();
+  for (const t of T){
+    if (t.artist === NI) continue;
+    const raw = splitArtistsRaw(t.artist);
+    splitArtists(t.artist).forEach((p, i) => { if (!spotifyHas(p) && !tadbHasGenre(p) && !need.has(p)) need.set(p, raw[i] || p); });
+  }
+  for (const [p, name] of need) coverQueue.push({job: async () => {
+    try { TADBGENRES[p] = await tadbArtistGenres(name); } catch(e){ TADBGENRES[p] = []; }
+    saveTADBGenres(); refreshShownGenres();
+  }});
+  if (need.size) pumpCovers();
+}
+// Nota: Deezer não expõe gênero de artista na API pública; as quatro fontes ativas são Spotify, MusicBrainz, TheAudioDB e Apple
 function queueAppleSingles(){
   const need = new Map();
   for (const t of T){
@@ -1277,23 +1371,179 @@ function genreTip(g){
 }
 function renderGenres(){
   const base = rows(true, true, false), el = $("#genres");
-  const counts = new Map();
-  for (const t of base) for (const g of t.ge || []) counts.set(g, (counts.get(g) || 0) + 1);
-  // na playlist de exemplo não tem "Atualizar dados" (o botão do topo também some)
   const missing = STORE ? base.filter(t => !t.gs).length : 0;
-  const upd = missing ? ` · <button type="button" class="lnk" data-upd style="padding:0">buscar gênero de ${faixas(missing)}</button>` : "";
-  if (!counts.size){
-    el.innerHTML = `<div class="empty-in"><p>${!STORE ? "Os gêneros aparecem aqui assim que forem encontrados." : missing ? "Nenhuma música tem gênero ainda." : "O Spotify não informa gênero para os artistas dessa seleção."}</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Gasta 1 busca no Spotify por artista, não por música.</p>` : ""}</div>`;
-    $("#gen-hint").innerHTML = "";
-    return;
-  }
-  if (el.querySelector(".empty-in")) el.innerHTML = "";
-  const items = [...counts].map(([k, value]) => ({k, value})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
   const withG = base.filter(t => t.ge && t.ge.length).length;
-  renderList(el, items, {kind: "genre", rank: true, selected: state.genres, tip: genreTip, scrollToSel: true,
-    label: d => `${d.value}<small>${pct(d.value, withG)}</small>`});
-  $("#gen-hint").innerHTML = `${items.length} gêneros · uma música conta em cada gênero do artista${upd}`;
+  // Build buckets: each track counted once per bucket, sub-genres counted per occurrence
+  const buckets = new Map(); // bucket → { trackNs: Set, subs: Map<genre, Set<trackN>> }
+  const orphans = new Map(); // genres without a bucket → Set<trackN>
+  for (const t of base){
+    for (const g of t.ge || []){
+      const root = genreToRoot(g);
+      const store = root ? buckets : orphans;
+      const key = root || g;
+      if (!store.has(key)) store.set(key, root ? { trackNs: new Set(), subs: new Map() } : new Set());
+      if (root){
+        const b = buckets.get(root);
+        b.trackNs.add(t.n);
+        if (!b.subs.has(g)) b.subs.set(g, new Set());
+        b.subs.get(g).add(t.n);
+      } else {
+        orphans.get(g).add(t.n);
+      }
+    }
+  }
+  // bucket com poucas faixas → migra pra bucket relacionado (se existir) ou cai em Outros
+  const BUCKET_FALLBACK = {punk: "rock", blues: "rock", folk: "country", classical: null};
+  const MIN_BUCKET = Math.max(3, Math.ceil(withG * 0.01));
+  for (const [root, data] of [...buckets]){
+    if (data.trackNs.size >= MIN_BUCKET) continue;
+    const fb = Object.prototype.hasOwnProperty.call(BUCKET_FALLBACK, root) ? BUCKET_FALLBACK[root] : null;
+    const target = fb && buckets.has(fb) && buckets.get(fb).trackNs.size >= MIN_BUCKET ? buckets.get(fb) : null;
+    if (target){
+      for (const n of data.trackNs) target.trackNs.add(n);
+      for (const [g, ns] of data.subs) target.subs.set(g, ns);
+    } else {
+      for (const [g, ns] of data.subs) orphans.set(g, ns);
+    }
+    buckets.delete(root);
+  }
+  const upd = missing ? ` · <button type="button" class="lnk" data-upd style="padding:0">buscar gênero de ${faixas(missing)}</button>` : "";
+  if (!buckets.size && !orphans.size){
+    el.innerHTML = `<div class="empty-in"><p>${!STORE ? "Os gêneros aparecem aqui assim que forem encontrados." : missing ? "Nenhuma música tem gênero ainda." : "O Spotify não informa gênero para os artistas dessa seleção."}</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Gasta 1 busca no Spotify por artista, não por música.</p>` : ""}</div>`;
+    $("#gen-hint").innerHTML = ""; return;
+  }
+  const hasSel = state.genres.size > 0;
+  const sortedBuckets = [...buckets]
+    .map(([k, v]) => {
+      // agrupa sub-gêneros com as EXATAS mesmas faixas (serializa o Set pra comparar)
+      const tGroups = new Map();
+      for (const [g, ns] of v.subs){
+        const tKey = [...ns].sort((a,b) => a-b).join(",");
+        if (!tGroups.has(tKey)) tGroups.set(tKey, []);
+        tGroups.get(tKey).push({k: g, value: ns.size});
+      }
+      const subs = [...tGroups.values()].map(group => {
+        if (group.length === 1) return group[0];
+        // múltiplos gêneros idênticos: mescla o nome
+        const names = group.map(s => s.k).sort((a,b) => a.length - b.length);
+        const combined = names.map(capFirst).join(" / ");
+        return { k: group[0].k, value: group[0].value, label: combined.length <= 36 ? combined : capFirst(names[0]) };
+      }).sort((a,b) => b.value - a.value || coll.compare(a.k, b.k));
+      return [k, { count: v.trackNs.size, subs }];
+    })
+    .sort((a,b) => b[1].count - a[1].count);
+  const orphanGroups = new Map();
+  for (const [g, ns] of orphans){
+    const tKey = [...ns].sort((a,b) => a-b).join(",");
+    if (!orphanGroups.has(tKey)) orphanGroups.set(tKey, []);
+    orphanGroups.get(tKey).push({k: g, value: ns.size});
+  }
+  const sortedOrphans = [...orphanGroups.values()].map(group => {
+    if (group.length === 1) return group[0];
+    const names = group.map(s => s.k).sort((a,b) => a.length - b.length);
+    const combined = names.map(capFirst).join(" / ");
+    return { k: group[0].k, value: group[0].value, label: combined.length <= 36 ? combined : capFirst(names[0]) };
+  }).sort((a,b) => b.value - a.value || coll.compare(a.k, b.k));
+  const maxCount = Math.max(...sortedBuckets.map(([,d]) => d.count), ...sortedOrphans.map(o => o.value), 1);
+  const totalBuckets = sortedBuckets.length + (sortedOrphans.length ? 1 : 0);
+  const totalGenres = [...buckets.values()].reduce((n,b) => n + b.subs.size, 0) + orphans.size;
+  let html = "";
+
+  // modo foco: um único bucket aberto ocupa todo o espaço
+  const focusKey = expandedGenreBucket;
+  if (focusKey !== null){
+    let focusCount = 0, focusSubs = [], focusRk = "", focusLabel = "";
+    if (focusKey === "__outros__"){
+      focusCount = sortedOrphans.reduce((n,o) => n + o.value, 0);
+      focusSubs = sortedOrphans;
+      focusRk = String(sortedBuckets.length + 1).padStart(2, "0");
+      focusLabel = `Outros (${sortedOrphans.length})`;
+    } else {
+      const idx = sortedBuckets.findIndex(([k]) => k === focusKey);
+      if (idx >= 0){
+        const [, fd] = sortedBuckets[idx];
+        focusCount = fd.count;
+        focusSubs = fd.subs.filter(s => s.k.toLowerCase() !== focusKey);
+        focusRk = String(idx + 1).padStart(2, "0");
+        focusLabel = capFirst(focusKey);
+      } else {
+        // bucket sumiu após filtro: sai do foco
+        expandedGenreBucket = null;
+      }
+    }
+    if (expandedGenreBucket !== null){
+      el.classList.add("genres-focus");
+      el.classList.toggle("genres-multicol", focusSubs.length > 6);
+      const bucketSel = focusSubs.some(s => state.genres.has(s.k));
+      html += `<div class="row genre-bucket${bucketSel ? " sel" : ""}" data-bucket="${esc(focusKey)}">
+        <span class="rk">${focusRk}</span><span class="bucket-tog">▾</span>
+        <span class="nm">${focusLabel}</span>
+        <span class="vl">${focusCount}<small>${pct(focusCount, withG)}</small></span>
+        <div class="tr"><div class="fl" style="width:${(focusCount/maxCount)*100}%"></div></div></div>`;
+      const subMax = focusSubs[0]?.value || 1;
+      html += `<div class="genre-subs-grid">`;
+      focusSubs.forEach(s => {
+        const sel = state.genres.has(s.k);
+        html += `<div class="row genre-sub${sel ? " sel" : ""}${hasSel && !sel ? " dim" : ""}" data-genre="${esc(s.k)}">
+          <span class="nm">${esc(s.label || capFirst(s.k))}</span>
+          <span class="vl">${s.value}<small>${pct(s.value, withG)}</small></span>
+          <div class="tr"><div class="fl" style="width:${(s.value/subMax)*100}%"></div></div></div>`;
+      });
+      html += `</div>`;
+      el.innerHTML = html;
+      el.querySelectorAll(".genre-sub[data-genre]").forEach(r => bindTip(r, () => genreTip(r.dataset.genre)));
+      $("#gen-hint").innerHTML = `${totalBuckets} categorias · ${totalGenres} gêneros · clique na categoria para fechar${upd}`;
+      return;
+    }
+  }
+
+  // modo lista: todos os buckets, 1 coluna sempre
+  el.classList.remove("genres-focus", "genres-multicol");
+  sortedBuckets.forEach(([root, data], bi) => {
+    const visibleSubs = data.subs.filter(s => s.k.toLowerCase() !== root);
+    const rk = String(bi + 1).padStart(2, "0");
+    html += `<div class="genre-group">`;
+    if (visibleSubs.length >= 2){
+      const bucketSel = data.subs.some(s => state.genres.has(s.k));
+      html += `<div class="row genre-bucket${bucketSel ? " sel" : ""}${hasSel && !bucketSel ? " dim" : ""}" data-bucket="${esc(root)}">
+        <span class="rk">${rk}</span><span class="bucket-tog">›</span>
+        <span class="nm">${capFirst(root)} <small class="sub-ct">(${visibleSubs.length})</small></span>
+        <span class="vl">${data.count}<small>${pct(data.count, withG)}</small></span>
+        <div class="tr"><div class="fl" style="width:${(data.count/maxCount)*100}%"></div></div></div>`;
+    } else {
+      const s = visibleSubs[0];
+      const gKey = s ? s.k : root, gLabel = s ? (s.label || capFirst(s.k)) : capFirst(root);
+      const sel = state.genres.has(gKey);
+      html += `<div class="row genre-bucket${sel ? " sel" : ""}${hasSel && !sel ? " dim" : ""}" data-genre="${esc(gKey)}">
+        <span class="rk">${rk}</span><span class="bucket-tog"></span>
+        <span class="nm">${esc(gLabel)}</span>
+        <span class="vl">${data.count}<small>${pct(data.count, withG)}</small></span>
+        <div class="tr"><div class="fl" style="width:${(data.count/maxCount)*100}%"></div></div></div>`;
+    }
+    html += `</div>`;
+  });
+  if (sortedOrphans.length){
+    const oBucketSel = sortedOrphans.some(o => state.genres.has(o.k));
+    const rk = String(sortedBuckets.length + 1).padStart(2, "0");
+    html += `<div class="genre-group"><div class="row genre-bucket${oBucketSel ? " sel" : ""}${hasSel && !oBucketSel ? " dim" : ""}" data-bucket="__outros__">
+      <span class="rk">${rk}</span><span class="bucket-tog">›</span>
+      <span class="nm">Outros (${sortedOrphans.length})</span>
+      <span class="vl">${sortedOrphans.reduce((n,o) => n + o.value,0)}<small></small></span>
+      <div class="tr"><div class="fl" style="width:${(sortedOrphans.reduce((n,o)=>n+o.value,0)/maxCount)*100}%"></div></div></div></div>`;
+  }
+  el.innerHTML = html;
+  $("#gen-hint").innerHTML = `${totalBuckets} categorias · ${totalGenres} gêneros · clique na categoria para ver os subgêneros${upd}`;
 }
+document.querySelector("#genres")?.addEventListener("click", e => {
+  const bucketRow = e.target.closest("[data-bucket]"), subRow = e.target.closest("[data-genre]");
+  if (bucketRow && !subRow){
+    const k = bucketRow.dataset.bucket;
+    expandedGenreBucket = (expandedGenreBucket === k) ? null : k;
+    renderGenres();
+  } else if (subRow){
+    toggle("genre", subRow.dataset.genre);
+  }
+});
 function profStack(title, big, segs, total){
   const on = segs.filter(s => s[0] > 0);
   return `<div class="pf"><div class="pf-h"><span>${title}</span><b>${big}</b></div>
@@ -1304,21 +1554,63 @@ function renderProfile(R){
   const M = R.filter(hasMeta), el = $("#profile");
   const missing = STORE ? R.filter(t => !t.m).length : 0;
   $("#prof-hint").innerHTML = M.length ? `${M.length === R.length ? `todas as ${faixas(M.length)}` : `${nf(M.length)} de ${faixas(R.length)}`} com esses dados${missing ? ` · <button type="button" class="lnk" data-upd style="padding:0">completar ${missing}</button>` : ""}` : "";
-  if (!M.length){
-    el.innerHTML = `<div class="empty-in"><p>Explícitas e singles aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
-    return;
+  let html = "";
+
+  // --- duração (t.sec sempre disponível) ---
+  const withSec = R.filter(t => t.sec > 0);
+  if (withSec.length){
+    const dur = {short: 0, normal: 0, long: 0, epic: 0};
+    for (const t of withSec){
+      if (t.sec < 180) dur.short++;
+      else if (t.sec < 300) dur.normal++;
+      else if (t.sec < 480) dur.long++;
+      else dur.epic++;
+    }
+    const dTotal = withSec.length;
+    const domLabel = dur.normal >= dur.short && dur.normal >= dur.long && dur.normal >= dur.epic ? `${pct(dur.normal, dTotal, 0)} são normais` :
+                     dur.short  >= dur.normal && dur.short  >= dur.long  && dur.short  >= dur.epic  ? `${pct(dur.short,  dTotal, 0)} são curtas`  :
+                     dur.long   >= dur.normal && dur.long   >= dur.short && dur.long   >= dur.epic  ? `${pct(dur.long,   dTotal, 0)} são longas`  :
+                     `${pct(dur.epic, dTotal, 0)} são épicas`;
+    html += profStack("Duração das faixas", domLabel,
+      [[dur.short, "#A3E635", "Curtas < 3min"], [dur.normal, "#34D399", "Normais 3–5min"], [dur.long, "#047857", "Longas 5–8min"], [dur.epic, "#065F46", "Épicas > 8min"]], dTotal);
+    const longest = [...withSec].sort((a, b) => b.sec - a.sec).slice(0, 3);
+    if (longest.length) html += `<div class="pf"><div class="pf-h"><span>Músicas mais longas</span><b>Duração</b></div>
+      ${longest.map(t => `<div class="hrow"><div class="hl"><span>${esc(t.title)} <em>${esc(t.artist)}</em></span><b>${durTxt(t.sec)}</b></div><div class="ht"><i style="width:${Math.max(2, t.sec / longest[0].sec * 100)}%"></i></div></div>`).join("")}</div>`;
   }
-  const ex = M.filter(t => t.m.x).length;
-  const ty = {album: 0, single: 0, compilation: 0}; M.forEach(t => { if (t.m.ty in ty) ty[t.m.ty]++; });
-  const tyN = ty.album + ty.single + ty.compilation;
-  let html = tyN ? profStack("De onde vêm", pct(ty.album, tyN, 0) + " de álbuns", [[ty.album, "#34D399", "Álbum"], [ty.single, "#A3E635", "Single/EP"], [ty.compilation, "#047857", "Coletânea"]], tyN) : "";
-  html += profStack("Explícitas", pct(ex, M.length, 0), [[ex, "#F0FDF7", "Explícitas"], [M.length - ex, "#047857", "Sem palavrão"]], M.length);
-  // ranking de explícitas por artista
-  if (ex){
-    const arts = [...groupBy(M, "artist")].map(([k, rs]) => ({k, n: rs.length, e: rs.filter(t => t.m.x).length}))
-      .filter(a => a.n >= 3 && a.e).sort((a, b) => b.e / b.n - a.e / a.n || b.e - a.e).slice(0, 4);
-    if (arts.length) html += `<div class="pf"><div class="pf-h"><span>Artistas mais explícitos</span><b>% das faixas</b></div>
-      ${arts.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%"></i></div></div>`).join("")}</div>`;
+
+  // --- décadas (t.date sempre disponível) ---
+  const withYear = R.filter(t => t.date && String(t.date).length >= 4);
+  if (withYear.length){
+    const decades = new Map();
+    for (const t of withYear){
+      const y = parseInt(String(t.date).slice(0, 4), 10);
+      if (!y || y < 1950 || y > 2030) continue;
+      const dec = Math.floor(y / 10) * 10;
+      decades.set(dec, (decades.get(dec) || 0) + 1);
+    }
+    if (decades.size > 1){
+      const sorted = [...decades].sort((a, b) => a[0] - b[0]);
+      const decMax = Math.max(...sorted.map(([, n]) => n));
+      html += `<div class="pf"><div class="pf-h"><span>Por década</span><b>Faixas</b></div>
+        ${sorted.map(([d, n]) => `<div class="hrow"><div class="hl"><span>${d}s</span><b>${n} <em>${pct(n, withYear.length, 0)}</em></b></div><div class="ht"><i style="width:${Math.max(2, n / decMax * 100)}%"></i></div></div>`).join("")}</div>`;
+    }
+  }
+
+  // --- dados do Spotify (apenas quando importado por link) ---
+  if (M.length){
+    const ex = M.filter(t => t.m.x).length;
+    const ty = {album: 0, single: 0, compilation: 0}; M.forEach(t => { if (t.m.ty in ty) ty[t.m.ty]++; });
+    const tyN = ty.album + ty.single + ty.compilation;
+    html += tyN ? profStack("De onde vêm", pct(ty.album, tyN, 0) + " de álbuns", [[ty.album, "#34D399", "Álbum"], [ty.single, "#A3E635", "Single/EP"], [ty.compilation, "#047857", "Coletânea"]], tyN) : "";
+    html += profStack("Explícitas", pct(ex, M.length, 0), [[ex, "#F0FDF7", "Explícitas"], [M.length - ex, "#047857", "Sem palavrão"]], M.length);
+    if (ex){
+      const arts = [...groupBy(M, "artist")].map(([k, rs]) => ({k, n: rs.length, e: rs.filter(t => t.m.x).length}))
+        .filter(a => a.n >= 3 && a.e).sort((a, b) => b.e / b.n - a.e / a.n || b.e - a.e).slice(0, 4);
+      if (arts.length) html += `<div class="pf"><div class="pf-h"><span>Artistas mais explícitos</span><b>% das faixas</b></div>
+        ${arts.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%"></i></div></div>`).join("")}</div>`;
+    }
+  } else if (!html){
+    html = `<div class="empty-in"><p>Explícitas e singles aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
   }
   el.innerHTML = html;
 }
@@ -1685,7 +1977,7 @@ function tmPlay(){
 // as 8 primeiras linhas usam as cores categóricas validadas (versão escura), em ordem fixa; da 9ª em diante
 // (dá pra marcar todas) as cores são geradas espalhando o matiz. Cada linha mantém a cor enquanto está marcada
 const EVO_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
-const EVO_DEFAULT = 10, EVO_TOPS = [1, 3, 5, 8, 10, 25, 50, 100, 250, 500, 750, 1000];
+const EVO_DEFAULT = 10, EVO_TOPS = [1, 3, 5, 10, 25, 50, 100, 250, 500, 750, 1000];
 const evoCol = s => s < EVO_COLORS.length ? EVO_COLORS[s] : `hsl(${Math.round(((s - EVO_COLORS.length) * 137.5 + 20) % 360)}, 62%, 62%)`;
 const evo = {mode: "band", dyn: {band: null, genre: null}, sel: {band: null, genre: null}, slot: {band: new Map(), genre: new Map()}, list: [], map: new Map(), R: [], N: 0};
 const evoName = k => evo.mode === "genre" ? capFirst(k) : k;
@@ -1781,7 +2073,7 @@ function drawEvo(){
   if (!evo.list.length){ box.innerHTML = `<p class="none">${evo.mode === "genre" ? "Ainda não há gêneros para mostrar. Use \"Atualizar dados\" para buscá-los." : "Sem dados para este recorte."}</p>`; return; }
   if (!W) return;
   const shown = [...evoSel()].filter(k => evo.map.has(k)).sort((a, b) => evo.slot[evo.mode].get(a) - evo.slot[evo.mode].get(b));
-  const H = 300, L = 38, Rm = Math.round(Math.min(84, Math.max(30, W * 0.16))), Tp = 14, Bt = 26;   // margem da direita comporta o rótulo da ponta da linha
+  const H = 300, L = 38, Rm = Math.round(Math.min(160, Math.max(60, W * 0.22))), Tp = 14, Bt = 26;   // margem da direita comporta os rótulos empurrados
   const NA = Math.max(N, evo.axisN || N);
   const X = i => L + (NA <= 1 ? 0 : i / (NA - 1)) * (W - L - Rm);
   const cum = shown.map(k => { const ix = evo.map.get(k).ix, a = new Int32Array(N); let p = 0, c = 0; for (let i = 0; i < N; i++){ if (p < ix.length && ix[p] === i){ c++; p++; } a[i] = c; } return a; });
@@ -1793,25 +2085,53 @@ function drawEvo(){
   for (let v = 0; v <= top; v += step) svg += `<line x1="${L}" x2="${W - Rm}" y1="${Y(v)}" y2="${Y(v)}" stroke="rgba(110,231,183,.08)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
   [0, .25, .5, .75, 1].forEach((f, j, arr) => { const i = Math.round(f * (NA - 1)); svg += `<text x="${X(i)}" y="${H - 6}" text-anchor="${j === 0 ? "start" : j === arr.length - 1 ? "end" : "middle"}">#${(evo.full[i] || evo.R[Math.min(i, N - 1)]).n}</text>`; });
   const every = Math.max(1, Math.ceil(N / 500));
-  cum.forEach((a, j) => {
+  // pré-computa pontos e cores para os dois passes
+  const lineData = cum.map((a, j) => {
     const pts = []; for (let i = 0; i < N; i += every) pts.push(i); if (pts[pts.length - 1] !== N - 1) pts.push(N - 1);
-    const col = evoCol(evo.slot[evo.mode].get(shown[j]));
-    svg += `<path d="M${pts.map(i => `${X(i).toFixed(1)},${Y(a[i]).toFixed(1)}`).join("L")}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
-    svg += `<circle cx="${X(N - 1)}" cy="${Y(a[N - 1])}" r="4" fill="${col}" stroke="#071a14" stroke-width="2"/>`;
+    return {a, pts, col: evoCol(evo.slot[evo.mode].get(shown[j])), final: a[N - 1]};
   });
-  /* rótulo na ponta de cada linha, na cor dela: o
-     nome — inteiro se for uma palavra só, ou só o primeiro nome se for composto — o tempo todo, inclusive na máquina do tempo. Rótulos muito próximos se afastam */
-  const maxCh = Math.max(1, Math.floor((Rm - 16) / 6.6));
+  // 1º passo — linhas: menor count por último (em cima) → cor de quem chegou por último domina
+  const pathOrd = lineData.map((_, j) => j).sort((a, b) => lineData[b].final - lineData[a].final);
+  for (const j of pathOrd) {
+    const {a, pts, col} = lineData[j];
+    svg += `<path d="M${pts.map(i => `${X(i).toFixed(1)},${Y(a[i]).toFixed(1)}`).join("L")}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  }
+  // 2º passo — bolinhas: maior count por último (em cima) → bolinha de quem chegou primeiro domina
+  const circOrd = lineData.map((_, j) => j).sort((a, b) => lineData[a].final - lineData[b].final);
+  for (const j of circOrd) {
+    const {a, col} = lineData[j];
+    svg += `<circle cx="${X(N - 1)}" cy="${Y(a[N - 1])}" r="4" fill="${col}" stroke="#071a14" stroke-width="2"/>`;
+  }
+  /* rótulos na ponta das linhas: empurrados à direita quando colidirem verticalmente (mesma altura),
+     prioridade ao de maior contagem (fica mais perto do ponto); 2+ colisões truncam para 5 chars */
+  const CH = 7.5, LBL_GAP = 4, baseX = X(N - 1) + 9;
+  const maxCh = Math.max(1, Math.floor((Rm - 16) / CH));
   const ends = shown.map((k, j) => {
     const nm = String(evoName(k)).trim(), first = nm.split(/\s+/)[0] || nm;
-    // o rótulo é sempre o primeiro nome da banda, escrito normal, do começo ao fim da animação
-    let txt = first;
-    if (txt.length > maxCh) txt = txt.slice(0, Math.max(1, maxCh - 1)) + "…";
-    return {txt, y: Y(cum[j][N - 1]), col: evoCol(evo.slot[evo.mode].get(k))};
-  }).sort((a, b) => a.y - b.y);
-  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 12) ends[i].y = ends[i - 1].y + 12;
-  const lastY = H - Bt - 2; for (let i = ends.length - 1; i >= 0; i--) { if (ends[i].y > lastY) ends[i].y = lastY; if (i && ends[i].y - ends[i - 1].y < 12) ends[i - 1].y = ends[i].y - 12; }
-  ends.forEach(e => { svg += `<text class="evo-end" x="${X(N - 1) + 9}" y="${(e.y + 4).toFixed(1)}" style="fill:${e.col}">${esc(e.txt)}</text>`; });
+    let txt = first.length > maxCh ? first.slice(0, Math.max(1, maxCh - 1)) + "…" : first;
+    const count = cum[j][N - 1];
+    return {txt, rawY: Y(count), col: evoCol(evo.slot[evo.mode].get(k)), count};
+  });
+  ends.sort((a, b) => a.rawY - b.rawY);
+  // agrupar por proximidade vertical (≤ 12px)
+  const grps = [];
+  for (const e of ends) {
+    const g = grps[grps.length - 1];
+    if (g && e.rawY - g[g.length - 1].rawY <= 12) g.push(e);
+    else grps.push([e]);
+  }
+  for (const g of grps) {
+    g.sort((a, b) => b.count - a.count);   // maior count = mais perto do ponto
+    const trunc = g.length >= 2;
+    const anchorY = g[0].rawY;
+    let x = baseX;
+    for (const e of g) {
+      e.lbl = trunc ? e.txt.slice(0, 5) : e.txt;
+      e.finalX = x; e.finalY = anchorY;
+      x += e.lbl.length * CH + LBL_GAP;
+    }
+  }
+  ends.forEach(e => { svg += `<text class="evo-end" x="${(e.finalX ?? baseX).toFixed(1)}" y="${((e.finalY ?? e.rawY) + 4).toFixed(1)}" style="fill:${e.col}">${esc(e.lbl ?? e.txt)}</text>`; });
   svg += `<g id="evo-hot" style="display:none"><line y1="${Tp}" y2="${H - Bt}" stroke="rgba(240,253,247,.35)" stroke-dasharray="3 3"/>${cum.map((a, j) => `<circle r="4.5" fill="${evoCol(evo.slot[evo.mode].get(shown[j]))}" stroke="#071a14" stroke-width="2"/>`).join("")}</g>`;
   svg += `<rect id="evo-hit" x="${L}" y="0" width="${W - L - Rm}" height="${H - Bt}" fill="transparent"/></svg>`;
   box.innerHTML = svg;
@@ -1860,6 +2180,8 @@ addEventListener("hashchange", () => showTab(location.hash === "#insights" ? "in
 const NN = BY_PLAYLIST.length;
 function median(a){ if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 function blocks(k){ k = Math.max(1, Math.min(k, NN)); const out = []; for (let i = 0; i < k; i++){ const a = Math.floor(i * NN / k), b = Math.floor((i + 1) * NN / k); out.push(BY_PLAYLIST.slice(a, b)); } return out; }
+function chapCount(n){ return Math.max(3, Math.min(10, Math.round(1.5 + Math.log2(n / 15)))); }
+function chapPos(i, total){ const p = i / Math.max(1, total - 1); return p < 0.33 ? "no início" : p < 0.67 ? "no meio" : "no final"; }
 const seedOf = s => { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
 const pickV = (key, arr) => arr[seedOf(key + "|" + NN + "|" + (IS_TOP || "")) % arr.length];
 let IS_TOP = "";
@@ -1919,7 +2241,7 @@ const IS = (() => {
     return S.art.filter(a => others.has(a.k.toLowerCase()));
   };
   S.journey = NN >= 30;
-  S.chap = S.journey ? blocks(6) : [];
+  S.chap = S.journey ? blocks(chapCount(NN)) : [];
   return S;
 })();
 IS_TOP = IS.art.length ? IS.art[0].k : "";
@@ -1984,7 +2306,7 @@ const V = {
       const seps = bounds.map(x => `<rect x="${x}" y="0" width=".6" height="14" fill="rgba(240,253,247,.18)"/>`).join("");
       return `<div class="strip"><div class="sl"><span>${esc(nm)}</span><em>#${a.rs[0].n} → #${a.rs[a.rs.length - 1].n} · ${faixas(a.c)}</em></div>
         <svg viewBox="0 0 ${NN} 14" preserveAspectRatio="none" class="strip-svg" aria-hidden="true"><rect width="${NN}" height="14" rx="3" fill="rgba(110,231,183,.06)"/>${seps}${ticks}</svg></div>`;
-    }).join("") + `<div class="sx"><span>#1</span><span>capítulos 1–${IS.chap.length || 1}</span><span>#${NN}</span></div>`;
+    }).join("") + `<div class="sx"><span>#1</span><span>início → fim</span><span>#${NN}</span></div>`;
   },
   cells(win, a1, a2){
     const col = t => hasBand(t, a1) ? "#F0FDF7" : hasBand(t, a2) ? "#10B981" : "rgba(110,231,183,.14)";
@@ -2157,7 +2479,7 @@ rule(() => {
   }
   const lastCh = CHI[CHI.length - 1], x = lastCh.seg.filter(t => hasBand(t, a1.k)).length;
   if (lastCh.top[0] === a1.k) return {kind: "pl", theme: 1, score: 78, title: `${a1.k} lidera o catálogo e também o agora`,
-    body: `<p>O maior artista do catálogo continua dominando as adições recentes: é o artista mais presente no último capítulo.</p>`, viz: V.strips([a1.k]), kick: [nf(x), `das últimas ${lastCh.seg.length} adições são de ${a1.k}`]};
+    body: `<p>O maior artista do catálogo continua dominando as adições recentes: é o artista mais presente no final da playlist.</p>`, viz: V.strips([a1.k]), kick: [nf(x), `das últimas ${lastCh.seg.length} adições são de ${a1.k}`]};
   return null;
 });
 
@@ -2232,8 +2554,8 @@ rule(() => {
   const title = ml > mf + 1 ? (back ? `Menos ${oldLbl} com o tempo, até o passado voltar` : "O gosto ficou mais novo com o tempo") : ml < mf - 1 ? "A playlist foi ficando mais nostálgica" : "O gosto mudou de artista, não de época";
   const backers = back ? [...groupBy(CHI[CHI.length - 1].seg.filter(t => t.year !== NI && t.year < pivot), "artist")].sort((a, b) => b[1].length - a[1].length).slice(0, 3).map(x => esc(x[0])) : [];
   return {kind: "pl", theme: 0, score: 78, title,
-    body: `<p>${ml > mf + 1 ? "A mediana do ano de lançamento sobe ao longo da playlist" : ml < mf - 1 ? "A mediana do ano de lançamento cai ao longo da playlist" : "A mediana do ano de lançamento quase não muda"}${backers.length ? `, mas o último capítulo resgata ${listPt(backers)}` : ""}.</p>`,
-    viz: V.mbars(pre, CHI.map((c, i) => `cap. ${i + 1}`), `faixas lançadas antes de ${pivot}, por capítulo`),
+    body: `<p>${ml > mf + 1 ? "A mediana do ano de lançamento sobe ao longo da playlist" : ml < mf - 1 ? "A mediana do ano de lançamento cai ao longo da playlist" : "A mediana do ano de lançamento quase não muda"}${backers.length ? `, mas o final da playlist resgata ${listPt(backers)}` : ""}.</p>`,
+    viz: V.mbars(pre, CHI.map((_, i) => `${i + 1}`), `faixas lançadas antes de ${pivot}, por parte da playlist`),
     kick: [`${mf} → ${ml}`, `ano mediano de lançamento: primeiras ${w} vs. últimas ${w} adições`]};
 });
 
@@ -2258,9 +2580,10 @@ rule(() => {
   const fresh = firstAt.filter(t => t.n > cut), col = fresh.filter(t => splitArtistsAll(t.artist).length > 1);
   const best = [...CHI].sort((a, b) => b.arts - a.arts)[0], slow = fresh.length <= Math.max(2, total * .2);
   const colOwner = col.length ? (splitArtists(col[0].artist).map(p => IS.art.find(a => a.k.toLowerCase() === p)).find(Boolean) || {}).k : null;
+  const halfPct = Math.round(half.n / NN * 100);
   return {tech: true, kind: "pl", theme: 4, score: 66,
     title: slow ? "A descoberta desacelerou" : "A playlist segue descobrindo artistas",
-    body: `<p>Metade dos ${total} artistas já tinha aparecido até a #${half.n}. O capítulo ${best.i + 1} reuniu ${best.arts} artistas em ${best.seg.length} faixas.</p>`,
+    body: `<p>Metade dos ${total} artistas apareceu nos primeiros ${halfPct}% da playlist (até a #${half.n}). O trecho ${chapPos(best.i, CHI.length)} foi o mais rico: ${best.arts} artistas em ${best.seg.length} faixas.</p>`,
     viz: V.disc(), mvClass: "disc",
     kick: [nf(fresh.length), `artista${fresh.length === 1 ? "" : "s"} novo${fresh.length === 1 ? "" : "s"} nas últimas ${nf(NN - cut)} adições${col.length ? `, ${col.length} ${col.length > 1 ? "deles parcerias" : "deles parceria"}${colOwner ? ` de ${colOwner}` : ""}` : ""}`]};
 });
@@ -2353,7 +2676,7 @@ rule(() => {
   return {extra: true, kind: "pl", theme: 0, score: 77,
     title: `${capFirst(up.g)} ganhou espaço com o tempo`,
     body: `<p>Na primeira metade da playlist, ${esc(up.g)} estava em ${B(pc0(up.from, 1))} das faixas; na segunda, em ${B(pc0(up.to, 1))}.${down.d <= -.08 ? ` No caminho contrário, ${esc(down.g)} caiu de ${pc0(down.from, 1)} para ${pc0(down.to, 1)}.` : ""}</p>`,
-    viz: V.mbars(perCh, CHI.map((c, i) => `cap. ${i + 1}`), `faixas de ${up.g} por capítulo da playlist`),
+    viz: V.mbars(perCh, CHI.map((_, i) => `${i + 1}`), `faixas de ${up.g} por parte da playlist`),
     kick: [`${pc0(up.from, 1)} → ${pc0(up.to, 1)}`, `das faixas com ${up.g}: primeira vs. segunda metade`]};
 });
 
@@ -2420,7 +2743,7 @@ function renderHero(){
     if (tail >= Math.max(15, N * .15)) pl.push([`${a1.k} nas últimas ${nf(tail)}`, "0", `o líder parou em #${a1.rs[a1.rs.length - 1].n}`]);
     if (SLOW){ const cut = Math.round(N * .78), late = IS.artMap.get(SLOW).rs.filter(t => t.n > cut).length; pl.push([`${SLOW} nas últimas ${nf(N - cut)}`, nf(late), `${pc0(late, N - cut)} das adições recentes`]); }
     const big = sum(IS.runs.filter(r => r.length >= 5), r => r.length); if (big) pl.push(["Entraram em maratonas", pc0(big, N), `${nf(big)} faixas em sequências de 5+`]);
-    if (lastCh) pl.push([`Dono do último capítulo`, lastCh.top[0], `${lastCh.top[1]} de ${lastCh.seg.length} adições`]);
+    if (lastCh) pl.push([`Mais presente no final`, lastCh.top[0], `${lastCh.top[1]} de ${lastCh.seg.length} adições`]);
   }
   for (let i = 0; facts.length < 8 && (i < cat.length || i < pl.length); i++){ if (cat[i]) add(...cat[i]); if (pl[i] && facts.length < 8) add(...pl[i]); }
   $("#ins-hero").innerHTML = `<div class="eyebrow">Leitura executiva · catálogo${IS.journey ? " e playlist" : ""}</div><h2>${h2}</h2>
@@ -2433,34 +2756,53 @@ function renderJourney(){
   $("#journey").style.display = IS.journey ? "" : "none";
   if (!IS.journey) return;
   $("#chapters").innerHTML = CHI.map(c => `<div class="chap" style="--o:${(.25 + .75 * c.share / Math.max(...CHI.map(x => x.share))).toFixed(2)}" data-i="${c.i}">
-      <div class="cn">CAP. ${c.i + 1}</div><div class="ct">${esc(c.name)}</div><div class="cr">#${c.seg[0].n} → #${c.seg[c.seg.length - 1].n}</div>
+      <div class="cn">${c.i + 1}</div><div class="ct">${esc(c.name)}</div><div class="cr">#${c.seg[0].n} → #${c.seg[c.seg.length - 1].n}</div>
       <div class="cw"><b>${esc(c.top[0])}</b>${c.top[1]} de ${c.seg.length} faixas${c.g[1] ? ` · depois ${esc(c.g[1][0])} (${c.g[1][1]})` : ""}</div>
       <div class="cs"><span><b>${c.arts}</b> artistas</span><span><b>${c.fresh}</b> novos</span>${isNaN(c.yr) ? "" : `<span>lanç. mediano <b>${Math.round(c.yr)}</b></span>`}</div></div>`).join("");
   document.querySelectorAll(".chap").forEach(el => bindTip(el, () => {
     const c = CHI[+el.dataset.i];
-    return `<div class="eyebrow">Capítulo ${c.i + 1} · #${c.seg[0].n} a #${c.seg[c.seg.length - 1].n}</div><div class="t">${esc(c.name)}</div>
+    return `<div class="eyebrow">Parte ${c.i + 1} · #${c.seg[0].n} a #${c.seg[c.seg.length - 1].n}</div><div class="t">${esc(c.name)}</div>
       <div class="k"><span>Tempo adicionado</span><b>${fmtLong(sum(c.seg, r => r.sec))}</b></div><hr>
       <div class="eyebrow">Quem mais entrou</div>${sbars(c.g.slice(0, 4).map(([a, n]) => [a, `${n} · ${pc0(n, c.seg.length)}`, n / c.seg.length]))}`;
   }));
-  const BL = blocks(NN >= 36 ? 12 : 6);
-  const top = IS.art.slice(0, 10).map(a => a.k);
-  const grid = top.map(a => BL.map(seg => seg.filter(r => hasBand(r, a))));
-  const mx = Math.max(1, ...grid.flat().map(x => x.length));
-  let html = "";
-  top.forEach((a, ai) => {
-    html += `<div class="hn">${esc(a)}</div>`;
-    grid[ai].forEach((rs, bi) => { const k = rs.length / mx; const bg = rs.length ? `hsla(156, 70%, ${18 + 50 * k}%, ${.35 + .65 * k})` : "rgba(110,231,183,.04)";
-      html += `<div class="hc" data-a="${ai}" data-b="${bi}" data-bg="${bg}" style="background:rgba(110,231,183,.04);color:${k > .55 ? "#022C22" : "var(--ink)"}">${rs.length || ""}</div>`; });
+  const HEAT_OPTS = [6, 8, 10, 12, 16, 20].filter(n => n <= NN);
+  const heatColKey = "catalogo-musical:heat-cols";
+  const _hcDef = NN >= 10 ? 10 : HEAT_OPTS[0];
+  const _hcSaved = (() => { try { return +localStorage.getItem(heatColKey) || 0; } catch(e){ return 0; } })();
+  let heatCols = HEAT_OPTS.includes(_hcSaved) ? _hcSaved : (HEAT_OPTS.includes(_hcDef) ? _hcDef : HEAT_OPTS[HEAT_OPTS.length - 1]);
+  const colsRow = $("#heat-cols");
+  colsRow.innerHTML = HEAT_OPTS.map(n => `<button type="button" data-n="${n}" aria-pressed="${n === heatCols}">${n}</button>`).join("");
+
+  function renderHeat(){
+    const BL = blocks(heatCols);
+    const top = IS.art.slice(0, 10).map(a => a.k);
+    const grid = top.map(a => BL.map(seg => seg.filter(r => hasBand(r, a))));
+    const mx = Math.max(1, ...grid.flat().map(x => x.length));
+    let html = "";
+    top.forEach((a, ai) => {
+      html += `<div class="hn">${esc(a)}</div>`;
+      grid[ai].forEach((rs, bi) => { const k = rs.length / mx; const bg = rs.length ? `hsla(156, 70%, ${18 + 50 * k}%, ${.35 + .65 * k})` : "rgba(110,231,183,.04)";
+        html += `<div class="hc" data-a="${ai}" data-b="${bi}" data-bg="${bg}" style="background:rgba(110,231,183,.04);color:${k > .55 ? "#022C22" : "var(--ink)"}">${rs.length || ""}</div>`; });
+    });
+    html += `<div></div>` + BL.map((seg, i) => `<div class="hx">${i % 3 === 0 ? "#" + seg[0].n : ""}</div>`).join("");
+    const heat = $("#heat"); heat.style.gridTemplateColumns = `auto repeat(${BL.length},minmax(0,1fr))`; heat.innerHTML = html;
+    $("#heat-hint").textContent = `cada coluna = ~${Math.round(NN / BL.length)} adições · passe o mouse`;
+    heat.querySelectorAll(".hc").forEach(el => bindTip(el, () => {
+      const a = top[+el.dataset.a], seg = BL[+el.dataset.b], rs = grid[+el.dataset.a][+el.dataset.b];
+      return `<div class="eyebrow">Adições #${seg[0].n} a #${seg[seg.length - 1].n}</div><div class="t">${esc(a)}</div>
+        <div class="k"><span>Faixas neste trecho</span><b>${rs.length} de ${seg.length} · ${pc0(rs.length, seg.length)}</b></div>
+        ${rs.length ? `<hr><div class="eyebrow">Entraram aqui</div>${rs.slice(0, 4).map(r => `<div class="k"><span style="color:var(--ink)">#${r.n} ${esc(r.title)}</span></div>`).join("")}${rs.length > 4 ? `<div class="k"><span>+ ${rs.length - 4} faixas</span></div>` : ""}` : `<hr><div class="k"><span>Nenhuma faixa neste trecho</span></div>`}`;
+    }));
+    requestAnimationFrame(() => heat.querySelectorAll(".hc").forEach((el, k) => setTimeout(() => el.style.background = el.dataset.bg, k * 6)));
+  }
+  renderHeat();
+  colsRow.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    heatCols = +b.dataset.n;
+    try { localStorage.setItem(heatColKey, heatCols); } catch(e2){}
+    colsRow.querySelectorAll("button").forEach(btn => btn.setAttribute("aria-pressed", btn.dataset.n === String(heatCols)));
+    renderHeat();
   });
-  html += `<div></div>` + BL.map((seg, i) => `<div class="hx">${i % 3 === 0 ? "#" + seg[0].n : ""}</div>`).join("");
-  const heat = $("#heat"); heat.style.gridTemplateColumns = `auto repeat(${BL.length},minmax(0,1fr))`; heat.innerHTML = html;
-  $("#heat-hint").textContent = `cada coluna = ~${Math.round(NN / BL.length)} adições · passe o mouse`;
-  heat.querySelectorAll(".hc").forEach(el => bindTip(el, () => {
-    const a = top[+el.dataset.a], seg = BL[+el.dataset.b], rs = grid[+el.dataset.a][+el.dataset.b];
-    return `<div class="eyebrow">Adições #${seg[0].n} a #${seg[seg.length - 1].n}</div><div class="t">${esc(a)}</div>
-      <div class="k"><span>Faixas neste trecho</span><b>${rs.length} de ${seg.length} · ${pc0(rs.length, seg.length)}</b></div>
-      ${rs.length ? `<hr><div class="eyebrow">Entraram aqui</div>${rs.slice(0, 4).map(r => `<div class="k"><span style="color:var(--ink)">#${r.n} ${esc(r.title)}</span></div>`).join("")}${rs.length > 4 ? `<div class="k"><span>+ ${rs.length - 4} faixas</span></div>` : ""}` : `<hr><div class="k"><span>Nenhuma faixa neste trecho</span></div>`}`;
-  }));
 }
 function drawScatter(){
   const box = $("#scatter"); if (!box || !IS.journey) return;
@@ -2474,7 +2816,7 @@ function drawScatter(){
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ano de lançamento de cada faixa pela ordem de entrada na playlist">`;
   CHI.forEach((c, i) => { const xa = X(c.seg[0].n), xb = X(c.seg[c.seg.length - 1].n);
     if (i % 2) svg += `<rect x="${xa}" y="${Tp - 16}" width="${xb - xa}" height="${H - Tp - Bt + 16}" fill="rgba(110,231,183,.04)" rx="6"/>`;
-    svg += `<text x="${(xa + xb) / 2}" y="${Tp - 6}" text-anchor="middle">cap. ${i + 1}</text>`; });
+    svg += `<text x="${(xa + xb) / 2}" y="${Tp - 6}" text-anchor="middle">${i + 1}</text>`; });
   const step = (y1 - y0) > 60 ? 20 : 10;
   for (let y = y0; y <= y1; y += step) svg += `<line x1="${L}" x2="${W - R}" y1="${Y(y)}" y2="${Y(y)}" stroke="rgba(110,231,183,.07)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(y) + 3}" text-anchor="end">${y}</text>`;
   const ticks = [1, Math.round(NN / 4), Math.round(NN / 2), Math.round(NN * 3 / 4), NN];
@@ -2516,7 +2858,7 @@ function renderDisc(){
   el.style.display = "flex"; el.style.flexDirection = "column"; el.style.flex = "1";
 }
 function renderNote(){
-  $("#ins-note").textContent = `${IS.journey ? `Ordem de entrada = coluna "número" da lista (#1 é a mais antiga na playlist). Capítulos = 6 blocos de ~${Math.round(NN / 6)} adições; trechos = ${NN >= 36 ? 12 : 6} blocos de ~${Math.round(NN / (NN >= 36 ? 12 : 6))}. ` : ""}Cada faixa conta uma vez para o artista exatamente como está escrito na lista. Índice de concentração = soma dos quadrados das participações (HHI). Os textos desta aba são gerados por regras a partir dos dados atuais e mudam quando a lista muda.`;
+  const nc = chapCount(NN); $("#ins-note").textContent = `${IS.journey ? `Ordem de entrada = coluna "número" da lista (#1 é a mais antiga na playlist). Partes = ${nc} blocos de ~${Math.round(NN / nc)} adições. ` : ""}Cada faixa conta uma vez para o artista exatamente como está escrito na lista. Índice de concentração = soma dos quadrados das participações (HHI). Os textos desta aba são gerados por regras a partir dos dados atuais e mudam quando a lista muda.`;
 }
 function renderTechBar(){
   const b = $("#tech-toggle");
@@ -2829,10 +3171,14 @@ function renderSpAccountBar(){
   bar.style.display = "";
   const btn = bar.querySelector(".sp-logout-x");
   if (btn) btn.addEventListener("click", () => {
-    clearSpotifyOAuth();
-    spotifyUserDisplay = null;
-    renderSpAccountBar();
-    toast("Você saiu da conta Spotify.");
+    const name = (loadSpotifyOAuth()?.profile?.name) || "sua conta Spotify";
+    const body = document.createElement("div");
+    body.innerHTML = `<div class="confirm"><p>Sair de <strong>${esc(name)}</strong>?</p><p class="muted">Você não perderá os dados da playlist, só a conexão com o Spotify.</p></div>`;
+    const foot = document.createElement("div"); foot.className = "mfrow";
+    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn nm-red" type="button" data-ok>Sair</button>`;
+    const md = openModal({title: "Sair do Spotify", body, foot, size: "sm"});
+    foot.querySelector("[data-c]").onclick = () => md.close();
+    foot.querySelector("[data-ok]").onclick = () => { md.close(); clearSpotifyOAuth(); spotifyUserDisplay = null; renderSpAccountBar(); toast("Você saiu da conta Spotify."); };
   });
 }
 async function spotifyLogin(clientId, pendingText, pendingMode){
@@ -4494,6 +4840,8 @@ function openDups(opt = {}){
 }
 
 /* ---------- wire the header buttons ---------- */
+$("#dt-clear").innerHTML = `${ICON.x}<span>Limpar filtros</span>`;
+$("#dt-clear").addEventListener("click", clearFilters);
 $("#dt-table").innerHTML = `${ICON.list}<span>Músicas</span>`;
 $("#dt-import").innerHTML = `${ICON.up}<span>Adicionar músicas</span>`;
 $("#dt-export").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
@@ -4519,6 +4867,8 @@ function boot(){
   render();
   renderSpAccountBar();
   queueAppleGenres();
+  queueMBGenres();
+  queueTADBGenres();
   if (STORE){ queueAppleDates(); queueAppleSingles(); }
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
   if (STORE){

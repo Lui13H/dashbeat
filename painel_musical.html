@@ -45,13 +45,17 @@
   </header>
 
   <div class="toolbar rise" style="--d:0">
-    <nav class="tabs" role="tablist" aria-label="Seções">
-      <span class="pill" aria-hidden="true"></span>
-      <button role="tab" id="tab-painel" aria-selected="true" aria-controls="painel">Painel</button>
-      <button role="tab" id="tab-insights" aria-selected="false" aria-controls="insights">Insights</button>
-    </nav>
-    <div class="tb-chips"><button class="tm-play tb-play" id="tb-play" type="button" style="display:none" aria-label="Reproduzir a playlist crescendo" title="Máquina do tempo: tocar / pausar"></button><button class="chip tb-chip" id="tb-time" type="button" style="display:none" title="Voltar o painel para a playlist inteira"></button><button class="chip tb-chip" id="tb-anim" type="button" style="display:none" title="Voltar este gráfico para a playlist inteira"></button></div>
+    <div class="tabs-play">
+      <nav class="tabs" role="tablist" aria-label="Seções">
+        <span class="pill" aria-hidden="true"></span>
+        <button role="tab" id="tab-painel" aria-selected="true" aria-controls="painel">Painel</button>
+        <button role="tab" id="tab-insights" aria-selected="false" aria-controls="insights">Insights</button>
+      </nav>
+      <button class="tm-play tb-play" id="tb-play" type="button" style="display:none" aria-label="Reproduzir a playlist crescendo" title="Máquina do tempo: tocar / pausar"></button>
+    </div>
+    <div class="tb-chips"><button class="chip tb-chip" id="tb-time" type="button" style="display:none" title="Voltar o painel para a playlist inteira"></button><button class="chip tb-chip" id="tb-anim" type="button" style="display:none" title="Voltar este gráfico para a playlist inteira"></button></div>
     <div class="dtools">
+      <button class="dbtn clr-btn" id="dt-clear" type="button" title="Tirar os filtros de banda, álbum, gênero e ano" hidden></button>
       <button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button>
       <button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button>
       <button class="dbtn" id="dt-cards" type="button" title="Gerar imagens prontas para compartilhar com os destaques da playlist"></button>
@@ -126,13 +130,13 @@
           <header><div><div class="eyebrow">04 · Ranking</div><h2>Bandas/artistas do maior para o menor</h2></div><div class="hint">Com participação e acumulado</div></header>
           <div class="body"><div class="list rank" id="rank"></div></div>
         </article>
-        <article class="card chart rise" style="--d:11">
-          <header><div><div class="eyebrow">05 · Estilo</div><h2>Músicas por gênero</h2></div><div class="hint" id="gen-hint"></div></header>
-          <div class="body"><div class="list rank genres" id="genres"></div></div>
-        </article>
-        <article class="card chart rise" style="--d:12">
-          <header><div><div class="eyebrow">06 · Perfil</div><h2>Como são as faixas</h2></div><div class="hint" id="prof-hint"></div></header>
+        <article class="card chart rise prof-card" style="--d:11">
+          <header><div><div class="eyebrow">05 · Perfil</div><h2>Como são as faixas</h2></div><div class="hint" id="prof-hint"></div></header>
           <div class="body"><div class="prof" id="profile"></div></div>
+        </article>
+        <article class="card chart rise genre-wide" style="--d:12">
+          <header><div><div class="eyebrow">06 · Estilo</div><h2>Músicas por gênero</h2></div><div class="hint" id="gen-hint"></div></header>
+          <div class="body"><div class="list rank genres" id="genres"></div></div>
         </article>
       </div>
 
@@ -172,12 +176,12 @@
     <article class="card ins-hero rise" style="--d:1" id="ins-hero" data-ins="simple"></article>
 
     <article class="card journey rise" style="--d:2" id="journey" data-ins="tech">
-      <div class="eyebrow">A jornada da playlist · seis capítulos pela ordem de entrada</div>
-      <h3 class="jt">A playlist em capítulos</h3>
+      <div class="eyebrow">A jornada da playlist · partes pela ordem de entrada</div>
+      <h3 class="jt">A playlist em partes</h3>
       <div class="chapters" id="chapters"></div>
       <div class="jviz">
         <div class="jbox">
-          <div class="jhead"><div><div class="eyebrow">Presença por artista</div><h4>Quem dominou cada trecho da playlist</h4></div><span class="hint2" id="heat-hint"></span></div>
+          <div class="jhead"><div><div class="eyebrow">Presença por artista</div><h4>Quem dominou cada trecho da playlist</h4></div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="seg" id="heat-cols" role="group" aria-label="Colunas"></span><span class="hint2" id="heat-hint"></span></div></div>
           <div class="heat" id="heat"></div>
         </div>
         <div class="jbox">
