@@ -4,11 +4,37 @@
    Nenhuma ação gasta busca sozinha: os botões só abrem as telas que já pedem confirmação. */
 (() => {
 "use strict";
-const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, an: 0};   // peso de cada verificação na nota (soma 105: nunca zera só por isso; peso 0 = só informa)
+const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, an: 0, nm: 0};   // peso de cada verificação na nota (soma 105: nunca zera só por isso; peso 0 = só informa)
 const FULL_AT = 0.25;                                                       // com 25% das faixas afetadas o item já custa o peso inteiro
 const MAX_SEC = 20 * 60;
 
 const DUR_CHECK_KEY = "catalogo-musical:dur-check";
+const ALBUM_NAME_IGN_KEY = "catalogo-musical:album-name-ign";
+const ALBUM_NAME_IGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(ALBUM_NAME_IGN_KEY) || "[]")); } catch(e) { return new Set(); } })();
+const saveAlbumNameIgn = () => { try { localStorage.setItem(ALBUM_NAME_IGN_KEY, JSON.stringify([...ALBUM_NAME_IGN])); } catch(e) {} };
+
+// detecta sufixos de edição/versão no final do nome do álbum e sugere o nome limpo
+const EDITION_RE1 = /\s+[-–—]\s*[(\[]?(?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|anniversary|special|limited|collector'?s|platinum)(?:\s+(?:edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]?\s*$/i;
+const EDITION_RE2 = /\s+[(\[](?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|anniversary|special|limited|collector'?s|platinum)(?:\s+(?:edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]\s*$/i;
+function suggestCleanName(name){
+  if (!name || name === NI) return null;
+  const c = name.replace(EDITION_RE1, '').replace(EDITION_RE2, '').trim();
+  return c && c !== name && c.length >= 2 ? c : null;
+}
+function albumNameIssues(list){
+  const seen = new Map();
+  for (const t of list){
+    if (!t.albumRaw || t.albumRaw === NI || ALBUM_NAME_IGN.has(t.albumRaw)) continue;
+    if (!seen.has(t.albumRaw)) seen.set(t.albumRaw, []);
+    seen.get(t.albumRaw).push(t);
+  }
+  const out = [];
+  for (const [rawName, tracks] of seen){
+    const cleanName = suggestCleanName(rawName);
+    if (cleanName) out.push({rawName, cleanName, tracks});
+  }
+  return out;
+}
 // { [trackKey]: { status: "ok"|"warn"|"mismatch", confirmed: bool, appleMs: number|null, mbMs: number|null } }
 const DUR_CHECK = (() => { try { return JSON.parse(localStorage.getItem(DUR_CHECK_KEY) || "null") || {}; } catch(e) { return {}; } })();
 const saveDurCheck = () => { try { localStorage.setItem(DUR_CHECK_KEY, JSON.stringify(DUR_CHECK)); } catch(e) {} };
@@ -52,6 +78,7 @@ function healthChecks(list = BY_PLAYLIST){
   const sugs = list.filter(t => t.m && t.m.ty && t.m.ty !== "album" && ASING[singleKey(t)] && ASING[singleKey(t)].album && !ASING_IGN.has(singleKey(t)));   // sugestão da Apple: não pesa na nota
   const altList = altAlbums(list), sameDay = sameDayAlbums(list), review = list.filter(t => t.dfix);   // dfix: data corrigida pelo site, à espera de conferência manual
   const spell = artistSpellings(list), ai = ALBUM_INFO, autoG = ai.groups.filter(g => !g.confirmed);
+  const nmIssues = albumNameIssues(list);
   const mk = (k, count, frac, level, extra) => ({k, count, frac, level: count ? level : "ok", w: HEALTH_W[k], ...extra});
   const items = [
     mk("a", noData.length, noData.length / N, "warn", {tracks: noData}),
@@ -68,6 +95,7 @@ function healthChecks(list = BY_PLAYLIST){
     mk("dc", sameDay.length, sameDay.filter(x => x.apple || ADATES[x.k] !== undefined).reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: sameDay}),   // pesa depois da checagem automática da Apple, até a pessoa responder
     mk("dr", review.length, review.length / N, "warn", {tracks: review}),
     mk("an", altList.length, 0, "help", {albums: altList}),   // sugestão opcional: não pesa na nota
+    mk("nm", nmIssues.length, 0, "help", {albums: nmIssues}),   // sugestão opcional: não pesa na nota
     mk("h", spell.length, Math.min(1, spell.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {groups: spell})
   ];
   for (const it of items) it.penalty = it.count ? Math.min(it.w, it.w * Math.min(1, it.frac / FULL_AT)) : 0;
@@ -94,6 +122,7 @@ const META = {
   dc: {t: "Álbuns próximos do mesmo artista", ok: "Nenhum álbum do mesmo artista lançado tão perto de outro.", d: n => `${plural(n, "álbum saiu", "álbuns saíram")} no mesmo ano ou a menos de 2 meses de outro álbum do mesmo artista. A Apple confere sozinha, mas se a suspeita continuar isso pesa na nota até você responder (está certo, editar a data ou reavaliar).`, act: "near"},
   dr: {t: "Datas para conferir à mão", ok: "Nenhuma data pendente de conferência.", d: n => `${plural(n, "faixa tem", "faixas têm")} uma data que o site montou (ano do Spotify com dia e mês da Apple) porque a Apple não confirmou. Confira em Editar: pesa na nota até você ajustar.`, act: "list"},
   an: {t: "Álbuns em versão alternativa", ok: "Nenhum álbum em edição alternativa.", d: (n, it) => { const sg = it.albums.filter(x => NORM[x.k] && NORM[x.k].name).length; return `${plural(n, "álbum é uma edição alternativa", "álbuns são edições alternativas")} (deluxe, remaster, expanded…). O site procura a versão normal sozinho (Apple e MusicBrainz, sem gastar o Spotify)${sg ? `, e ${plural(sg, "tem", "têm")} a versão normal disponível` : ""}. Trocar é opcional: não pesa na nota.`; }, act: "alt"},
+  nm: {t: "Nomes com sufixo de edição", ok: "Nenhum nome de álbum com sufixo de edição.", d: n => `${plural(n, "álbum tem", "álbuns têm")} sufixo de edição no nome (Remastered, Deluxe…). Limpar o nome é opcional e não pesa na nota.`, act: "nm"},
   h: {t: "Grafias parecidas do mesmo artista", ok: "Nenhum artista escrito de duas formas.", d: n => `${plural(n, "artista aparece", "artistas aparecem")} escrito de mais de um jeito. Se for a mesma banda, junte os nomes.`, act: "spell"}
 };
 const LEVEL = {ok: "ok", warn: "atenção", help: "ajuda"};
@@ -508,6 +537,64 @@ function openDurReview(tracks) {
   });
 }
 
+const IC_CHECK = '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.5 3.5 6.5-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+const IC_PEN   = '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3 13 5.5 6 12.5 3 13l.5-3Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+
+function openAlbumNameClean(issues){
+  let list = [...issues];
+  const body = document.createElement("div");
+
+  const renderRows = () => {
+    body.innerHTML = `<div class="confirm"><p>Estes álbuns têm sufixo de edição no nome. Você escolhe o que fazer com cada um — <strong>não pesa na nota</strong>.</p>
+      <div class="du-rows">${list.map(x => `<div class="alb-row" data-raw="${esc(x.rawName)}">
+        <div class="alb-main">
+          <strong>${esc(x.rawName)}</strong><br>
+          <span class="muted" style="font-size:12px">→ <strong style="color:var(--ink-2)">${esc(x.cleanName)}</strong> · ${faixas(x.tracks.length)}</span>
+        </div>
+        <div class="alb-btns">
+          <button class="gbtn nm-red"  type="button" data-ign="${esc(x.rawName)}"    title="Ignorar sugestão">${ICON.x} Ignorar</button>
+          <button class="gbtn nm-amb"  type="button" data-manual="${esc(x.rawName)}" title="Editar manualmente">${IC_PEN} Renomear</button>
+          <button class="pbtn nm-ok"   type="button" data-ok="${esc(x.rawName)}"     title="Aceitar nome sugerido">${IC_CHECK} Confirmar</button>
+        </div>
+      </div>`).join("")}</div></div>`;
+  };
+
+  renderRows();
+  const md = openModal({title: "Nomes com sufixo de edição", sub: "Opcional · não pesa na nota", body, size: "lg"});
+
+  body.addEventListener("click", async e => {
+    const ign = e.target.closest("[data-ign]"), manual = e.target.closest("[data-manual]"), ok = e.target.closest("[data-ok]");
+    if (ign){
+      ALBUM_NAME_IGN.add(ign.dataset.ign);
+      saveAlbumNameIgn();
+      list = list.filter(x => x.rawName !== ign.dataset.ign);
+      if (!list.length){ md.close(); return; }
+      renderRows();
+    } else if (ok){
+      const x = list.find(i => i.rawName === ok.dataset.ok); if (!x) return;
+      ssSet("health", "1");
+      commitRows(currentRows().map(r => { const t = BY_PLAYLIST.find(b => b.n === r[0]); return t && t.albumRaw === x.rawName ? [r[0], r[1], r[2], x.cleanName, r[4], r[5], ...(r[6] ? [r[6]] : [])] : r; }), `Álbum limpo: "${x.rawName}" → "${x.cleanName}"`);
+    } else if (manual){
+      const x = list.find(i => i.rawName === manual.dataset.manual); if (!x) return;
+      const inp = document.createElement("div");
+      inp.innerHTML = `<div class="confirm"><p class="muted">Nome atual: <strong>${esc(x.rawName)}</strong></p><label class="sd-f"><span>Novo nome</span><input type="text" id="nm-inp" value="${esc(x.cleanName)}" autocomplete="off" style="width:100%"></label><p class="err" id="nm-err" hidden></p></div>`;
+      const foot2 = document.createElement("div"); foot2.className = "mfrow";
+      foot2.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-save>Renomear</button>`;
+      const sm = openModal({title: "Renomear álbum", body: inp, foot: foot2, size: "sm"});
+      foot2.querySelector("[data-c]").onclick = sm.close;
+      foot2.querySelector("[data-save]").onclick = () => {
+        const newName = inp.querySelector("#nm-inp").value.trim();
+        const errEl = inp.querySelector("#nm-err");
+        if (!newName || newName === x.rawName){ errEl.hidden = false; errEl.textContent = !newName ? "Digite um nome." : "O nome é igual ao atual."; return; }
+        sm.close();
+        ssSet("health", "1");
+        commitRows(currentRows().map(r => { const t = BY_PLAYLIST.find(b => b.n === r[0]); return t && t.albumRaw === x.rawName ? [r[0], r[1], r[2], newName, r[4], r[5], ...(r[6] ? [r[6]] : [])] : r; }), `Álbum renomeado: "${x.rawName}" → "${newName}"`);
+      };
+      setTimeout(() => inp.querySelector("#nm-inp")?.focus(), 60);
+    }
+  });
+}
+
 function openHealth(){
   const H = healthChecks(), bad = H.items.filter(i => i.count && i.w);
   const body = document.createElement("div"); body.className = "sd";
@@ -524,6 +611,7 @@ function openHealth(){
     const btn = m.act === "upd" ? `<button class="gbtn" type="button" data-act="upd">Atualizar dados</button>`
       : m.act === "covers" ? `<button class="gbtn" type="button" data-act="dups" data-o="covers">Revisar covers</button>`
       : m.act === "adoubt" ? `<button class="gbtn" type="button" data-act="dups" data-o="adoubt">Revisar álbuns</button>`
+      : m.act === "nm" ? `<button class="gbtn" type="button" data-act="nm">Revisar nomes (${nf(it.count)})</button>`
       : m.act === "alt" ? (() => { const sg = it.albums.filter(x => NORM[x.k] && NORM[x.k].name).length, sp = it.albums.filter(x => NORM[x.k] && !NORM[x.k].name && (NORM[x.k].tried || []).includes("auto2") && !(NORM[x.k].tried || []).includes("spotify")).length; return `${sg ? `<button class="gbtn" type="button" data-act="alt-sug">Ver sugestões (${nf(sg)})</button>` : ""}${sp ? `<button class="gbtn" type="button" data-act="alt-spot">Procurar também no Spotify (${nf(sp)})</button>` : ""}`; })()
       : m.act === "near" ? `<button class="gbtn" type="button" data-act="near">Responder (${nf(it.count)})</button><button class="gbtn" type="button" data-act="reeval">Reavaliar datas</button>`
       : m.act === "singles" ? `<button class="gbtn" type="button" data-act="singles">Ver sugestões (${nf(it.count)})</button>`
@@ -551,6 +639,7 @@ function openHealth(){
     else if (a === "fix"){ md.close(); openFixOrder(); }
     else if (a === "rev"){ md.close(); askReverse(); }
     else if (a === "list"){ const it = by(b.dataset.k); list(META[it.k].t, it.tracks, `${faixas(it.tracks.length)} · “—” é o que está em branco`); }
+    else if (a === "nm"){ md.close(); openAlbumNameClean(by("nm").albums); }
     else if (a === "alt-sug"){ md.close(); openAltSuggestions(by("an").albums.filter(x => NORM[x.k] && NORM[x.k].name)); }
     else if (a === "alt-spot"){ md.close(); openAltSpotify(by("an").albums.filter(x => NORM[x.k] && !NORM[x.k].name && (NORM[x.k].tried || []).includes("auto2") && !(NORM[x.k].tried || []).includes("spotify"))); }
     else if (a === "near"){ md.close(); openNear(by("dc").albums); }
