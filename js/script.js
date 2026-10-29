@@ -982,6 +982,7 @@ function renderTree(){
   }
   const ttl = $("#tree-title"); if (ttl) ttl.textContent = byAlbum ? "Músicas por álbum" : "Músicas por banda/artista";
   document.querySelectorAll("#tree-mode button").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.m === "albuns") === byAlbum)));
+  treeEl.classList.toggle("byalbum", byAlbum);
   const base = byAlbum ? rows(true, false) : rows(false, true);   // o filtro do próprio tipo de quadrado não esconde os outros quadrados
   const g = groupBy(base, keyName);
   const items = [...g].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
@@ -1005,7 +1006,8 @@ function renderTree(){
     const pad = padOf(w, h);
     for (const s of sizesOf(w, h)){
       const roomForLine = h - 2 * pad - Math.max(FONT_MIN, s - 2) * 1.2 - 4 >= s * 1.05;   // one name line above the count
-      if (w - 2 * pad > 0 && roomForLine && fitsOneLine(name, s, "Sora, sans-serif", 600, w - 2 * pad, "-.01em")) return s;
+      if (w - 2 * pad <= 0 || !roomForLine) continue;
+      if (byAlbum ? fitsAt(name, s, "Sora, sans-serif", 600, w - 2 * pad, 2, "-.01em") : fitsOneLine(name, s, "Sora, sans-serif", 600, w - 2 * pad, "-.01em")) return s;
     }
     return 0;
   };
