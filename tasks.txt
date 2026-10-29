@@ -191,10 +191,10 @@ possibilidade de trocar a cor do site e quais tabelas mostrar e em quais posiç�
 
 **Site / Playlists**
 
-* os dois masters são albuns diferentes mas o site não diferenciou
+* os dois masters são albuns diferentes mas o site não diferenciou ✅
 
 
-* Buscar uma forma de fazer uma distinção melhor dos gêneros por exemplo thrash metal, nu metal, groove metal, power metal etc
+* Buscar uma forma de fazer uma distinção melhor dos gêneros por exemplo thrash metal, nu metal, groove metal, power metal etc ✅
 * Separar a ferramenta em playlists premium e playlists básica
 * Abrir a tela de músicas da ctrl A ctrl C tem que gerar um texto válido que o site leia no upload
 

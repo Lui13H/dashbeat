@@ -1984,7 +1984,8 @@ const evoName = k => evo.mode === "genre" ? capFirst(k) : k;
 function evoBuild(R){
   const sorted = [...R].sort((a, b) => a.n - b.n), idx = new Map();
   sorted.forEach((t, i) => {
-    const keys = evo.mode === "band" ? (t.artist === NI ? [] : (splitArtistsRaw(t.artist).length ? splitArtistsRaw(t.artist) : [t.artist])) : (t.ge || []);
+    const rawKeys = evo.mode === "band" ? (t.artist === NI ? [] : (splitArtistsRaw(t.artist).length ? splitArtistsRaw(t.artist) : [t.artist])) : (t.ge || []);
+    const keys = evo.mode === "genre" ? [...new Set(rawKeys.map(g => genreToRoot(g) || g))] : rawKeys;
     for (const k of keys) (idx.get(k) || idx.set(k, []).get(k)).push(i);
   });
   evo.R = sorted; evo.N = sorted.length;
@@ -2106,32 +2107,63 @@ function drawEvo(){
      prioridade ao de maior contagem (fica mais perto do ponto); 2+ colisões truncam para 5 chars */
   const CH = 7.5, LBL_GAP = 4, baseX = X(N - 1) + 9;
   const maxCh = Math.max(1, Math.floor((Rm - 16) / CH));
+  const wrapLbl = nm => {
+    if (nm.length <= maxCh) return [nm];
+    const words = nm.split(/\s+/); let cur = "";
+    const lines = [];
+    for (const w of words) {
+      const next = cur ? cur + " " + w : w;
+      if (next.length <= maxCh) { cur = next; }
+      else { if (cur) lines.push(cur); cur = w.length > maxCh ? w.slice(0, maxCh - 1) + "…" : w; if (lines.length) break; }
+    }
+    if (cur) lines.push(cur.length > maxCh ? cur.slice(0, maxCh - 1) + "…" : cur);
+    return lines.slice(0, 2);
+  };
   const ends = shown.map((k, j) => {
     const nm = String(evoName(k)).trim(), first = nm.split(/\s+/)[0] || nm;
     let txt = first.length > maxCh ? first.slice(0, Math.max(1, maxCh - 1)) + "…" : first;
     const count = cum[j][N - 1];
-    return {txt, rawY: Y(count), col: evoCol(evo.slot[evo.mode].get(k)), count};
+    return {txt, nm, rawY: Y(count), col: evoCol(evo.slot[evo.mode].get(k)), count};
   });
   ends.sort((a, b) => a.rawY - b.rawY);
+  // bandas/gêneros com só 1 faixa não recebem rótulo (evita poluição quando há muitos selecionados)
+  const endsVis = ends.filter(e => e.count > 1);
   // agrupar por proximidade vertical (≤ 12px)
   const grps = [];
-  for (const e of ends) {
+  for (const e of endsVis) {
     const g = grps[grps.length - 1];
     if (g && e.rawY - g[g.length - 1].rawY <= 12) g.push(e);
     else grps.push([e]);
   }
   for (const g of grps) {
     g.sort((a, b) => b.count - a.count);   // maior count = mais perto do ponto
-    const trunc = g.length >= 2;
-    const anchorY = g[0].rawY;
-    let x = baseX;
-    for (const e of g) {
-      e.lbl = trunc ? e.txt.slice(0, 5) : e.txt;
-      e.finalX = x; e.finalY = anchorY;
-      x += e.lbl.length * CH + LBL_GAP;
+    if (g.length === 1) {
+      const nm = g[0].nm, first = nm.split(/\s+/)[0] || nm;
+      const compoundLimit = 12;   // nomes compostos acima deste tamanho usam só a primeira palavra
+      const fits = nm.includes(" ") ? nm.length <= compoundLimit : nm.length <= maxCh;
+      const lbl = fits ? nm : (first.length > maxCh ? first.slice(0, maxCh - 1) + "…" : first);
+      g[0].lines = [lbl];
+      g[0].finalX = baseX; g[0].finalY = g[0].rawY;
+    } else {
+      // flui horizontalmente dentro de Rm; quando passa da borda, quebra para a linha abaixo
+      const maxX = W - 4, ROW_H = 13;
+      const anchorY = g[0].rawY;
+      let cx = baseX, row = 0;
+      for (const e of g) {
+        e.lbl = e.txt.slice(0, 5);
+        const lblW = e.lbl.length * CH + LBL_GAP;
+        if (cx + lblW > maxX && cx > baseX) { cx = baseX; row++; }
+        e.finalX = cx; e.finalY = anchorY + row * ROW_H;
+        cx += lblW;
+      }
     }
   }
-  ends.forEach(e => { svg += `<text class="evo-end" x="${(e.finalX ?? baseX).toFixed(1)}" y="${((e.finalY ?? e.rawY) + 4).toFixed(1)}" style="fill:${e.col}">${esc(e.lbl ?? e.txt)}</text>`; });
+  endsVis.forEach(e => {
+    const x = (e.finalX ?? baseX).toFixed(1), y = ((e.finalY ?? e.rawY) + 4).toFixed(1);
+    const lines = e.lines ?? [e.lbl ?? e.txt];
+    if (lines.length === 1) { svg += `<text class="evo-end" x="${x}" y="${y}" style="fill:${e.col}">${esc(lines[0])}</text>`; }
+    else { svg += `<text class="evo-end" x="${x}" y="${y}" style="fill:${e.col}"><tspan x="${x}" dy="0">${esc(lines[0])}</tspan><tspan x="${x}" dy="13">${esc(lines[1])}</tspan></text>`; }
+  });
   svg += `<g id="evo-hot" style="display:none"><line y1="${Tp}" y2="${H - Bt}" stroke="rgba(240,253,247,.35)" stroke-dasharray="3 3"/>${cum.map((a, j) => `<circle r="4.5" fill="${evoCol(evo.slot[evo.mode].get(shown[j]))}" stroke="#071a14" stroke-width="2"/>`).join("")}</g>`;
   svg += `<rect id="evo-hit" x="${L}" y="0" width="${W - L - Rm}" height="${H - Bt}" fill="transparent"/></svg>`;
   box.innerHTML = svg;
