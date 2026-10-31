@@ -1,4 +1,4 @@
-const DEFAULT_RAW = [[1,"One","Metallica","...And Justice for All",447,"1988-08-25"],[2,"For Whom The Bell Tolls - Remastered","Metallica","Ride the Lightning",309,"1984-07-27"],[3,"Master Of Puppets","Metallica","Master of Puppets",515,"1986-03-03"],[4,"Sad But True","Metallica","Metallica",323,"1991-08-12"],[5,"Wherever I May Roam","Metallica","Metallica",403,"1991-08-12"],[6,"Enter Sandman","Metallica","Metallica",331,"1991-08-12"],[7,"The Unforgiven","Metallica","Metallica",386,"1991-08-12"],[8,"Battery","Metallica","Master of Puppets",312,"1986-03-03"],[9,"Welcome Home (Sanitarium)","Metallica","Master of Puppets",387,"1986-03-03"],[10,"Fade To Black - Remastered","Metallica","Ride the Lightning",417,"1984-07-27"],[11,"Blackened","Metallica","...And Justice for All",400,"1988-08-25"],[12,"The Shortest Straw","Metallica","...And Justice for All",395,"1988-08-25"],[13,"All Nightmare Long","Metallica","Death Magnetic",477,"2008-01-01"],[14,"Don't Tread On Me","Metallica","Metallica",240,"1991-08-12"],[15,"The Thing That Should Not Be","Metallica","Master of Puppets",396,"1986-03-03"],[16,"Murder One","Metallica","Hardwired... to Self-Destruct",345,"2016-11-18"],[17,"...And Justice For All","Metallica","...And Justice for All",586,"1988-08-25"],[18,"Eye Of The Beholder","Metallica","...And Justice for All",390,"1988-08-25"],[19,"Sarcastrophe","Slipknot",".5: The Gray Chapter",306,"2014-10-15"],[20,"A.V.I.","Slipknot",".5: The Gray Chapter",332,"2014-10-15"],[21,"The Devil in I","Slipknot",".5: The Gray Chapter",342,"2014-10-15"],[22,"Lech","Slipknot",".5: The Gray Chapter",290,"2014-10-15"],[23,"The Negative One","Slipknot",".5: The Gray Chapter",325,"2014-10-15"],[24,"All Out Life","Slipknot","All Out Life",340,"2018-10-31"],[25,"People = Shit","Slipknot","Iowa",215,"2001-01-01"],[26,"Disasterpiece","Slipknot","Iowa",308,"2001-01-01"],[27,"Everything Ends","Slipknot","Iowa",254,"2001-01-01"],[28,"The Heretic Anthem","Slipknot","Iowa",254,"2001-01-01"],[29,"Left Behind","Slipknot","Iowa",241,"2001-01-01"],[30,"Spit It Out - Hyper Version","Slipknot","Antennas to Hell",144,"2009-09-09"],[31,"The Blister Exists","Slipknot","Vol. 3: (The Subliminal Verses)",319,"2004-01-01"],[32,"Three Nil","Slipknot","Vol. 3: (The Subliminal Verses)",288,"2004-01-01"],[33,"Duality","Slipknot","Vol. 3: (The Subliminal Verses)",252,"2004-01-01"],[34,"Before I Forget","Slipknot","Vol. 3: (The Subliminal Verses)",278,"2004-01-01"],[35,"Scream","Slipknot","Vol. 3: (The Subliminal Verses)",271,"2004-01-01"],[36,"Unsainted","Slipknot","We Are Not Your Kind",260,"2019-08-09"],[37,"Birth Of The Cruel","Slipknot","We Are Not Your Kind",275,"2019-08-09"],[38,"Nero Forte","Slipknot","We Are Not Your Kind",315,"2019-08-09"],[39,"Critical Darling","Slipknot","We Are Not Your Kind",385,"2019-08-09"],[40,"Red Flag","Slipknot","We Are Not Your Kind",251,"2019-08-09"],[41,"Orphan","Slipknot","We Are Not Your Kind",361,"2019-08-09"],[42,"Solway Firth","Slipknot","We Are Not Your Kind",355,"2019-08-09"],[43,"B.Y.O.B.","System Of A Down","Mezmerize",255,"2005-05-17"],[44,"I-E-A-I-A-I-O","System Of A Down","Steal This Album!",188,"2002-11-26"],[45,"Sugar","System Of A Down","System Of A Down",153,"1998-01-01"],[46,"Spiders","System Of A Down","System Of A Down",215,"1998-01-01"],[47,"Toxicity","System Of A Down","Toxicity",218,"2001-09-04"],[48,"Aerials","System Of A Down","Toxicity",235,"2001-09-04"],[49,"Walk","Pantera","Vulgar Display of Power",315,"1992-01-01"],[50,"We’ll Be Back","Megadeth","The Sick, the Dying... and the Dead!",269,"2022-09-02"],[51,"The Trooper - 2015 Remaster","Iron Maiden","Piece of Mind",252,"1983-01-01"],[52,"Nightmare","Avenged Sevenfold","Nightmare",374,"2010-07-25"],[53,"Buried Alive","Avenged Sevenfold","Nightmare",404,"2010-07-25"],[54,"Walk","Avenged Sevenfold","Diamonds in the Rough",321,"2007-07-10"],[55,"This Means War","Avenged Sevenfold","Hail to the King",369,"2013-08-20"],[56,"Hail to the King","Avenged Sevenfold","Hail to the King",305,"2013-08-20"],[57,"Roots Bloody Roots","Sepultura","Roots",212,"1996-02-20"],[58,"Refuse / Resist","Sepultura","Chaos A.D.",199,"1993-09-02"],[59,"Ratamahatta","Sepultura","Roots",270,"1996-02-20"],[60,"The Number of the Beast - 2015 Remaster","Iron Maiden","The Number of the Beast",290,"1982-01-01"],[61,"2 Minutes to Midnight - 2015 Remaster","Iron Maiden","Powerslave",363,"1984-01-01"],[62,"Teutonic Terror","Accept","Blood of the Nations",313,"2010-08-20"],[63,"Delusions of Saviour","Slayer","Repentless",115,"2015-09-11"],[64,"Painkiller","Judas Priest","Painkiller",365,"1990-09-26"],[65,"Territory","Sepultura","Chaos A.D.",287,"1993-09-02"],[66,"The Beautiful People","Marilyn Manson","Antichrist Superstar",218,"1996-01-01"],[67,"Just One Fix","Sepultura","Kairos",211,"2011-06-24"],[68,"Breed Apart","Sepultura","Roots",241,"1996-02-20"],[69,"Skeletons Of Society","Slayer","Seasons in the Abyss",280,"1990-10-09"],[70,"Memento Mori","Lamb of God","Omens",348,"2020-06-19"],[71,"Voice of the Soul","Death","The Sound of Perseverance",223,"1998-01-01"],[72,"Suite-Pee","System Of A Down","System Of A Down",151,"1998-01-01"],[73,"Pulse of the Maggots","Slipknot","Vol. 3: (The Subliminal Verses)",259,"2004-01-01"],[74,"Bounce","System Of A Down","Toxicity",114,"2001-09-04"],[75,"Custer","Slipknot",".5: The Gray Chapter",254,"2014-10-15"],[76,"Purity","Slipknot","Slipknot",265,"2009-09-09"],[77,"All Hope Is Gone","Slipknot","All Hope Is Gone",284,"2008-08-22"],[78,"Interloper - Demo","Slipknot","Slipknot (10th Anniversary Edition)",139,"2009-09-09"],[79,"Vermilion","Slipknot","Vol. 3: (The Subliminal Verses)",316,"2004-01-01"],[80,"Hive Mind","Slipknot","The End, So Far",315,"2022-09-30"],[81,"Falling Away from Me","Korn","Issues",270,"1999-11-09"],[82,"Got the Life","Korn","Follow the Leader",225,"1998-08-18"],[83,"Warranty","Slipknot","The End, So Far",231,"2022-09-30"],[84,"Spectrum","Sepultura","Kairos",241,"2011-06-24"],[85,"Orgasmatron","Sepultura","Arise (Remastered)",254,"1991-03-20"],[86,"Arise","Sepultura","Arise",198,"1991-03-20"],[87,"Kairos","Sepultura","Kairos",215,"2011-06-24"],[88,"Born Strong","Sepultura","Kairos",278,"2011-06-24"],[89,"Structure Violence Azzes","Sepultura","Kairos",337,"2011-06-24"],[90,"Machine Messiah","Sepultura","Machine Messiah",354,"2017-01-13"],[91,"Fear of the Dark - 2015 Remaster","Iron Maiden","Fear of the Dark",438,"1992-01-01"],[92,"Spit","Sepultura","Roots",165,"1996-02-20"],[93,"Dictatorshit","Sepultura","Roots",84,"1996-02-20"],[94,"Carry On","Avenged Sevenfold","Black Ops II (Soundtrack)",255,"2012-09-24"],[95,"Diluted","Slipknot","Slipknot",203,"1999-01-01"],[96,"Liberate","Slipknot","Slipknot",184,"1999-01-01"],[97,"Aces High - 2015 Remaster","Iron Maiden","Powerslave",271,"1984-01-01"],[98,"Alexander the Great (356-323 B.C.) - 2015 Remaster","Iron Maiden","Somewhere in Time",517,"1986-01-01"],[99,"Children of the Damned - 2015 Remaster","Iron Maiden","The Number of the Beast",275,"1982-01-01"],[100,"Rime of the Ancient Mariner - 2015 Remaster","Iron Maiden","Powerslave",818,"1984-01-01"],[101,"The Evil That Men Do - 2015 Remaster","Iron Maiden","Seventh Son of a Seventh Son",274,"1988-01-01"],[102,"Opium of the People","Slipknot","Vol. 3: (The Subliminal Verses)",192,"2004-01-01"],[103,"Dusted","Sepultura","Roots",243,"1996-02-20"],[104,"The Clairvoyant - 2015 Remaster","Iron Maiden","Seventh Son of a Seventh Son",267,"1988-01-01"],[105,"Hallowed Be Thy Name - 2015 Remaster","Iron Maiden","The Number of the Beast",431,"1982-01-01"],[106,"Tornado Of Souls - 2004 Remix","Megadeth","Rust in Peace",319,"1990-10-04"],[107,"Silent Scream","Slayer","South of Heaven",186,"1988-01-01"],[108,"Spit Out The Bone","Metallica","Hardwired... to Self-Destruct",429,"2016-11-18"],[109,"Hangar 18 - 2004 Remix","Megadeth","Rust in Peace",311,"1990-10-04"],[110,"Surfacing","Slipknot","Slipknot",218,"1999-01-01"],[111,"No Life","Slipknot","Slipknot",167,"1999-01-01"],[112,"Inherit the Earth","Burn The Priest","Burn the Priest",209,"2018-05-18"],[113,"Honey Bucket","Burn The Priest","Burn the Priest",163,"2018-05-18"],[114,"Jesus Built My Hotrod","Burn The Priest","Burn the Priest",373,"2018-05-18"],[115,"We Gotta Know","Burn The Priest","Burn the Priest",207,"2018-05-18"],[116,"Laid to Rest","Lamb of God","Ashes of the Wake",230,"2004-08-26"],[117,"Kerosene","Burn The Priest","Burn the Priest",372,"2018-05-18"],[118,"Sphinx","Gojira","Fortitude",240,"2021-04-30"],[119,"Filth Upon Filth","Soulfly","Totem",173,"2022-08-05"],[120,"Flying Whales","Gojira","From Mars to Sirius",464,"2005-09-27"],[121,"If You Want Peace... Prepare For War","Children Of Bodom","Are You Dead Yet?",237,"2005-01-01"],[122,"Bastards Of Bodom","Children Of Bodom","Are You Dead Yet?",207,"2005-01-01"],[123,"Needled 24 / 7","Children Of Bodom","Hate Crew Deathroll",248,"2004-01-01"],[124,"Under Grass and Clover","Children Of Bodom","Hexed",213,"2019-03-08"],[125,"The Nameless","Slipknot","Vol. 3: (The Subliminal Verses)",268,"2004-01-01"],[126,"Gematria (The Killing Name)","Slipknot","All Hope Is Gone",361,"2008-08-22"],[127,"Sulfur","Slipknot","All Hope Is Gone",277,"2008-08-22"],[128,"Vendetta","Slipknot","All Hope Is Gone",315,"2008-08-22"],[129,"This Cold Black","Slipknot","All Hope Is Gone",280,"2008-08-22"],[130,"Psychosocial","Slipknot","All Hope Is Gone",283,"2008-08-22"],[131,"Unstable","Adema","Unstable",192,"2003-06-11"],[132,"Hallowed Be Thy Name","Machine Head","The Blackening",447,"2007-03-27"],[133,"Animal I Have Become","Three Days Grace","One-X",231,"2006-06-25"],[134,"Nomad","Sepultura","Chaos A.D.",299,"1993-09-02"],[135,"Freak On a Leash","Korn","Follow the Leader",255,"1998-08-18"],[136,"512","Lamb of God","VII: Sturm und Drang",284,"2015-07-24"],[137,"Altered State","Sepultura","Arise",394,"1991-03-20"],[138,"Harvester Of Sorrow","Metallica","...And Justice for All",345,"1988-08-25"],[139,"Under the Waste Command","Municipal Waste","Slime and Punishment",110,"2017-06-23"],[140,"Thrasher's Abattoir","Carcass","Surgical Steel",110,"2013-09-13"],[141,"Blind","Korn","Korn",258,"1994-10-11"],[142,"Snuff","Slipknot","All Hope Is Gone",276,"2008-08-22"],[143,"Halo","Machine Head","The Blackening",543,"2007-03-27"],[144,"Amazonia","Gojira","Fortitude",300,"2021-04-30"],[145,"1985","Carcass","Surgical Steel",75,"2013-09-13"],[146,"Let Go","Illdisposed","The Prestige",68,"2008-03-28"],[147,"The Heaviest Matter of the Universe","Gojira","From Mars to Sirius",237,"2005-09-27"],[148,"(sic)","Slipknot","Slipknot",199,"1999-01-01"],[149,"Eyeless","Slipknot","Slipknot",236,"1999-01-01"],[150,"Wait and Bleed","Slipknot","Slipknot",147,"1999-01-01"],[151,"Silvera","Gojira","Magma",212,"2016-06-17"],[152,"L'enfant sauvage","Gojira","L'Enfant Sauvage",257,"2012-06-26"],[153,"Born in Winter","Gojira","L'Enfant Sauvage",231,"2012-06-26"],[154,"Another World","Gojira","Another World",264,"2021-04-30"],[155,"Oroborus","Gojira","The Way of All Flesh",321,"2008-10-06"],[156,"Born For One Thing","Gojira","Fortitude",260,"2021-04-30"],[157,"Holy Wars...The Punishment Due - 2004 Remix","Megadeth","Rust in Peace",392,"1990-10-04"],[158,"Not Ready to Die - From \"Call of the Dead\"","Avenged Sevenfold","Not Ready to Die",425,"2011-05-02"],[159,"Bloodline","Slayer","God Hates Us All",216,"2001-01-01"],[160,"Born Stubborn","Sepultura","Roots",247,"1996-02-20"],[161,"Losfer Words (Big 'Orra) - 2015 Remaster","Iron Maiden","Powerslave",255,"1984-01-01"],[162,"The Shooting Star","Gojira","Magma",342,"2016-06-17"],[163,"Prison Song","System Of A Down","Toxicity",201,"2001-09-04"],[164,"Cowboys from Hell","Pantera","Cowboys from Hell",243,"1990-07-20"],[165,"Nookie","Limp Bizkit","Significant Other",289,"1999-01-01"],[166,"Vandals Nest","Sepultura","Machine Messiah",167,"2017-01-13"],[167,"Redneck","Lamb of God","Sacrament",220,"2006-08-22"],[168,"Zero Tolerance","Death","Symbolic",288,"1995-03-19"],[169,"Biotech Is Godzilla","Sepultura","Chaos A.D.",112,"1993-09-02"],[170,"This Love","Pantera","Vulgar Display of Power",393,"1992-01-01"],[171,"Sympathy","Pissing Razors","Where Death Lives",203,"1999-04-20"],[172,"Domination","Pantera","Cowboys from Hell",305,"1990-07-20"],[173,"Axis Rot","Burn The Priest","Burn the Priest",184,"2018-05-18"],[174,"Mouth for War","Pantera","Vulgar Display of Power",237,"1992-01-01"],[175,"Sun Doesn't Rise","Mushroomhead","XIII",193,"2003-01-01"],[176,"Straighthate","Sepultura","Roots",321,"1996-02-20"],[177,"The Day That Never Comes","Metallica","Death Magnetic",476,"2008-01-01"],[178,"Shepherd of Fire","Avenged Sevenfold","Hail to the King",323,"2013-08-20"],[179,"Creeping Death - Remastered","Metallica","Ride the Lightning",395,"1984-07-27"],[180,"Dystopia","Megadeth","Dystopia",299,"2016-01-22"],[181,"Down for Life","Testament","The Gathering",203,"1999-06-08"],[182,"Repentless","Slayer","Repentless",199,"2015-09-11"],[183,"Dead Embryonic Cells","Sepultura","Arise",292,"1991-03-20"],[184,"Dig","Mudvayne","L.D. 50",162,"2000-08-13"],[185,"Orion","Metallica","Master of Puppets",507,"1986-03-03"],[186,"Disposable Heroes","Metallica","Master of Puppets",496,"1986-03-03"],[187,"Ride The Lightning - Remastered","Metallica","Ride the Lightning",396,"1984-07-27"],[188,"Welcome","Slipknot","Vol. 3: (The Subliminal Verses)",195,"2004-01-01"],[189,"Slaughtered","Pantera","Far Beyond Driven",237,"1994-01-01"],[190,"Blacklist","Exodus","Tempo of the Damned",376,"2004-02-02"],[191,"I'm Broken","Pantera","Far Beyond Driven",264,"1994-01-01"],[192,"Brotherhood of the Snake","Testament","Brotherhood of the Snake",253,"2016-10-28"],[193,"Get This","Slipknot","Slipknot",123,"2009-09-09"],[194,"Ten Ton Hammer","Machine Head","The More Things Change...",254,"1997-01-01"],[195,"A New Level - 2012 Remaster","Pantera","Vulgar Display of Power",237,"1992-01-01"],[196,"Backbone","Gojira","From Mars to Sirius",258,"2005-09-27"],[197,"Descending","Lamb of God","Sacrament",215,"2006-08-22"],[198,"The Pale King","Testament","Brotherhood of the Snake",291,"2016-10-28"],[199,"Hourglass","Lamb of God","Ashes of the Wake",240,"2004-08-26"],[200,"Bat Country","Avenged Sevenfold","City of Evil",311,"2005-06-06"],[201,"Forget to Remember - From Saw II - Original Soundtrack","Mudvayne","Lost and Found",215,"2005-01-01"],[202,"Strife","Trivium","Vengeance Falls",269,"2013-10-08"],[203,"Caught Somewhere in Time - 2015 Remaster","Iron Maiden","Somewhere in Time",447,"1986-01-01"],[204,"Stranger in a Strange Land - 2015 Remaster","Iron Maiden","Somewhere in Time",346,"1986-01-01"],[205,"Given Up","Linkin Park","Minutes to Midnight",189,"2007-05-14"],[206,"Symbolic","Death","Symbolic",392,"1995-03-19"],[207,"Spirit Crusher","Death","The Sound of Perseverance",407,"1998-01-01"],[208,"Flesh and the Power It Holds","Death","The Sound of Perseverance",506,"1998-01-01"],[209,"Lack of Comprehension","Death","Human",223,"2011-06-21"],[210,"Trapped In A Corner","Death","Individual Thought Patterns",254,"2011-10-25"],[211,"Crystal Mountain","Death","Symbolic",307,"1995-03-19"],[212,"Almost Easy","Avenged Sevenfold","Avenged Sevenfold",234,"2007-10-26"],[213,"Fight Fire With Fire - Remastered","Metallica","Ride the Lightning",284,"1984-07-27"],[214,"Walk with Me In Hell","Lamb of God","Sacrament",311,"2006-08-22"],[215,"Dead Memories","Slipknot","All Hope Is Gone",268,"2008-08-22"],[216,"Only One","Slipknot","Slipknot",144,"2009-09-09"],[217,"5 Minutes Alone","Pantera","Far Beyond Driven",347,"1994-01-01"],[218,"Propaganda","Sepultura","Chaos A.D.",213,"1993-09-02"],[219,"Demonic Refusal","Testament","Demonic",321,"1997-06-09"],[220,"Skeptic","Slipknot",".5: The Gray Chapter",286,"2014-10-15"],[221,"Nomadic","Slipknot",".5: The Gray Chapter",258,"2014-10-15"],[222,"Love","Gojira","Terra Incognita",259,"2001-03-19"],[223,"Remembrance","Gojira","The Link",275,"2003-04-18"],[224,"Mouth of Kala","Gojira","L'Enfant Sauvage",351,"2012-06-26"],[225,"The art of dying","Gojira","The Way of All Flesh",594,"2008-10-13"],[226,"My Own Summer (Shove It)","Deftones","Around the Fur",214,"1997-10-27"],[227,"Grace","Lamb of God","Wrath",236,"2009-02-23"],[228,"Be Still and Know","Machine Head","Unto the Locust",343,"2011-09-21"],[229,"Stranded","Gojira","Magma",269,"2016-06-17"],[230,"Davidian","Machine Head","Burn My Eyes",296,"1994-08-08"],[231,"Set To Fail","Lamb of God","Wrath",226,"2009-02-23"],[232,"Amen","Sepultura","Chaos A.D.",267,"1993-09-02"],[233,"Kaiowas","Sepultura","Chaos A.D.",223,"1993-09-02"],[234,"Manifest","Sepultura","Chaos A.D.",289,"1993-09-02"],[235,"Murder","Sepultura","Arise",206,"1991-03-20"],[236,"Under Siege (Regnum Irae)","Sepultura","Arise",294,"1991-03-20"],[237,"Natural Born Killer","Avenged Sevenfold","Nightmare",315,"2010-07-25"],[238,"Contractor","Lamb of God","Wrath",202,"2009-02-23"],[239,"Deathamphetamine","Exodus","Shovel Headed Kill Machine",511,"2005-10-04"],[240,"Empty Words","Death","Symbolic",382,"1995-03-19"],[241,"Funeral Hymn","Exodus","The Atrocity Exhibition... Exhibit A",517,"2007-10-26"],[242,"Salt the Wound","Exodus","Blood In, Blood Out",264,"2014-10-10"],[243,"Riot Act","Exodus","The Atrocity Exhibition... Exhibit A",217,"2007-10-26"],[244,"Persona Non Grata","Exodus","Persona Non Grata",450,"2021-11-19"],[245,"The Beatings Will Continue (Until Morale Improves)","Exodus","Persona Non Grata",181,"2021-11-19"],[246,"Blood in Blood Out","Exodus","Blood In, Blood Out",222,"2014-10-10"],[247,"Save Me","Avenged Sevenfold","Nightmare",656,"2010-07-25"],[248,"Bedlam 1-2-3","Exodus","The Atrocity Exhibition... Exhibit A",479,"2007-10-26"],[249,"Culling the Herd","Exodus","Tempo of the Damned",367,"2004-02-02"],[250,"Impaler","Exodus","Tempo of the Damned",324,"2004-02-02"],[251,"My Last Nerve","Exodus","Blood In, Blood Out",370,"2014-10-10"],[252,"Forward March","Exodus","Tempo of the Damned",458,"2004-02-02"],[253,"War Is My Shepherd","Exodus","Tempo of the Damned",267,"2004-02-02"],[254,"Esoteric Surgery","Gojira","The Way of All Flesh",344,"2008-10-06"],[255,"Scavenger of Human Sorrow","Death","The Sound of Perseverance",416,"1998-01-01"],[256,"Painkiller","Death","The Sound of Perseverance",362,"1998-01-01"],[257,"Food for the Worms","Exodus","Blood In, Blood Out",382,"2014-10-10"],[258,"Psycho Holiday","Pantera","Cowboys from Hell",319,"1990-07-20"],[259,"In Human Form","Death","Individual Thought Patterns",237,"2011-10-25"],[260,"Wrapped in the Arms of Rage","Exodus","Blood In, Blood Out",270,"2014-10-10"],[261,"Honor Killings","Exodus","Blood In, Blood Out",342,"2014-10-10"],[262,"Clone","Gojira","The Link",297,"2009-01-01"],[263,"March of the Sycophants","Exodus","Exhibit B: The Human Condition",405,"2010-05-07"],[264,"The Cell","Gojira","Magma",197,"2016-06-17"],[265,"Children of a Worthless God","Exodus","The Atrocity Exhibition... Exhibit A",504,"2007-10-26"],[266,"Love?","Strapping Young Lad","Alien",293,"2005-01-01"],[267,"Jealousy","Death","Individual Thought Patterns",221,"2011-10-25"],[268,"44 Magnum Opus","Exodus","Shovel Headed Kill Machine",416,"2005-10-04"],[269,"As It Was, as It Soon Shall Be","Exodus","The Atrocity Exhibition... Exhibit A",315,"2007-10-26"],[270,"Low Lands","Gojira","Magma",363,"2016-06-17"],[271,"Explosia","Gojira","L'Enfant Sauvage",399,"2012-06-26"],[272,"Creeping Death","Stone Sour","Straight Outta Burbank...",395,"2015-04-28"],[273,"Tempo of the Damned","Exodus","Tempo of the Damned",261,"2004-02-02"],[274,"I Am Abomination","Exodus","Shovel Headed Kill Machine",204,"2005-10-04"],[275,"Space Time","Gojira","The Link",320,"2009-01-01"],[276,"Shroud of Urine","Exodus","Tempo of the Damned",291,"2004-02-02"],[277,"Afterlife","Avenged Sevenfold","Avenged Sevenfold",352,"2007-10-26"],[278,"Burn, Hollywood, Burn","Exodus","Exhibit B: The Human Condition",245,"2010-05-07"],[279,"Bite the Pain","Death","The Sound of Perseverance",269,"1998-01-01"],[280,"Ruin","Lamb of God","As the Palaces Burn",234,"2003-05-05"],[281,"Downfall","Exodus","Exhibit B: The Human Condition",381,"2010-05-07"],[282,"Unholy Confessions","Avenged Sevenfold","Waking the Fallen",283,"2003-08-26"],[283,"Beast and the Harlot","Avenged Sevenfold","City of Evil",343,"2005-06-06"],[284,"Burn It Down","Avenged Sevenfold","City of Evil",298,"2005-06-06"],[285,"Blinded in Chains","Avenged Sevenfold","City of Evil",394,"2005-06-06"],[286,"Trashed and Scattered","Avenged Sevenfold","City of Evil",351,"2005-06-06"],[287,"I Won't See You Tonight Part 2","Avenged Sevenfold","Waking the Fallen",284,"2003-08-26"],[288,"Toxic Garbage Island","Gojira","The Way of All Flesh",246,"2008-10-13"],[289,"Vacuity","Gojira","The Way of All Flesh",291,"2008-10-13"],[290,"Lizard Skin","Gojira","Terra Incognita",270,"2001-03-19"],[291,"Imperium","Machine Head","Through the Ashes of Empires",401,"2003-12-16"],[292,"Now You've Got Something to Die For","Lamb of God","Ashes of the Wake",219,"2004-08-26"],[293,"Omertá","Lamb of God","Ashes of the Wake",286,"2004-08-26"],[294,"Nothing Remains","Chimaira","Chimaira",336,"2005-08-01"],[295,"Locust","Machine Head","Unto the Locust",456,"2011-09-21"],[296,"Power Trip","Chimaira","The Impossibility of Reason",166,"2003-05-05"],[297,"11th Hour","Lamb of God","As the Palaces Burn",224,"2003-05-06"],[298,"A Devil In God's Country","Lamb of God","As the Palaces Burn",194,"2003-05-06"],[299,"In Defense Of Our Good Name","Lamb of God","As the Palaces Burn",250,"2003-05-06"],[300,"Vigil","Lamb of God","As the Palaces Burn",283,"2003-05-06"],[301,"The Faded Line","Lamb of God","Ashes of the Wake",278,"2004-08-26"],[302,"Blood Of The Scribe","Lamb of God","Ashes of the Wake",263,"2004-08-26"],[303,"One Gun","Lamb of God","Ashes of the Wake",239,"2004-08-26"],[304,"Break You","Lamb of God","Ashes of the Wake",215,"2004-08-26"],[305,"What I've Become","Lamb of God","Ashes of the Wake",208,"2004-08-26"],[306,"Ashes of the Wake","Lamb of God","Ashes of the Wake",345,"2004-08-26"],[307,"Remorse Is for the Dead","Lamb of God","Ashes of the Wake",340,"2004-08-26"],[308,"Pathetic","Lamb of God","Sacrament",271,"2006-08-22"],[309,"Foot to the Throat","Lamb of God","Sacrament",193,"2006-08-22"],[310,"Blacken the Cursed Sun","Lamb of God","Sacrament",328,"2006-08-22"],[311,"Forgotten (Lost Angels)","Lamb of God","Sacrament",185,"2006-08-22"],[312,"Requiem","Lamb of God","Sacrament",251,"2006-08-22"],[313,"More Time to Kill","Lamb of God","Sacrament",217,"2006-08-22"],[314,"Beating On Death's Door","Lamb of God","Sacrament",307,"2006-08-22"],[315,"The Passing","Lamb of God","Wrath",120,"2009-02-23"],[316,"In Your Words","Lamb of God","Wrath",324,"2009-02-23"],[317,"Without Judgement","Death","Symbolic",328,"1995-03-19"],[318,"The Garden of Bleeding","Exodus","The Atrocity Exhibition... Exhibit A",349,"2007-10-26"],[319,"R.E.M.F.","Exodus","Persona Non Grata",262,"2021-11-19"],[320,"Iconoclasm","Exodus","The Atrocity Exhibition... Exhibit A",474,"2007-10-26"],[321,"Collateral Damage","Exodus","Blood In, Blood Out",327,"2014-10-10"],[322,"Condemn The Hive","Lamb of God","Wrath",221,"2009-02-23"],[323,"Shoulder Of Your God - Bonus Track","Lamb of God","Wrath",355,"2009-02-23"],[324,"We Die Alone - Bonus Track","Lamb of God","Wrath",278,"2009-02-23"],[325,"Reclamation","Lamb of God","Wrath",426,"2009-02-23"],[326,"Choke Sermon","Lamb of God","Wrath",200,"2009-02-23"],[327,"Everything To Nothing","Lamb of God","Wrath",230,"2009-02-23"],[328,"Dead Seeds","Lamb of God","Wrath",221,"2009-02-23"],[329,"Broken Hands","Lamb of God","Wrath",233,"2009-02-23"],[330,"Desolation","Lamb of God","Resolution",234,"2012-01-24"],[331,"Scar Spangled Banner","Exodus","Tempo of the Damned",401,"2004-02-02"],[332,"Liquid Fire","Gojira","L'Enfant Sauvage",257,"2012-06-26"],[333,"Pure Hatred","Chimaira","The Impossibility of Reason",256,"2003-05-05"],[334,"Resurrection","Chimaira","Resurrection",277,"2007-03-02"],[335,"Salvation","Chimaira","Chimaira",320,"2005-08-01"],[336,"Cleansation","Chimaira","The Impossibility of Reason",247,"2003-05-05"],[337,"Sacred Serenity","Death","Symbolic",267,"1995-03-19"],[338,"Fucking Hostile","Pantera","Vulgar Display of Power",168,"1992-01-01"],[339,"Rise","Pantera","Vulgar Display of Power",276,"1992-01-01"],[340,"No Good (Attack the Radical)","Pantera","Vulgar Display of Power",289,"1992-01-01"],[341,"Scene Two: I. Overture 1928","Dream Theater","Metropolis Pt. 2: Scenes from a Memory",217,"1999-01-01"],[342,"Slipping Into Madness","Exodus","Persona Non Grata",333,"2021-11-19"],[343,"Heresy","Pantera","Cowboys from Hell",286,"1990-07-20"],[344,"Critical Acclaim","Avenged Sevenfold","Avenged Sevenfold",315,"2007-10-26"],[345,"Misanthrope","Death","Symbolic",303,"1995-03-19"],[346,"The Mirror","Dream Theater","Awake",405,"1994-10-03"],[347,"Resurrection Man","Lamb of God","Omens",299,"2020-06-19"],[348,"More Than Meets the Eye","Testament","The Formation of Damnation",273,"2008-04-25"],[349,"Death Blooms","Mudvayne","L.D. 50",291,"2000-08-13"],[350,"I Will Be Heard","Hatebreed","Perseverance",178,"2002-01-01"],[351,"Still Echoes","Lamb of God","VII: Sturm und Drang",262,"2015-07-24"],[352,"Ghost Walking","Lamb of God","Resolution",270,"2012-01-24"],[353,"The Killing Floor","Lamb of God","Omens",256,"2026-03-13"],[354,"Ditch","Lamb of God","Omens",217,"2022-10-07"],[355,"Poison Dream","Lamb of God, Jamey Jasta","Omens",297,"2020-06-19"],[356,"Hit The Wall","Lamb of God","Resolution",219,"2012-01-24"],[357,"COLD BLOOD","HEALTH, Lamb of God","DISCO4 :: PART II",326,"2022-04-08"],[358,"Blunt Force Blues","Lamb of God","Omens",251,"2026-03-13"]];
+﻿const DEFAULT_RAW = [[1,"One","Metallica","...And Justice for All",447,"1988-08-25"],[2,"For Whom The Bell Tolls - Remastered","Metallica","Ride the Lightning",309,"1984-07-27"],[3,"Master Of Puppets","Metallica","Master of Puppets",515,"1986-03-03"],[4,"Sad But True","Metallica","Metallica",323,"1991-08-12"],[5,"Wherever I May Roam","Metallica","Metallica",403,"1991-08-12"],[6,"Enter Sandman","Metallica","Metallica",331,"1991-08-12"],[7,"The Unforgiven","Metallica","Metallica",386,"1991-08-12"],[8,"Battery","Metallica","Master of Puppets",312,"1986-03-03"],[9,"Welcome Home (Sanitarium)","Metallica","Master of Puppets",387,"1986-03-03"],[10,"Fade To Black - Remastered","Metallica","Ride the Lightning",417,"1984-07-27"],[11,"Blackened","Metallica","...And Justice for All",400,"1988-08-25"],[12,"The Shortest Straw","Metallica","...And Justice for All",395,"1988-08-25"],[13,"All Nightmare Long","Metallica","Death Magnetic",477,"2008-01-01"],[14,"Don't Tread On Me","Metallica","Metallica",240,"1991-08-12"],[15,"The Thing That Should Not Be","Metallica","Master of Puppets",396,"1986-03-03"],[16,"Murder One","Metallica","Hardwired... to Self-Destruct",345,"2016-11-18"],[17,"...And Justice For All","Metallica","...And Justice for All",586,"1988-08-25"],[18,"Eye Of The Beholder","Metallica","...And Justice for All",390,"1988-08-25"],[19,"Sarcastrophe","Slipknot",".5: The Gray Chapter",306,"2014-10-15"],[20,"A.V.I.","Slipknot",".5: The Gray Chapter",332,"2014-10-15"],[21,"The Devil in I","Slipknot",".5: The Gray Chapter",342,"2014-10-15"],[22,"Lech","Slipknot",".5: The Gray Chapter",290,"2014-10-15"],[23,"The Negative One","Slipknot",".5: The Gray Chapter",325,"2014-10-15"],[24,"All Out Life","Slipknot","All Out Life",340,"2018-10-31"],[25,"People = Shit","Slipknot","Iowa",215,"2001-01-01"],[26,"Disasterpiece","Slipknot","Iowa",308,"2001-01-01"],[27,"Everything Ends","Slipknot","Iowa",254,"2001-01-01"],[28,"The Heretic Anthem","Slipknot","Iowa",254,"2001-01-01"],[29,"Left Behind","Slipknot","Iowa",241,"2001-01-01"],[30,"Spit It Out - Hyper Version","Slipknot","Antennas to Hell",144,"2009-09-09"],[31,"The Blister Exists","Slipknot","Vol. 3: (The Subliminal Verses)",319,"2004-01-01"],[32,"Three Nil","Slipknot","Vol. 3: (The Subliminal Verses)",288,"2004-01-01"],[33,"Duality","Slipknot","Vol. 3: (The Subliminal Verses)",252,"2004-01-01"],[34,"Before I Forget","Slipknot","Vol. 3: (The Subliminal Verses)",278,"2004-01-01"],[35,"Scream","Slipknot","Vol. 3: (The Subliminal Verses)",271,"2004-01-01"],[36,"Unsainted","Slipknot","We Are Not Your Kind",260,"2019-08-09"],[37,"Birth Of The Cruel","Slipknot","We Are Not Your Kind",275,"2019-08-09"],[38,"Nero Forte","Slipknot","We Are Not Your Kind",315,"2019-08-09"],[39,"Critical Darling","Slipknot","We Are Not Your Kind",385,"2019-08-09"],[40,"Red Flag","Slipknot","We Are Not Your Kind",251,"2019-08-09"],[41,"Orphan","Slipknot","We Are Not Your Kind",361,"2019-08-09"],[42,"Solway Firth","Slipknot","We Are Not Your Kind",355,"2019-08-09"],[43,"B.Y.O.B.","System Of A Down","Mezmerize",255,"2005-05-17"],[44,"I-E-A-I-A-I-O","System Of A Down","Steal This Album!",188,"2002-11-26"],[45,"Sugar","System Of A Down","System Of A Down",153,"1998-01-01"],[46,"Spiders","System Of A Down","System Of A Down",215,"1998-01-01"],[47,"Toxicity","System Of A Down","Toxicity",218,"2001-09-04"],[48,"Aerials","System Of A Down","Toxicity",235,"2001-09-04"],[49,"Walk","Pantera","Vulgar Display of Power",315,"1992-01-01"],[50,"We’ll Be Back","Megadeth","The Sick, the Dying... and the Dead!",269,"2022-09-02"],[51,"The Trooper - 2015 Remaster","Iron Maiden","Piece of Mind",252,"1983-01-01"],[52,"Nightmare","Avenged Sevenfold","Nightmare",374,"2010-07-25"],[53,"Buried Alive","Avenged Sevenfold","Nightmare",404,"2010-07-25"],[54,"Walk","Avenged Sevenfold","Diamonds in the Rough",321,"2007-07-10"],[55,"This Means War","Avenged Sevenfold","Hail to the King",369,"2013-08-20"],[56,"Hail to the King","Avenged Sevenfold","Hail to the King",305,"2013-08-20"],[57,"Roots Bloody Roots","Sepultura","Roots",212,"1996-02-20"],[58,"Refuse / Resist","Sepultura","Chaos A.D.",199,"1993-09-02"],[59,"Ratamahatta","Sepultura","Roots",270,"1996-02-20"],[60,"The Number of the Beast - 2015 Remaster","Iron Maiden","The Number of the Beast",290,"1982-01-01"],[61,"2 Minutes to Midnight - 2015 Remaster","Iron Maiden","Powerslave",363,"1984-01-01"],[62,"Teutonic Terror","Accept","Blood of the Nations",313,"2010-08-20"],[63,"Delusions of Saviour","Slayer","Repentless",115,"2015-09-11"],[64,"Painkiller","Judas Priest","Painkiller",365,"1990-09-26"],[65,"Territory","Sepultura","Chaos A.D.",287,"1993-09-02"],[66,"The Beautiful People","Marilyn Manson","Antichrist Superstar",218,"1996-01-01"],[67,"Just One Fix","Sepultura","Kairos",211,"2011-06-24"],[68,"Breed Apart","Sepultura","Roots",241,"1996-02-20"],[69,"Skeletons Of Society","Slayer","Seasons in the Abyss",280,"1990-10-09"],[70,"Memento Mori","Lamb of God","Omens",348,"2020-06-19"],[71,"Voice of the Soul","Death","The Sound of Perseverance",223,"1998-01-01"],[72,"Suite-Pee","System Of A Down","System Of A Down",151,"1998-01-01"],[73,"Pulse of the Maggots","Slipknot","Vol. 3: (The Subliminal Verses)",259,"2004-01-01"],[74,"Bounce","System Of A Down","Toxicity",114,"2001-09-04"],[75,"Custer","Slipknot",".5: The Gray Chapter",254,"2014-10-15"],[76,"Purity","Slipknot","Slipknot",265,"2009-09-09"],[77,"All Hope Is Gone","Slipknot","All Hope Is Gone",284,"2008-08-22"],[78,"Interloper - Demo","Slipknot","Slipknot (10th Anniversary Edition)",139,"2009-09-09"],[79,"Vermilion","Slipknot","Vol. 3: (The Subliminal Verses)",316,"2004-01-01"],[80,"Hive Mind","Slipknot","The End, So Far",315,"2022-09-30"],[81,"Falling Away from Me","Korn","Issues",270,"1999-11-09"],[82,"Got the Life","Korn","Follow the Leader",225,"1998-08-18"],[83,"Warranty","Slipknot","The End, So Far",231,"2022-09-30"],[84,"Spectrum","Sepultura","Kairos",241,"2011-06-24"],[85,"Orgasmatron","Sepultura","Arise (Remastered)",254,"1991-03-20"],[86,"Arise","Sepultura","Arise",198,"1991-03-20"],[87,"Kairos","Sepultura","Kairos",215,"2011-06-24"],[88,"Born Strong","Sepultura","Kairos",278,"2011-06-24"],[89,"Structure Violence Azzes","Sepultura","Kairos",337,"2011-06-24"],[90,"Machine Messiah","Sepultura","Machine Messiah",354,"2017-01-13"],[91,"Fear of the Dark - 2015 Remaster","Iron Maiden","Fear of the Dark",438,"1992-01-01"],[92,"Spit","Sepultura","Roots",165,"1996-02-20"],[93,"Dictatorshit","Sepultura","Roots",84,"1996-02-20"],[94,"Carry On","Avenged Sevenfold","Black Ops II (Soundtrack)",255,"2012-09-24"],[95,"Diluted","Slipknot","Slipknot",203,"1999-01-01"],[96,"Liberate","Slipknot","Slipknot",184,"1999-01-01"],[97,"Aces High - 2015 Remaster","Iron Maiden","Powerslave",271,"1984-01-01"],[98,"Alexander the Great (356-323 B.C.) - 2015 Remaster","Iron Maiden","Somewhere in Time",517,"1986-01-01"],[99,"Children of the Damned - 2015 Remaster","Iron Maiden","The Number of the Beast",275,"1982-01-01"],[100,"Rime of the Ancient Mariner - 2015 Remaster","Iron Maiden","Powerslave",818,"1984-01-01"],[101,"The Evil That Men Do - 2015 Remaster","Iron Maiden","Seventh Son of a Seventh Son",274,"1988-01-01"],[102,"Opium of the People","Slipknot","Vol. 3: (The Subliminal Verses)",192,"2004-01-01"],[103,"Dusted","Sepultura","Roots",243,"1996-02-20"],[104,"The Clairvoyant - 2015 Remaster","Iron Maiden","Seventh Son of a Seventh Son",267,"1988-01-01"],[105,"Hallowed Be Thy Name - 2015 Remaster","Iron Maiden","The Number of the Beast",431,"1982-01-01"],[106,"Tornado Of Souls - 2004 Remix","Megadeth","Rust in Peace",319,"1990-10-04"],[107,"Silent Scream","Slayer","South of Heaven",186,"1988-01-01"],[108,"Spit Out The Bone","Metallica","Hardwired... to Self-Destruct",429,"2016-11-18"],[109,"Hangar 18 - 2004 Remix","Megadeth","Rust in Peace",311,"1990-10-04"],[110,"Surfacing","Slipknot","Slipknot",218,"1999-01-01"],[111,"No Life","Slipknot","Slipknot",167,"1999-01-01"],[112,"Inherit the Earth","Burn The Priest","Burn the Priest",209,"2018-05-18"],[113,"Honey Bucket","Burn The Priest","Burn the Priest",163,"2018-05-18"],[114,"Jesus Built My Hotrod","Burn The Priest","Burn the Priest",373,"2018-05-18"],[115,"We Gotta Know","Burn The Priest","Burn the Priest",207,"2018-05-18"],[116,"Laid to Rest","Lamb of God","Ashes of the Wake",230,"2004-08-26"],[117,"Kerosene","Burn The Priest","Burn the Priest",372,"2018-05-18"],[118,"Sphinx","Gojira","Fortitude",240,"2021-04-30"],[119,"Filth Upon Filth","Soulfly","Totem",173,"2022-08-05"],[120,"Flying Whales","Gojira","From Mars to Sirius",464,"2005-09-27"],[121,"If You Want Peace... Prepare For War","Children Of Bodom","Are You Dead Yet?",237,"2005-01-01"],[122,"Bastards Of Bodom","Children Of Bodom","Are You Dead Yet?",207,"2005-01-01"],[123,"Needled 24 / 7","Children Of Bodom","Hate Crew Deathroll",248,"2004-01-01"],[124,"Under Grass and Clover","Children Of Bodom","Hexed",213,"2019-03-08"],[125,"The Nameless","Slipknot","Vol. 3: (The Subliminal Verses)",268,"2004-01-01"],[126,"Gematria (The Killing Name)","Slipknot","All Hope Is Gone",361,"2008-08-22"],[127,"Sulfur","Slipknot","All Hope Is Gone",277,"2008-08-22"],[128,"Vendetta","Slipknot","All Hope Is Gone",315,"2008-08-22"],[129,"This Cold Black","Slipknot","All Hope Is Gone",280,"2008-08-22"],[130,"Psychosocial","Slipknot","All Hope Is Gone",283,"2008-08-22"],[131,"Unstable","Adema","Unstable",192,"2003-06-11"],[132,"Hallowed Be Thy Name","Machine Head","The Blackening",447,"2007-03-27"],[133,"Animal I Have Become","Three Days Grace","One-X",231,"2006-06-25"],[134,"Nomad","Sepultura","Chaos A.D.",299,"1993-09-02"],[135,"Freak On a Leash","Korn","Follow the Leader",255,"1998-08-18"],[136,"512","Lamb of God","VII: Sturm und Drang",284,"2015-07-24"],[137,"Altered State","Sepultura","Arise",394,"1991-03-20"],[138,"Harvester Of Sorrow","Metallica","...And Justice for All",345,"1988-08-25"],[139,"Under the Waste Command","Municipal Waste","Slime and Punishment",110,"2017-06-23"],[140,"Thrasher's Abattoir","Carcass","Surgical Steel",110,"2013-09-13"],[141,"Blind","Korn","Korn",258,"1994-10-11"],[142,"Snuff","Slipknot","All Hope Is Gone",276,"2008-08-22"],[143,"Halo","Machine Head","The Blackening",543,"2007-03-27"],[144,"Amazonia","Gojira","Fortitude",300,"2021-04-30"],[145,"1985","Carcass","Surgical Steel",75,"2013-09-13"],[146,"Let Go","Illdisposed","The Prestige",68,"2008-03-28"],[147,"The Heaviest Matter of the Universe","Gojira","From Mars to Sirius",237,"2005-09-27"],[148,"(sic)","Slipknot","Slipknot",199,"1999-01-01"],[149,"Eyeless","Slipknot","Slipknot",236,"1999-01-01"],[150,"Wait and Bleed","Slipknot","Slipknot",147,"1999-01-01"],[151,"Silvera","Gojira","Magma",212,"2016-06-17"],[152,"L'enfant sauvage","Gojira","L'Enfant Sauvage",257,"2012-06-26"],[153,"Born in Winter","Gojira","L'Enfant Sauvage",231,"2012-06-26"],[154,"Another World","Gojira","Another World",264,"2021-04-30"],[155,"Oroborus","Gojira","The Way of All Flesh",321,"2008-10-06"],[156,"Born For One Thing","Gojira","Fortitude",260,"2021-04-30"],[157,"Holy Wars...The Punishment Due - 2004 Remix","Megadeth","Rust in Peace",392,"1990-10-04"],[158,"Not Ready to Die - From \"Call of the Dead\"","Avenged Sevenfold","Not Ready to Die",425,"2011-05-02"],[159,"Bloodline","Slayer","God Hates Us All",216,"2001-01-01"],[160,"Born Stubborn","Sepultura","Roots",247,"1996-02-20"],[161,"Losfer Words (Big 'Orra) - 2015 Remaster","Iron Maiden","Powerslave",255,"1984-01-01"],[162,"The Shooting Star","Gojira","Magma",342,"2016-06-17"],[163,"Prison Song","System Of A Down","Toxicity",201,"2001-09-04"],[164,"Cowboys from Hell","Pantera","Cowboys from Hell",243,"1990-07-20"],[165,"Nookie","Limp Bizkit","Significant Other",289,"1999-01-01"],[166,"Vandals Nest","Sepultura","Machine Messiah",167,"2017-01-13"],[167,"Redneck","Lamb of God","Sacrament",220,"2006-08-22"],[168,"Zero Tolerance","Death","Symbolic",288,"1995-03-19"],[169,"Biotech Is Godzilla","Sepultura","Chaos A.D.",112,"1993-09-02"],[170,"This Love","Pantera","Vulgar Display of Power",393,"1992-01-01"],[171,"Sympathy","Pissing Razors","Where Death Lives",203,"1999-04-20"],[172,"Domination","Pantera","Cowboys from Hell",305,"1990-07-20"],[173,"Axis Rot","Burn The Priest","Burn the Priest",184,"2018-05-18"],[174,"Mouth for War","Pantera","Vulgar Display of Power",237,"1992-01-01"],[175,"Sun Doesn't Rise","Mushroomhead","XIII",193,"2003-01-01"],[176,"Straighthate","Sepultura","Roots",321,"1996-02-20"],[177,"The Day That Never Comes","Metallica","Death Magnetic",476,"2008-01-01"],[178,"Shepherd of Fire","Avenged Sevenfold","Hail to the King",323,"2013-08-20"],[179,"Creeping Death - Remastered","Metallica","Ride the Lightning",395,"1984-07-27"],[180,"Dystopia","Megadeth","Dystopia",299,"2016-01-22"],[181,"Down for Life","Testament","The Gathering",203,"1999-06-08"],[182,"Repentless","Slayer","Repentless",199,"2015-09-11"],[183,"Dead Embryonic Cells","Sepultura","Arise",292,"1991-03-20"],[184,"Dig","Mudvayne","L.D. 50",162,"2000-08-13"],[185,"Orion","Metallica","Master of Puppets",507,"1986-03-03"],[186,"Disposable Heroes","Metallica","Master of Puppets",496,"1986-03-03"],[187,"Ride The Lightning - Remastered","Metallica","Ride the Lightning",396,"1984-07-27"],[188,"Welcome","Slipknot","Vol. 3: (The Subliminal Verses)",195,"2004-01-01"],[189,"Slaughtered","Pantera","Far Beyond Driven",237,"1994-01-01"],[190,"Blacklist","Exodus","Tempo of the Damned",376,"2004-02-02"],[191,"I'm Broken","Pantera","Far Beyond Driven",264,"1994-01-01"],[192,"Brotherhood of the Snake","Testament","Brotherhood of the Snake",253,"2016-10-28"],[193,"Get This","Slipknot","Slipknot",123,"2009-09-09"],[194,"Ten Ton Hammer","Machine Head","The More Things Change...",254,"1997-01-01"],[195,"A New Level - 2012 Remaster","Pantera","Vulgar Display of Power",237,"1992-01-01"],[196,"Backbone","Gojira","From Mars to Sirius",258,"2005-09-27"],[197,"Descending","Lamb of God","Sacrament",215,"2006-08-22"],[198,"The Pale King","Testament","Brotherhood of the Snake",291,"2016-10-28"],[199,"Hourglass","Lamb of God","Ashes of the Wake",240,"2004-08-26"],[200,"Bat Country","Avenged Sevenfold","City of Evil",311,"2005-06-06"],[201,"Forget to Remember - From Saw II - Original Soundtrack","Mudvayne","Lost and Found",215,"2005-01-01"],[202,"Strife","Trivium","Vengeance Falls",269,"2013-10-08"],[203,"Caught Somewhere in Time - 2015 Remaster","Iron Maiden","Somewhere in Time",447,"1986-01-01"],[204,"Stranger in a Strange Land - 2015 Remaster","Iron Maiden","Somewhere in Time",346,"1986-01-01"],[205,"Given Up","Linkin Park","Minutes to Midnight",189,"2007-05-14"],[206,"Symbolic","Death","Symbolic",392,"1995-03-19"],[207,"Spirit Crusher","Death","The Sound of Perseverance",407,"1998-01-01"],[208,"Flesh and the Power It Holds","Death","The Sound of Perseverance",506,"1998-01-01"],[209,"Lack of Comprehension","Death","Human",223,"2011-06-21"],[210,"Trapped In A Corner","Death","Individual Thought Patterns",254,"2011-10-25"],[211,"Crystal Mountain","Death","Symbolic",307,"1995-03-19"],[212,"Almost Easy","Avenged Sevenfold","Avenged Sevenfold",234,"2007-10-26"],[213,"Fight Fire With Fire - Remastered","Metallica","Ride the Lightning",284,"1984-07-27"],[214,"Walk with Me In Hell","Lamb of God","Sacrament",311,"2006-08-22"],[215,"Dead Memories","Slipknot","All Hope Is Gone",268,"2008-08-22"],[216,"Only One","Slipknot","Slipknot",144,"2009-09-09"],[217,"5 Minutes Alone","Pantera","Far Beyond Driven",347,"1994-01-01"],[218,"Propaganda","Sepultura","Chaos A.D.",213,"1993-09-02"],[219,"Demonic Refusal","Testament","Demonic",321,"1997-06-09"],[220,"Skeptic","Slipknot",".5: The Gray Chapter",286,"2014-10-15"],[221,"Nomadic","Slipknot",".5: The Gray Chapter",258,"2014-10-15"],[222,"Love","Gojira","Terra Incognita",259,"2001-03-19"],[223,"Remembrance","Gojira","The Link",275,"2003-04-18"],[224,"Mouth of Kala","Gojira","L'Enfant Sauvage",351,"2012-06-26"],[225,"The art of dying","Gojira","The Way of All Flesh",594,"2008-10-13"],[226,"My Own Summer (Shove It)","Deftones","Around the Fur",214,"1997-10-27"],[227,"Grace","Lamb of God","Wrath",236,"2009-02-23"],[228,"Be Still and Know","Machine Head","Unto the Locust",343,"2011-09-21"],[229,"Stranded","Gojira","Magma",269,"2016-06-17"],[230,"Davidian","Machine Head","Burn My Eyes",296,"1994-08-08"],[231,"Set To Fail","Lamb of God","Wrath",226,"2009-02-23"],[232,"Amen","Sepultura","Chaos A.D.",267,"1993-09-02"],[233,"Kaiowas","Sepultura","Chaos A.D.",223,"1993-09-02"],[234,"Manifest","Sepultura","Chaos A.D.",289,"1993-09-02"],[235,"Murder","Sepultura","Arise",206,"1991-03-20"],[236,"Under Siege (Regnum Irae)","Sepultura","Arise",294,"1991-03-20"],[237,"Natural Born Killer","Avenged Sevenfold","Nightmare",315,"2010-07-25"],[238,"Contractor","Lamb of God","Wrath",202,"2009-02-23"],[239,"Deathamphetamine","Exodus","Shovel Headed Kill Machine",511,"2005-10-04"],[240,"Empty Words","Death","Symbolic",382,"1995-03-19"],[241,"Funeral Hymn","Exodus","The Atrocity Exhibition... Exhibit A",517,"2007-10-26"],[242,"Salt the Wound","Exodus","Blood In, Blood Out",264,"2014-10-10"],[243,"Riot Act","Exodus","The Atrocity Exhibition... Exhibit A",217,"2007-10-26"],[244,"Persona Non Grata","Exodus","Persona Non Grata",450,"2021-11-19"],[245,"The Beatings Will Continue (Until Morale Improves)","Exodus","Persona Non Grata",181,"2021-11-19"],[246,"Blood in Blood Out","Exodus","Blood In, Blood Out",222,"2014-10-10"],[247,"Save Me","Avenged Sevenfold","Nightmare",656,"2010-07-25"],[248,"Bedlam 1-2-3","Exodus","The Atrocity Exhibition... Exhibit A",479,"2007-10-26"],[249,"Culling the Herd","Exodus","Tempo of the Damned",367,"2004-02-02"],[250,"Impaler","Exodus","Tempo of the Damned",324,"2004-02-02"],[251,"My Last Nerve","Exodus","Blood In, Blood Out",370,"2014-10-10"],[252,"Forward March","Exodus","Tempo of the Damned",458,"2004-02-02"],[253,"War Is My Shepherd","Exodus","Tempo of the Damned",267,"2004-02-02"],[254,"Esoteric Surgery","Gojira","The Way of All Flesh",344,"2008-10-06"],[255,"Scavenger of Human Sorrow","Death","The Sound of Perseverance",416,"1998-01-01"],[256,"Painkiller","Death","The Sound of Perseverance",362,"1998-01-01"],[257,"Food for the Worms","Exodus","Blood In, Blood Out",382,"2014-10-10"],[258,"Psycho Holiday","Pantera","Cowboys from Hell",319,"1990-07-20"],[259,"In Human Form","Death","Individual Thought Patterns",237,"2011-10-25"],[260,"Wrapped in the Arms of Rage","Exodus","Blood In, Blood Out",270,"2014-10-10"],[261,"Honor Killings","Exodus","Blood In, Blood Out",342,"2014-10-10"],[262,"Clone","Gojira","The Link",297,"2009-01-01"],[263,"March of the Sycophants","Exodus","Exhibit B: The Human Condition",405,"2010-05-07"],[264,"The Cell","Gojira","Magma",197,"2016-06-17"],[265,"Children of a Worthless God","Exodus","The Atrocity Exhibition... Exhibit A",504,"2007-10-26"],[266,"Love?","Strapping Young Lad","Alien",293,"2005-01-01"],[267,"Jealousy","Death","Individual Thought Patterns",221,"2011-10-25"],[268,"44 Magnum Opus","Exodus","Shovel Headed Kill Machine",416,"2005-10-04"],[269,"As It Was, as It Soon Shall Be","Exodus","The Atrocity Exhibition... Exhibit A",315,"2007-10-26"],[270,"Low Lands","Gojira","Magma",363,"2016-06-17"],[271,"Explosia","Gojira","L'Enfant Sauvage",399,"2012-06-26"],[272,"Creeping Death","Stone Sour","Straight Outta Burbank...",395,"2015-04-28"],[273,"Tempo of the Damned","Exodus","Tempo of the Damned",261,"2004-02-02"],[274,"I Am Abomination","Exodus","Shovel Headed Kill Machine",204,"2005-10-04"],[275,"Space Time","Gojira","The Link",320,"2009-01-01"],[276,"Shroud of Urine","Exodus","Tempo of the Damned",291,"2004-02-02"],[277,"Afterlife","Avenged Sevenfold","Avenged Sevenfold",352,"2007-10-26"],[278,"Burn, Hollywood, Burn","Exodus","Exhibit B: The Human Condition",245,"2010-05-07"],[279,"Bite the Pain","Death","The Sound of Perseverance",269,"1998-01-01"],[280,"Ruin","Lamb of God","As the Palaces Burn",234,"2003-05-05"],[281,"Downfall","Exodus","Exhibit B: The Human Condition",381,"2010-05-07"],[282,"Unholy Confessions","Avenged Sevenfold","Waking the Fallen",283,"2003-08-26"],[283,"Beast and the Harlot","Avenged Sevenfold","City of Evil",343,"2005-06-06"],[284,"Burn It Down","Avenged Sevenfold","City of Evil",298,"2005-06-06"],[285,"Blinded in Chains","Avenged Sevenfold","City of Evil",394,"2005-06-06"],[286,"Trashed and Scattered","Avenged Sevenfold","City of Evil",351,"2005-06-06"],[287,"I Won't See You Tonight Part 2","Avenged Sevenfold","Waking the Fallen",284,"2003-08-26"],[288,"Toxic Garbage Island","Gojira","The Way of All Flesh",246,"2008-10-13"],[289,"Vacuity","Gojira","The Way of All Flesh",291,"2008-10-13"],[290,"Lizard Skin","Gojira","Terra Incognita",270,"2001-03-19"],[291,"Imperium","Machine Head","Through the Ashes of Empires",401,"2003-12-16"],[292,"Now You've Got Something to Die For","Lamb of God","Ashes of the Wake",219,"2004-08-26"],[293,"Omertá","Lamb of God","Ashes of the Wake",286,"2004-08-26"],[294,"Nothing Remains","Chimaira","Chimaira",336,"2005-08-01"],[295,"Locust","Machine Head","Unto the Locust",456,"2011-09-21"],[296,"Power Trip","Chimaira","The Impossibility of Reason",166,"2003-05-05"],[297,"11th Hour","Lamb of God","As the Palaces Burn",224,"2003-05-06"],[298,"A Devil In God's Country","Lamb of God","As the Palaces Burn",194,"2003-05-06"],[299,"In Defense Of Our Good Name","Lamb of God","As the Palaces Burn",250,"2003-05-06"],[300,"Vigil","Lamb of God","As the Palaces Burn",283,"2003-05-06"],[301,"The Faded Line","Lamb of God","Ashes of the Wake",278,"2004-08-26"],[302,"Blood Of The Scribe","Lamb of God","Ashes of the Wake",263,"2004-08-26"],[303,"One Gun","Lamb of God","Ashes of the Wake",239,"2004-08-26"],[304,"Break You","Lamb of God","Ashes of the Wake",215,"2004-08-26"],[305,"What I've Become","Lamb of God","Ashes of the Wake",208,"2004-08-26"],[306,"Ashes of the Wake","Lamb of God","Ashes of the Wake",345,"2004-08-26"],[307,"Remorse Is for the Dead","Lamb of God","Ashes of the Wake",340,"2004-08-26"],[308,"Pathetic","Lamb of God","Sacrament",271,"2006-08-22"],[309,"Foot to the Throat","Lamb of God","Sacrament",193,"2006-08-22"],[310,"Blacken the Cursed Sun","Lamb of God","Sacrament",328,"2006-08-22"],[311,"Forgotten (Lost Angels)","Lamb of God","Sacrament",185,"2006-08-22"],[312,"Requiem","Lamb of God","Sacrament",251,"2006-08-22"],[313,"More Time to Kill","Lamb of God","Sacrament",217,"2006-08-22"],[314,"Beating On Death's Door","Lamb of God","Sacrament",307,"2006-08-22"],[315,"The Passing","Lamb of God","Wrath",120,"2009-02-23"],[316,"In Your Words","Lamb of God","Wrath",324,"2009-02-23"],[317,"Without Judgement","Death","Symbolic",328,"1995-03-19"],[318,"The Garden of Bleeding","Exodus","The Atrocity Exhibition... Exhibit A",349,"2007-10-26"],[319,"R.E.M.F.","Exodus","Persona Non Grata",262,"2021-11-19"],[320,"Iconoclasm","Exodus","The Atrocity Exhibition... Exhibit A",474,"2007-10-26"],[321,"Collateral Damage","Exodus","Blood In, Blood Out",327,"2014-10-10"],[322,"Condemn The Hive","Lamb of God","Wrath",221,"2009-02-23"],[323,"Shoulder Of Your God - Bonus Track","Lamb of God","Wrath",355,"2009-02-23"],[324,"We Die Alone - Bonus Track","Lamb of God","Wrath",278,"2009-02-23"],[325,"Reclamation","Lamb of God","Wrath",426,"2009-02-23"],[326,"Choke Sermon","Lamb of God","Wrath",200,"2009-02-23"],[327,"Everything To Nothing","Lamb of God","Wrath",230,"2009-02-23"],[328,"Dead Seeds","Lamb of God","Wrath",221,"2009-02-23"],[329,"Broken Hands","Lamb of God","Wrath",233,"2009-02-23"],[330,"Desolation","Lamb of God","Resolution",234,"2012-01-24"],[331,"Scar Spangled Banner","Exodus","Tempo of the Damned",401,"2004-02-02"],[332,"Liquid Fire","Gojira","L'Enfant Sauvage",257,"2012-06-26"],[333,"Pure Hatred","Chimaira","The Impossibility of Reason",256,"2003-05-05"],[334,"Resurrection","Chimaira","Resurrection",277,"2007-03-02"],[335,"Salvation","Chimaira","Chimaira",320,"2005-08-01"],[336,"Cleansation","Chimaira","The Impossibility of Reason",247,"2003-05-05"],[337,"Sacred Serenity","Death","Symbolic",267,"1995-03-19"],[338,"Fucking Hostile","Pantera","Vulgar Display of Power",168,"1992-01-01"],[339,"Rise","Pantera","Vulgar Display of Power",276,"1992-01-01"],[340,"No Good (Attack the Radical)","Pantera","Vulgar Display of Power",289,"1992-01-01"],[341,"Scene Two: I. Overture 1928","Dream Theater","Metropolis Pt. 2: Scenes from a Memory",217,"1999-01-01"],[342,"Slipping Into Madness","Exodus","Persona Non Grata",333,"2021-11-19"],[343,"Heresy","Pantera","Cowboys from Hell",286,"1990-07-20"],[344,"Critical Acclaim","Avenged Sevenfold","Avenged Sevenfold",315,"2007-10-26"],[345,"Misanthrope","Death","Symbolic",303,"1995-03-19"],[346,"The Mirror","Dream Theater","Awake",405,"1994-10-03"],[347,"Resurrection Man","Lamb of God","Omens",299,"2020-06-19"],[348,"More Than Meets the Eye","Testament","The Formation of Damnation",273,"2008-04-25"],[349,"Death Blooms","Mudvayne","L.D. 50",291,"2000-08-13"],[350,"I Will Be Heard","Hatebreed","Perseverance",178,"2002-01-01"],[351,"Still Echoes","Lamb of God","VII: Sturm und Drang",262,"2015-07-24"],[352,"Ghost Walking","Lamb of God","Resolution",270,"2012-01-24"],[353,"The Killing Floor","Lamb of God","Omens",256,"2026-03-13"],[354,"Ditch","Lamb of God","Omens",217,"2022-10-07"],[355,"Poison Dream","Lamb of God, Jamey Jasta","Omens",297,"2020-06-19"],[356,"Hit The Wall","Lamb of God","Resolution",219,"2012-01-24"],[357,"COLD BLOOD","HEALTH, Lamb of God","DISCO4 :: PART II",326,"2022-04-08"],[358,"Blunt Force Blues","Lamb of God","Omens",251,"2026-03-13"]];
 /* ---------------- data layer: the list lives in the browser, so imports/edits survive reloads ---------------- */
 const STORE_KEY = "catalogo-musical:v1";
 function readStore(){
@@ -151,17 +151,178 @@ const DEEZERGENRES = (() => { try { return JSON.parse(localStorage.getItem(DEEZE
 const saveDeezerGenres = () => { try { localStorage.setItem(DEEZER_KEY, JSON.stringify(DEEZERGENRES)); } catch (e) {} };
 const deezerHasGenre = p => Object.prototype.hasOwnProperty.call(DEEZERGENRES, p);
 const spotifyHas = p => hasGenre(p) && GENRES[p].length > 0;
+/* ---- favoritas e etiquetas -------------------------------------------- */
+const TAGS_KEY = "catalogo-musical:tags";
+const TAGS = (() => { try { const o = JSON.parse(localStorage.getItem(TAGS_KEY) || "null"); const base = (o && o.musicas) ? o : {musicas: {}, bandas: {}}; if (!base.albuns) base.albuns = {}; if (!base.generos) base.generos = {}; return base; } catch (e) { return {musicas: {}, bandas: {}, albuns: {}, generos: {}}; } })();
+const saveTags = () => { try { localStorage.setItem(TAGS_KEY, JSON.stringify(TAGS)); } catch (e) {} };
+function tagsEntry(t, create) {
+  const mk = t.m && t.m.id;
+  if (mk) {
+    if (TAGS.musicas[mk]) return TAGS.musicas[mk];
+    const ok = (t.title || "").trim().toLowerCase() + "|" + (splitArtists(t.artist || "")[0] || "");
+    if (TAGS.musicas[ok]) { TAGS.musicas[mk] = TAGS.musicas[ok]; delete TAGS.musicas[ok]; saveTags(); return TAGS.musicas[mk]; }
+    if (!create) return null;
+    TAGS.musicas[mk] = {}; saveTags(); return TAGS.musicas[mk];
+  }
+  const ok = (t.title || "").trim().toLowerCase() + "|" + (splitArtists(t.artist || "")[0] || "");
+  if (TAGS.musicas[ok]) return TAGS.musicas[ok];
+  if (!create) return null;
+  TAGS.musicas[ok] = {}; saveTags(); return TAGS.musicas[ok];
+}
+const isFavTrack = t => { const e = tagsEntry(t); return !!(e && e.f); };
+const isFavBand = band => { const e = TAGS.bandas[String(band).toLowerCase()]; return !!(e && e.f); };
+const isFavAlbum = album => { const e = TAGS.albuns[String(album).toLowerCase()]; return !!(e && e.f); };
+const isFavGenre = genre => { const e = TAGS.generos[String(genre).toLowerCase()]; return !!(e && e.f); };
+const isFavT = t => isFavTrack(t) || (t.bands || []).some(isFavBand) || isFavAlbum(t.album) || (t.ge || []).some(isFavGenre);
+const trackTagsOf = t => { const e = tagsEntry(t); return (e && e.t) || []; };
+const bandTagsOf = band => { const e = TAGS.bandas[String(band).toLowerCase()]; return (e && e.t) || []; };
+const trackHasTagVal = (t, tag) => trackTagsOf(t).includes(tag) || (t.bands || []).some(b => bandTagsOf(b).includes(tag));
+function allTagNames() {
+  const s = new Set();
+  [TAGS.musicas, TAGS.bandas, TAGS.albuns, TAGS.generos].forEach(obj =>
+    Object.values(obj || {}).forEach(v => (v.t || []).forEach(x => s.add(x))));
+  return [...s].sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+function tagColor(tag) {
+  let h = 0; for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) & 0x7FFFFFFF; return `hsl(${h % 360}, 55%, 60%)`;
+}
+function toggleTrackFav(t) {
+  const e = tagsEntry(t, true); const wasOff = !e.f; e.f = wasOff ? 1 : 0;
+  if (!e.f && !(e.t && e.t.length)) { const mk = t.m && t.m.id; const ok = (t.title||"").trim().toLowerCase()+"|"+(splitArtists(t.artist||"")[0]||""); if (mk) delete TAGS.musicas[mk]; else delete TAGS.musicas[ok]; }
+  saveTags(); return wasOff;
+}
+function toggleBandFav(band) {
+  const k = String(band).toLowerCase();
+  if (!TAGS.bandas[k]) TAGS.bandas[k] = {};
+  const wasOff = !TAGS.bandas[k].f; TAGS.bandas[k].f = wasOff ? 1 : 0;
+  if (!TAGS.bandas[k].f && !(TAGS.bandas[k].t && TAGS.bandas[k].t.length)) delete TAGS.bandas[k];
+  saveTags(); return wasOff;
+}
+function toggleAlbumFav(album) {
+  const k = String(album).toLowerCase();
+  if (!TAGS.albuns[k]) TAGS.albuns[k] = {};
+  const wasOff = !TAGS.albuns[k].f; TAGS.albuns[k].f = wasOff ? 1 : 0;
+  if (!TAGS.albuns[k].f && !(TAGS.albuns[k].t && TAGS.albuns[k].t.length)) delete TAGS.albuns[k];
+  saveTags(); return wasOff;
+}
+function toggleGenreFav(genre) {
+  const k = String(genre).toLowerCase();
+  if (!TAGS.generos[k]) TAGS.generos[k] = {};
+  const wasOff = !TAGS.generos[k].f; TAGS.generos[k].f = wasOff ? 1 : 0;
+  if (!TAGS.generos[k].f && !(TAGS.generos[k].t && TAGS.generos[k].t.length)) delete TAGS.generos[k];
+  saveTags(); return wasOff;
+}
+const albumTagsOf = album => { const e = TAGS.albuns[String(album).toLowerCase()]; return (e && e.t) || []; };
+const genreTagsOf = genre => { const e = TAGS.generos[String(genre).toLowerCase()]; return (e && e.t) || []; };
+function addTagToAlbum(album, tag) {
+  const k = String(album).toLowerCase();
+  if (!TAGS.albuns[k]) TAGS.albuns[k] = {};
+  if (!TAGS.albuns[k].t) TAGS.albuns[k].t = [];
+  if (!TAGS.albuns[k].t.includes(tag) && TAGS.albuns[k].t.length < 30) { TAGS.albuns[k].t.push(tag); saveTags(); return true; } return false;
+}
+function removeTagFromAlbum(album, tag) {
+  const k = String(album).toLowerCase(); if (!TAGS.albuns[k]) return;
+  TAGS.albuns[k].t = (TAGS.albuns[k].t || []).filter(x => x !== tag);
+  if (!TAGS.albuns[k].f && !TAGS.albuns[k].t.length) delete TAGS.albuns[k];
+  saveTags();
+}
+function addTagToGenre(genre, tag) {
+  const k = String(genre).toLowerCase();
+  if (!TAGS.generos[k]) TAGS.generos[k] = {};
+  if (!TAGS.generos[k].t) TAGS.generos[k].t = [];
+  if (!TAGS.generos[k].t.includes(tag) && TAGS.generos[k].t.length < 30) { TAGS.generos[k].t.push(tag); saveTags(); return true; } return false;
+}
+function removeTagFromGenre(genre, tag) {
+  const k = String(genre).toLowerCase(); if (!TAGS.generos[k]) return;
+  TAGS.generos[k].t = (TAGS.generos[k].t || []).filter(x => x !== tag);
+  if (!TAGS.generos[k].f && !TAGS.generos[k].t.length) delete TAGS.generos[k];
+  saveTags();
+}
+function addTagToTrack(t, tag) {
+  const e = tagsEntry(t, true); if (!e.t) e.t = [];
+  if (!e.t.includes(tag) && e.t.length < 30) { e.t.push(tag); saveTags(); return true; } return false;
+}
+function removeTagFromTrack(t, tag) {
+  const e = tagsEntry(t); if (!e) return;
+  e.t = (e.t || []).filter(x => x !== tag);
+  if (!e.f && !e.t.length) { const mk = t.m && t.m.id; const ok = (t.title||"").trim().toLowerCase()+"|"+(splitArtists(t.artist||"")[0]||""); if (mk) delete TAGS.musicas[mk]; else delete TAGS.musicas[ok]; }
+  saveTags();
+}
+function addTagToBand(band, tag) {
+  const k = String(band).toLowerCase();
+  if (!TAGS.bandas[k]) TAGS.bandas[k] = {};
+  if (!TAGS.bandas[k].t) TAGS.bandas[k].t = [];
+  if (!TAGS.bandas[k].t.includes(tag) && TAGS.bandas[k].t.length < 30) { TAGS.bandas[k].t.push(tag); saveTags(); return true; } return false;
+}
+function removeTagFromBand(band, tag) {
+  const k = String(band).toLowerCase(); if (!TAGS.bandas[k]) return;
+  TAGS.bandas[k].t = (TAGS.bandas[k].t || []).filter(x => x !== tag);
+  if (!TAGS.bandas[k].f && !TAGS.bandas[k].t.length) delete TAGS.bandas[k];
+  saveTags();
+}
+// gêneros bloqueados por artista (override manual de metadado errado)
+const GENRE_BLOCK = {
+  "slipknot": ["alternative rock"],
+};
+// gêneros forçados por artista (adiciona independente do que a fonte diz)
+const GENRE_ADD = {
+  "slipknot":            ["nu-metal", "alternative metal", "heavy metal"],
+  "lamb of god":         ["groove metal", "thrash metal", "heavy metal"],
+  "exodus":              ["thrash metal", "speed metal", "heavy metal"],
+  "sepultura":           ["thrash metal", "groove metal", "death metal"],
+  "gojira":              ["death metal", "groove metal", "progressive metal"],
+  "metallica":           ["thrash metal", "heavy metal", "speed metal"],
+  "avenged sevenfold":   ["heavy metal", "metalcore", "hard rock"],
+  "death":               ["death metal", "progressive metal"],
+  "iron maiden":         ["heavy metal", "nwobhm", "speed metal"],
+  "pantera":             ["groove metal", "heavy metal", "thrash metal"],
+  "system of a down":    ["alternative metal", "nu-metal", "hard rock"],
+  "dream theater":       ["progressive metal", "progressive rock", "heavy metal"],
+  "machine head":        ["groove metal", "thrash metal", "heavy metal"],
+  "burn the priest":     ["groove metal", "thrash metal"],
+  "chimaira":            ["groove metal", "metalcore", "alternative metal"],
+  "megadeth":            ["thrash metal", "heavy metal", "speed metal"],
+  "mudvayne":            ["nu-metal", "groove metal", "alternative metal"],
+  "slayer":              ["thrash metal", "speed metal", "death metal"],
+  "testament":           ["thrash metal", "speed metal", "heavy metal"],
+  "korn":                ["nu-metal", "alternative metal", "alternative rock"],
+  "children of bodom":   ["melodic death metal", "power metal", "speed metal"],
+  "accept":              ["heavy metal", "speed metal", "nwobhm"],
+  "carcass":             ["death metal", "melodic death metal", "grindcore"],
+  "adema":               ["nu-metal", "alternative rock", "hard rock"],
+  "deftones":            ["alternative metal", "nu-metal", "alternative rock"],
+  "hatebreed":           ["metalcore", "hardcore punk", "heavy metal"],
+  "health":              ["industrial rock", "noise rock", "electronic"],
+  "illdisposed":         ["death metal", "groove metal"],
+  "judas priest":        ["heavy metal", "speed metal", "nwobhm"],
+  "limp bizkit":         ["nu-metal", "rap metal", "alternative metal"],
+  "linkin park":         ["nu-metal", "alternative rock", "hard rock"],
+  "marilyn manson":      ["industrial metal", "alternative metal", "hard rock"],
+  "meshuggah":           ["djent", "progressive metal", "groove metal"],
+  "municipal waste":     ["thrash metal", "crossover thrash", "speed metal"],
+  "mushroomhead":        ["industrial metal", "nu-metal", "alternative metal"],
+  "pissing razors":      ["groove metal", "thrash metal"],
+  "soulfly":             ["groove metal", "nu-metal", "alternative metal"],
+  "stone sour":          ["alternative metal", "hard rock", "heavy metal"],
+  "strapping young lad": ["industrial metal", "progressive metal", "groove metal"],
+  "three days grace":    ["alternative metal", "hard rock", "post-grunge"],
+  "trivium":             ["metalcore", "thrash metal", "heavy metal"],
+};
 // gênero que aparece: Spotify → MusicBrainz → TheAudioDB → Deezer → Apple
 function shownGenres(artist){
   if (artist === NI) return [];
   const out = new Set(); let any = false;
   for (const p of splitArtists(artist)){
+    const pk = p.toLowerCase();
+    const blocked = GENRE_BLOCK[pk] || [];
+    const forced = GENRE_ADD[pk] || [];
     const g = spotifyHas(p) ? GENRES[p]
       : (Array.isArray(MBGENRES[p]) && MBGENRES[p].length ? MBGENRES[p]
       : (Array.isArray(TADBGENRES[p]) && TADBGENRES[p].length ? TADBGENRES[p]
       : (Array.isArray(DEEZERGENRES[p]) && DEEZERGENRES[p].length ? DEEZERGENRES[p]
       : (Array.isArray(AGENRES[p]) ? AGENRES[p] : null))));
-    if (g){ any = true; g.forEach(x => out.add(x)); }
+    if (g){ any = true; g.filter(x => !blocked.includes(x)).forEach(x => out.add(x)); }
+    if (forced.length){ any = true; forced.forEach(x => out.add(x)); }
   }
   return any ? [...out] : null;
 }
@@ -254,7 +415,7 @@ for (const t of T){
     (albumBands.get(t.album) || albumBands.set(t.album, new Set()).get(t.album)).add(b);
   }
 }
-const state = {bands: new Set(), albums: new Set(), genres: new Set(), years: new Set(), upTo: null};   // upTo: máquina do tempo (só faixas até a #n); null = playlist inteira
+const state = {bands: new Set(), albums: new Set(), genres: new Set(), years: new Set(), upTo: null, tags: new Set()};   // upTo: máquina do tempo (só faixas até a #n); null = playlist inteira
 let expandedGenreBucket = null;
 let tmBusy = false;   // tocando ou arrastando a máquina do tempo: sem animações caras nos gráficos
 let spotifyUserDisplay = null;  // nome do usuário logado no Spotify (preenchido ao obter token)
@@ -275,12 +436,13 @@ function groupBy(rows, key){
 }
 const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
 
-function rows(useBand = true, useAlbum = true, useGenre = true, useTime = true, useYear = true){
+function rows(useBand = true, useAlbum = true, useGenre = true, useTime = true, useYear = true, useTags = true){
   return T.filter(t => (!useTime || state.upTo == null || t.n <= state.upTo) &&
                        (!useBand || !state.bands.size || t.bands.some(b => state.bands.has(b))) &&
                        (!useAlbum || !state.albums.size || state.albums.has(t.album)) &&
                        (!useYear || !state.years.size || state.years.has(t.year)) &&
-                       (!useGenre || !state.genres.size || (t.ge && t.ge.some(g => state.genres.has(g)))));
+                       (!useGenre || !state.genres.size || (t.ge && t.ge.some(g => state.genres.has(g)))) &&
+                       (!useTags || !state.tags.size || (state.tags.has("♥") && isFavT(t)) || [...state.tags].filter(x => x !== "♥").some(tag => trackHasTagVal(t, tag))));
 }
 const bandEnabled = b => !state.albums.size || [...bandAlbums.get(b)].some(a => state.albums.has(a));
 const albumEnabled = a => !state.bands.size || [...albumBands.get(a)].some(b => state.bands.has(b));
@@ -362,6 +524,11 @@ document.addEventListener("keydown", e => { if (e.key === "Escape"){ document.bo
 const MS = {band: buildMS($("#ms-band"), "Banda/Artista", ALL_BANDS, "band"), album: buildMS($("#ms-album"), "Álbum", ALL_ALBUMS, "album")};
 
 function toggle(kind, v){
+  if (kind === "tag"){
+    if (state.tags.has(v)) state.tags.delete(v); else state.tags.add(v);
+    if (!rows().length){ state.tags.delete(v); toast("Nenhuma faixa com essa categoria no recorte atual"); }
+    render(); return;
+  }
   if (kind === "year"){   // clicar numa coluna da linha do tempo filtra as músicas daquele ano (clicar de novo tira; dá pra somar anos)
     if (state.years.has(v)) state.years.delete(v); else state.years.add(v);
     if (!rows().length){ state.years.delete(v); toast("Nenhuma faixa desse ano no recorte atual"); }
@@ -394,10 +561,10 @@ $("#tree-mode").addEventListener("click", e => {
   if (treePref === "bandas") { state.bands.clear(); state.years.clear(); }   // voltar para as bandas: sai do leque (banda/ano escolhidos)
   render();
 });
-function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.upTo = null; tmSync(); render(); }
-const activeFilters = () => state.bands.size + state.albums.size + state.genres.size + state.years.size;
-// "Limpar filtros" de cada card: tira banda, álbum, gênero e ano (a máquina do tempo tem o próprio botão de cancelar)
-function clearFilters(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); render(); }
+function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.tags.clear(); state.upTo = null; tmSync(); render(); }
+const activeFilters = () => state.bands.size + state.albums.size + state.genres.size + state.years.size + state.tags.size;
+// "Limpar filtros" de cada card: tira banda, álbum, gênero, ano e etiqueta (a máquina do tempo tem o próprio botão de cancelar)
+function clearFilters(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.tags.clear(); render(); }
 $("#clear").addEventListener("click", clearAll);
 $("#empty-clear").addEventListener("click", clearAll);
 
@@ -419,15 +586,17 @@ function renderFilters(){
     ms.foot.textContent = `${avail} de ${ms.els.size} disponíveis${set.size ? ` · ${set.size} selecionado${set.size > 1 ? "s" : ""}` : ""}`;
   }
   const chips = $("#chips");
-  const sig = [["band", state.bands], ["album", state.albums], ["genre", state.genres], ["year", state.years]].map(([k, s]) => k + ":" + [...s].join("")).join("|");
+  const sig = [["band", state.bands], ["album", state.albums], ["genre", state.genres], ["year", state.years], ["tag", state.tags]].map(([k, s]) => k + ":" + [...s].join("")).join("|");
   if (chips._sig !== sig){   // só reconstrói quando os filtros mudam: a cada quadro da máquina do tempo isso fazia os chips piscarem
     chips._sig = sig;
     const nodes = [];
-    for (const [kind, set, tag] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"], ["genre", state.genres, "Gênero"], ["year", state.years, "Ano"]]){
+    for (const [kind, set, lbl] of [["band", state.bands, "Banda"], ["album", state.albums, "Álbum"], ["genre", state.genres, "Gênero"], ["year", state.years, "Ano"], ["tag", state.tags, "Categoria"]]){
       for (const v of [...set].sort((a, b) => kind === "year" ? (a === NI ? 1 : b === NI ? -1 : a - b) : 0)){
         const c = document.createElement("button");
-        c.className = "chip"; c.type = "button"; c.setAttribute("aria-label", `Remover ${v}`);
-        c.innerHTML = `<b>${tag}</b><span>${esc(v)}</span><span class="x">×</span>`;
+        c.className = "chip"; c.type = "button"; c.setAttribute("aria-label", `Remover filtro ${v}`);
+        const chipLabel = (kind === "tag" && v === "♥") ? "" : `<b>${lbl}</b>`;
+        const chipVal = (kind === "tag" && v === "♥") ? "♥ Favoritas" : esc(v);
+        c.innerHTML = `${chipLabel}<span>${chipVal}</span><span class="x">×</span>`;
         c.addEventListener("click", () => toggle(kind, v));
         nodes.push(c);
       }
@@ -1397,9 +1566,12 @@ function renderList(container, items, opts){
     let el = keep.get(d.k);
     if (!el){
       el = document.createElement("div"); el.className = "row"; el.dataset.k = d.k;
-      el.innerHTML = (opts.rank ? `<span class="rk"></span>` : "") + `<span class="nm"></span><span class="vl"></span><div class="tr"><div class="fl"></div></div>`;
+      el.innerHTML = (opts.rank ? `<span class="rk"></span>` : "") + `<span class="nm"></span>` +
+        (opts.heart ? `<button class="hrt-btn" type="button" aria-label="Favoritar" aria-pressed="false">♡</button>` : "") +
+        `<span class="vl"></span><div class="tr"><div class="fl"></div></div>`;
       el.querySelector(".nm").textContent = d.k;
-      el.addEventListener("click", () => toggle(opts.kind, d.k));
+      el.addEventListener("click", e => { if (!e.target.closest(".hrt-btn")) toggle(opts.kind, d.k); });
+      if (opts.heart) el.querySelector(".hrt-btn").addEventListener("click", e => { e.stopPropagation(); opts.heart(d.k, e); });
       bindTip(el, () => opts.tip(d.k));
       el._new = true;
     }
@@ -1407,6 +1579,7 @@ function renderList(container, items, opts){
     if (opts.rank) el.querySelector(".rk").textContent = String(i + 1).padStart(2, "0");
     el.classList.toggle("top3", i < 3);
     el.querySelector(".vl").innerHTML = opts.label(d);
+    if (opts.heart){ const hrt = el.querySelector(".hrt-btn"); const fav = opts.isFav(d.k); hrt.textContent = fav ? "♥" : "♡"; hrt.setAttribute("aria-pressed", String(fav)); hrt.classList.toggle("on", fav); }
     const sel = opts.selected.has(d.k);
     el.classList.toggle("sel", sel); el.classList.toggle("dim", hasSel && !sel);
     el._w = (d.value / max) * 100;
@@ -1458,7 +1631,9 @@ function renderAlbums(){
   const items = [...g].map(([k, rs]) => ({k, value: byDur ? sum(rs, r => r.sec) : rs.length, n: rs.length, sec: sum(rs, r => r.sec)}))
     .sort((a, b) => b.value - a.value || (byDur ? b.n - a.n : b.sec - a.sec) || coll.compare(a.k, b.k));
   renderList($("#albums"), items, {kind: "album", selected: state.albums, tip: albumTip, scrollToSel: true,
-    label: d => byDur ? `${fmtDur(d.sec)}<small>${d.n} faixa${d.n > 1 ? "s" : ""}</small>` : `${d.n}<small>${fmtDur(d.sec)}</small>`});
+    label: d => byDur ? `${fmtDur(d.sec)}<small>${d.n} faixa${d.n > 1 ? "s" : ""}</small>` : `${d.n}<small>${fmtDur(d.sec)}</small>`,
+    heart: (album, e) => { const added = toggleAlbumFav(album); renderAlbums(); if (added && window.openAlbumTagPopover) window.openAlbumTagPopover(album, e, () => renderAlbums()); else if (!added && window.maybySuggestRemoveCategories) window.maybySuggestRemoveCategories({ label: album, getTags: () => albumTagsOf(album), removeAllTags: () => [...albumTagsOf(album)].forEach(t => removeTagFromAlbum(album, t)), onDone: () => renderAlbums() }); },
+    isFav: album => isFavAlbum(album)});
   $("#alb-title").textContent = byDur ? "Duração por álbum" : "Músicas por álbum";
   const what = byDur ? "Tempo total somado das faixas" : "Quantidade de faixas de cada álbum";
   $("#alb-hint").textContent = `${what} · ` + (state.bands.size ? `${items.length} álbu${items.length > 1 ? "ns" : "m"} no recorte` : `${items.length} álbuns`) + " · clique para filtrar";
@@ -1489,7 +1664,9 @@ function renderRank(){
   const base = rows(false, true);
   const items = [...groupBy(base, "artist")].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
   renderList($("#rank"), items, {kind: "band", rank: true, selected: state.bands, tip: rankTip, scrollToSel: true,
-    label: d => `${d.value}<small>${pct(d.value, base.length)}</small>`});
+    label: d => `${d.value}<small>${pct(d.value, base.length)}</small>`,
+    heart: (band, e) => { const added = toggleBandFav(band); renderRank(); if (added && window.openBandTagPopover) window.openBandTagPopover(band, e, () => renderRank()); else if (!added && window.maybySuggestRemoveCategories) window.maybySuggestRemoveCategories({ label: band, getTags: () => bandTagsOf(band), removeAllTags: () => [...bandTagsOf(band)].forEach(t => removeTagFromBand(band, t)), onDone: () => renderRank() }); },
+    isFav: band => isFavBand(band)});
 }
 
 /* ---------------- chart 5: genres · chart 6: track profile ---------------- */
@@ -1579,6 +1756,10 @@ function renderGenres(){
   const maxCount = Math.max(...sortedBuckets.map(([,d]) => d.count), ...sortedOrphans.map(o => o.value), 1);
   const totalBuckets = sortedBuckets.length + (sortedOrphans.length ? 1 : 0);
   const totalGenres = [...buckets.values()].reduce((n,b) => n + b.subs.size, 0) + orphans.size;
+  const gMaxRange = Math.min((totalBuckets - 1) * 20, 150);
+  const gStep = totalBuckets > 1 ? gMaxRange / (totalBuckets - 1) : 0;
+  const gHue = i => Math.round(-i * gStep);
+  const gFlBg = (w, hue) => `width:${w.toFixed(1)}%;background:linear-gradient(90deg,hsl(calc(var(--h) + ${hue}),70%,35%),hsl(calc(var(--h) + ${hue}),65%,55%))`;
   let html = "";
 
   // modo foco: um único bucket aberto ocupa todo o espaço
@@ -1606,12 +1787,15 @@ function renderGenres(){
     if (expandedGenreBucket !== null){
       el.classList.add("genres-focus");
       el.classList.toggle("genres-multicol", focusSubs.length > 6);
+      const focusIdx = focusKey === "__outros__" ? sortedBuckets.length : Math.max(0, sortedBuckets.findIndex(([k]) => k === focusKey));
+      const focusHue = gHue(focusIdx);
+      const subHue = focusHue - Math.max(20, Math.round(gStep * 1.2));
       const bucketSel = focusSubs.some(s => state.genres.has(s.k));
       html += `<div class="row genre-bucket${bucketSel ? " sel" : ""}" data-bucket="${esc(focusKey)}">
         <span class="rk">${focusRk}</span><span class="bucket-tog">▾</span>
         <span class="nm">${focusLabel}</span>
         <span class="vl">${focusCount}<small>${pct(focusCount, withG)}</small></span>
-        <div class="tr"><div class="fl" style="width:${(focusCount/maxCount)*100}%"></div></div></div>`;
+        <div class="tr"><div class="fl" style="${gFlBg((focusCount/maxCount)*100, focusHue)}"></div></div></div>`;
       const subMax = focusSubs[0]?.value || 1;
       html += `<div class="genre-subs-grid">`;
       focusSubs.forEach(s => {
@@ -1619,7 +1803,8 @@ function renderGenres(){
         html += `<div class="row genre-sub${sel ? " sel" : ""}${hasSel && !sel ? " dim" : ""}" data-genre="${esc(s.k)}">
           <span class="nm">${esc(s.label || capFirst(s.k))}</span>
           <span class="vl">${s.value}<small>${pct(s.value, withG)}</small></span>
-          <div class="tr"><div class="fl" style="width:${(s.value/subMax)*100}%"></div></div></div>`;
+          <button class="hrt-btn${isFavGenre(s.k) ? " on" : ""}" type="button" data-fav-genre="${esc(s.k)}" aria-label="Favoritar ${esc(s.label || capFirst(s.k))}">${isFavGenre(s.k) ? "♥" : "♡"}</button>
+          <div class="tr"><div class="fl" style="${gFlBg((s.value/subMax)*100, subHue)}"></div></div></div>`;
       });
       html += `</div>`;
       el.innerHTML = html;
@@ -1632,6 +1817,7 @@ function renderGenres(){
   // modo lista: todos os buckets, 1 coluna sempre
   el.classList.remove("genres-focus", "genres-multicol");
   sortedBuckets.forEach(([root, data], bi) => {
+    const hue = gHue(bi);
     const visibleSubs = data.subs.filter(s => s.k.toLowerCase() !== root);
     const rk = String(bi + 1).padStart(2, "0");
     html += `<div class="genre-group">`;
@@ -1641,7 +1827,7 @@ function renderGenres(){
         <span class="rk">${rk}</span><span class="bucket-tog">›</span>
         <span class="nm">${capFirst(root)} <small class="sub-ct">(${visibleSubs.length})</small></span>
         <span class="vl">${data.count}<small>${pct(data.count, withG)}</small></span>
-        <div class="tr"><div class="fl" style="width:${(data.count/maxCount)*100}%"></div></div></div>`;
+        <div class="tr"><div class="fl" style="${gFlBg((data.count/maxCount)*100, hue)}"></div></div></div>`;
     } else {
       const s = visibleSubs[0];
       const gKey = s ? s.k : root, gLabel = s ? (s.label || capFirst(s.k)) : capFirst(root);
@@ -1650,23 +1836,28 @@ function renderGenres(){
         <span class="rk">${rk}</span><span class="bucket-tog"></span>
         <span class="nm">${esc(gLabel)}</span>
         <span class="vl">${data.count}<small>${pct(data.count, withG)}</small></span>
-        <div class="tr"><div class="fl" style="width:${(data.count/maxCount)*100}%"></div></div></div>`;
+        <button class="hrt-btn${isFavGenre(gKey) ? " on" : ""}" type="button" data-fav-genre="${esc(gKey)}" aria-label="Favoritar ${esc(gLabel)}">${isFavGenre(gKey) ? "♥" : "♡"}</button>
+        <div class="tr"><div class="fl" style="${gFlBg((data.count/maxCount)*100, hue)}"></div></div></div>`;
     }
     html += `</div>`;
   });
   if (sortedOrphans.length){
     const oBucketSel = sortedOrphans.some(o => state.genres.has(o.k));
     const rk = String(sortedBuckets.length + 1).padStart(2, "0");
+    const oHue = gHue(sortedBuckets.length);
+    const oW = sortedOrphans.reduce((n,o) => n + o.value, 0);
     html += `<div class="genre-group"><div class="row genre-bucket${oBucketSel ? " sel" : ""}${hasSel && !oBucketSel ? " dim" : ""}" data-bucket="__outros__">
       <span class="rk">${rk}</span><span class="bucket-tog">›</span>
       <span class="nm">Outros (${sortedOrphans.length})</span>
-      <span class="vl">${sortedOrphans.reduce((n,o) => n + o.value,0)}<small></small></span>
-      <div class="tr"><div class="fl" style="width:${(sortedOrphans.reduce((n,o)=>n+o.value,0)/maxCount)*100}%"></div></div></div></div>`;
+      <span class="vl">${oW}<small></small></span>
+      <div class="tr"><div class="fl" style="${gFlBg((oW/maxCount)*100, oHue)}"></div></div></div></div>`;
   }
   el.innerHTML = html;
   $("#gen-hint").innerHTML = `${totalBuckets} categorias · ${totalGenres} gêneros · clique na categoria para ver os subgêneros${upd}`;
 }
 document.querySelector("#genres")?.addEventListener("click", e => {
+  const hrtBtn = e.target.closest(".hrt-btn[data-fav-genre]");
+  if (hrtBtn) { const g = hrtBtn.dataset.favGenre; const added = toggleGenreFav(g); renderGenres(); if (added && window.openGenreTagPopover) window.openGenreTagPopover(g, e, () => renderGenres()); else if (!added && window.maybySuggestRemoveCategories) window.maybySuggestRemoveCategories({ label: capFirst(g), getTags: () => genreTagsOf(g), removeAllTags: () => [...genreTagsOf(g)].forEach(t => removeTagFromGenre(g, t)), onDone: () => renderGenres() }); return; }
   const bucketRow = e.target.closest("[data-bucket]"), subRow = e.target.closest("[data-genre]");
   if (bucketRow && !subRow){
     const k = bucketRow.dataset.bucket;
@@ -1704,10 +1895,10 @@ function renderProfile(R){
                      dur.long   >= dur.normal && dur.long   >= dur.short && dur.long   >= dur.epic  ? `${pct(dur.long,   dTotal, 0)} são longas`  :
                      `${pct(dur.epic, dTotal, 0)} são épicas`;
     html += profStack("Duração das faixas", domLabel,
-      [[dur.short, "hsl(var(--h),60%,72%)", "Curtas < 3min"], [dur.normal, "hsl(var(--h),65%,52%)", "Normais 3–5min"], [dur.long, "hsl(var(--h),93%,24%)", "Longas 5–8min"], [dur.epic, "hsl(var(--h),85%,20%)", "Épicas > 8min"]], dTotal);
+      [[dur.short, "hsl(calc(var(--h) - 54),62%,62%)", "Curtas < 3min"], [dur.normal, "hsl(calc(var(--h) - 54),65%,50%)", "Normais 3–5min"], [dur.long, "hsl(calc(var(--h) - 54),68%,38%)", "Longas 5–8min"], [dur.epic, "hsl(calc(var(--h) - 54),70%,28%)", "Épicas > 8min"]], dTotal);
     const longest = [...withSec].sort((a, b) => b.sec - a.sec).slice(0, 3);
     if (longest.length) html += `<div class="pf"><div class="pf-h"><span>Músicas mais longas</span><b>Duração</b></div>
-      ${longest.map(t => `<div class="hrow"><div class="hl"><span>${esc(t.title)} <em>${esc(t.artist)}</em></span><b>${durTxt(t.sec)}</b></div><div class="ht"><i style="width:${Math.max(2, t.sec / longest[0].sec * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) + 75),65%,38%),hsl(calc(var(--h) + 75),60%,62%))"></i></div></div>`).join("")}</div>`;
+      ${longest.map(t => `<div class="hrow"><div class="hl"><span>${esc(t.title)} <em>${esc(t.artist)}</em></span><b>${durTxt(t.sec)}</b></div><div class="ht"><i style="width:${Math.max(2, t.sec / longest[0].sec * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) - 27),65%,38%),hsl(calc(var(--h) - 27),60%,62%))"></i></div></div>`).join("")}</div>`;
   }
 
   // --- décadas (t.date sempre disponível) ---
@@ -1724,7 +1915,7 @@ function renderProfile(R){
       const sorted = [...decades].sort((a, b) => a[0] - b[0]);
       const decMax = Math.max(...sorted.map(([, n]) => n));
       html += `<div class="pf"><div class="pf-h"><span>Por década</span><b>Faixas</b></div>
-        ${sorted.map(([d, n]) => `<div class="hrow"><div class="hl"><span>${d}s</span><b>${n} <em>${pct(n, withYear.length, 0)}</em></b></div><div class="ht"><i style="width:${Math.max(2, n / decMax * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) + 30),70%,35%),hsl(calc(var(--h) + 30),65%,58%))"></i></div></div>`).join("")}</div>`;
+        ${sorted.map(([d, n]) => `<div class="hrow"><div class="hl"><span>${d}s</span><b>${n} <em>${pct(n, withYear.length, 0)}</em></b></div><div class="ht"><i style="width:${Math.max(2, n / decMax * 100)}%;background:linear-gradient(90deg,hsl(var(--h),70%,35%),hsl(var(--h),65%,58%))"></i></div></div>`).join("")}</div>`;
     }
   }
 
@@ -1735,7 +1926,7 @@ function renderProfile(R){
       const artsA = [...groupBy(M, "artist")].map(([k, rs]) => ({k, n: rs.length, e: rs.filter(t => t.m.x).length}))
         .filter(a => a.n >= 3 && a.e).sort((a, b) => b.e / b.n - a.e / a.n || b.e - a.e).slice(0, 4);
       if (artsA.length) html += `<div class="pf"><div class="pf-h"><span>Artistas mais explícitos</span><b>% das faixas</b></div>
-        ${artsA.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) - 45),75%,32%),hsl(calc(var(--h) - 45),65%,58%))"></i></div></div>`).join("")}</div>`;
+        ${artsA.map(a => `<div class="hrow"><div class="hl"><span>${esc(a.k)} <em>${a.e} de ${a.n}</em></span><b>${pct(a.e, a.n, 0)}</b></div><div class="ht"><i style="width:${Math.max(2, a.e / a.n * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) + 27),75%,32%),hsl(calc(var(--h) + 27),65%,58%))"></i></div></div>`).join("")}</div>`;
     }
   }
 
@@ -1744,8 +1935,8 @@ function renderProfile(R){
     const ex = M.filter(t => t.m.x).length;
     const ty = {album: 0, single: 0, compilation: 0}; M.forEach(t => { if (t.m.ty in ty) ty[t.m.ty]++; });
     const tyN = ty.album + ty.single + ty.compilation;
-    html += tyN ? profStack("De onde vêm", pct(ty.album, tyN, 0) + " de álbuns", [[ty.album, "hsl(var(--h),65%,52%)", "Álbum"], [ty.single, "hsl(var(--h),60%,72%)", "Single/EP"], [ty.compilation, "hsl(var(--h),93%,24%)", "Coletânea"]], tyN) : "";
-    html += profStack("Explícitas", pct(ex, M.length, 0), [[ex, "hsl(var(--h),80%,98%)", "Explícitas"], [M.length - ex, "hsl(var(--h),93%,24%)", "Sem palavrão"]], M.length);
+    html += tyN ? profStack("De onde vêm", pct(ty.album, tyN, 0) + " de álbuns", [[ty.album, "hsl(calc(var(--h) + 54),65%,50%)", "Álbum"], [ty.single, "hsl(calc(var(--h) + 54),62%,63%)", "Single/EP"], [ty.compilation, "hsl(calc(var(--h) + 54),68%,35%)", "Coletânea"]], tyN) : "";
+    html += profStack("Explícitas", pct(ex, M.length, 0), [[ex, "hsl(calc(var(--h) + 54),65%,60%)", "Explícitas"], [M.length - ex, "hsl(calc(var(--h) + 54),65%,38%)", "Sem palavrão"]], M.length);
   } else if (!html){
     html = `<div class="empty-in"><p>Explícitas e singles aparecem aqui para músicas importadas por <strong>link do Spotify</strong>.</p>${missing ? `<button class="pbtn" type="button" data-upd>Atualizar dados</button><p class="muted">Procura as músicas que já estão na playlist: 1 busca por música.</p>` : ""}</div>`;
   }
@@ -1759,7 +1950,7 @@ const SONG_COLS = [
   {k: "n", l: "#", num: true, cell: t => t.n ?? ""},
   {k: "title", l: "Música", cls: "tt", cell: t => esc(t.title)},
   {k: "artist", l: "Artista", cell: t => esc(t.artist)},
-  {k: "album", l: "Álbum", cell: t => esc(t.album)},
+  {k: "album", l: "Álbum", cls: "al", cell: t => esc(t.album)},
   {k: "genre", l: "Gênero", cls: "gn", cell: t => t.genre ? esc(t.genre) : ND},
   {k: "date", l: "Lançamento", cell: t => t.date ? esc(t.date) : ND},
   {k: "sec", l: "Duração", num: true, cell: t => t.sec ? durTxt(t.sec) : ND},
@@ -1779,7 +1970,7 @@ const songView = r => { const a = (r.artist || "").trim() || NI; return {n: r.n,
 const songTable = list => `<div class="ptab"><table><thead><tr>${songHead(false)}</tr></thead><tbody>${list.map(t => `<tr>${songCells(t)}</tr>`).join("")}</tbody></table></div>`;
 
 /* ---------------- render ---------------- */
-$("#filtered-list-card thead tr").innerHTML = songHead();
+$("#filtered-list-card thead tr").innerHTML = `<th class="fv"></th>` + songHead();
 let flSortK = "n", flSortDir = 1;
 function renderFilteredList(R){
   const card = $("#filtered-list-card");
@@ -1787,10 +1978,18 @@ function renderFilteredList(R){
   card.style.display = active ? "" : "none";
   if (!active) return;
   const list = [...R].sort(cmpSong(flSortK, flSortDir));
-  $("#filtered-list-body").innerHTML = list.map((t, i) => `<tr title="Posição original na playlist: #${t.n}">${songCells(t, i + 1)}</tr>`).join("");
+  $("#filtered-list-body").innerHTML = list.map((t, i) => {
+    const fav = isFavTrack(t);
+    return `<tr title="Posição original na playlist: #${t.n}"><td class="fv"><button class="hrt-btn fv-hrt${fav ? " on" : ""}" data-n="${t.n}" aria-pressed="${fav}" aria-label="Favoritar ${esc(t.title)}">${fav ? "♥" : "♡"}</button></td>${songCells(t, i + 1)}</tr>`;
+  }).join("");
   $("#filtered-list-hint").textContent = `${faixas(list.length)} no filtro atual`;
   card.querySelectorAll("th[data-k]").forEach(th => th.setAttribute("aria-sort", th.dataset.k === flSortK ? (flSortDir > 0 ? "ascending" : "descending") : "none"));
 }
+$("#filtered-list-card tbody").addEventListener("click", e => {
+  const b = e.target.closest(".fv-hrt"); if (!b) return;
+  const n = +b.dataset.n, t = BY_PLAYLIST.find(x => x.n === n);
+  if (t){ const added = toggleTrackFav(t); render(); if (added && window.openTagPopover) window.openTagPopover(t, e, () => render()); else if (!added && window.maybySuggestRemoveCategories) window.maybySuggestRemoveCategories({ label: t.title, getTags: () => trackTagsOf(t), removeAllTags: () => [...trackTagsOf(t)].forEach(tag => removeTagFromTrack(t, tag)), onDone: () => render() }); }
+});
 $("#filtered-list-card").querySelectorAll("th[data-k]").forEach(th => {
   const go = () => { if (flSortK === th.dataset.k) flSortDir *= -1; else { flSortK = th.dataset.k; flSortDir = 1; } render(); };
   th.addEventListener("click", go);
@@ -2871,6 +3070,25 @@ rule(() => {
     kick: [`${pc0(up.from, 1)} → ${pc0(up.to, 1)}`, `das faixas com ${up.g}: primeira vs. segunda metade`]};
 });
 
+// FAVORITAS · resumo pessoal
+rule(() => {
+  const favs = T.filter(isFavT);
+  if (!favs.length) return null;
+  const artsFav = [...groupBy(favs, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const genFav = favs.flatMap(t => t.ge || []).reduce((m, g) => { m.set(g, (m.get(g) || 0) + 1); return m; }, new Map());
+  const topG = [...genFav].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g]) => g);
+  const decFav = favs.filter(t => t.year).reduce((m, t) => { const d = Math.floor(t.year / 10) * 10; m.set(d, (m.get(d) || 0) + 1); return m; }, new Map());
+  const topD = [...decFav].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([d]) => d + "s");
+  const artLine = artsFav.length ? `<p>Artistas mais favoritados: ${artsFav.map(([a, n]) => `${B(a)} (${faixas(n)})`).join(", ")}.</p>` : "";
+  const genLine = topG.length ? `<p>Gêneros preferidos: ${topG.map(g => B(capFirst(g))).join(", ")}.</p>` : "";
+  const decLine = topD.length ? `<p>Décadas: ${topD.join(" e ")}.</p>` : "";
+  return {kind: "pl", theme: 0, score: 98,
+    title: "Suas favoritas",
+    body: `<p>${B(faixas(favs.length))} favoritadas — ${pc1(favs.length, T.length)} da playlist.</p>${artLine}${genLine}${decLine}`,
+    viz: V.stack([[favs.length, "hsl(350,70%,65%)", "Favoritas"], [T.length - favs.length, "hsla(var(--h),60%,67%,.25)", "Outras"]], T.length),
+    kick: [pc1(favs.length, T.length), "das faixas estão favoritadas"]};
+});
+
 /* ---------- selection, ordering and row packing ---------- */
 /* a aba Insights tem duas visões: simples (resumo e cards principais) e técnica (jornada,
    cards avançados, metodologia). Cada bloco leva data-ins="simple|tech" no HTML, cada card leva tech: true;
@@ -3088,7 +3306,8 @@ const ICON = {
   x: '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
   sync: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 6.5A5.5 5.5 0 0 0 3.3 4.6M2.5 9.5a5.5 5.5 0 0 0 10.2 1.9M3 2v3h3M13 14v-3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   palette: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 4.4 11.4c.6-.5.5-1.4-.2-1.7a1 1 0 0 1 .8-1.8h.8c.7 0 1.2-.6 1.2-1.4A6.5 6.5 0 0 0 8 1.5z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="5.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="8" cy="4" r=".95" fill="currentColor"/><circle cx="10.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="5" cy="9.5" r=".95" fill="currentColor"/></svg>',
-  reset: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 .8-2.7M3 3.5V6h2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
+  reset: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 .8-2.7M3 3.5V6h2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+  tag: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h6l6 6-6 6-6-6V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></svg>'
 };
 const pad2 = n => String(n).padStart(2, "0");
 const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
@@ -4670,19 +4889,22 @@ async function askReverse(){
 
 /* ---------- song table with removal ---------- */
 function openTable({verify = false, query: q0 = ""} = {}){
-  const marked = new Set(); let sortK = "n", sortDir = 1, query = q0;
+  const marked = new Set(); let sortK = "n", sortDir = 1, query = q0, onlyFav = false;
   const body = document.createElement("div"); body.className = "tbwrap";
-  body.innerHTML = `${verify ? `<div class="ordnote">Confira a coluna <strong>#</strong>: a playlist deve ir da <strong>primeira música adicionada (#1)</strong> até a <strong>última (#${NN})</strong>. Se estiver fora de ordem, clique em <strong>CONSERTAR ORDEM DA PLAYLIST</strong>.</div>` : ""}<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button>${STORE ? `<button class="gbtn" type="button" id="tb-reverse" title="A #1 vira a última e a última vira a #1">Inverter ordem</button><button class="pbtn" type="button" id="tb-fix" title="Cole os links da playlist do Spotify e a ordem é refeita, sem buscar nada">CONSERTAR ORDEM DA PLAYLIST</button>` : ""}<span class="tbcount" id="tb-count"></span></div>
-    <div class="tbscroll"><table class="tb"><thead><tr><th class="ck"></th>${songHead()}</tr></thead><tbody></tbody></table></div>`;
+  body.innerHTML = `${verify ? `<div class="ordnote">Confira a coluna <strong>#</strong>: a playlist deve ir da <strong>primeira música adicionada (#1)</strong> até a <strong>última (#${NN})</strong>. Se estiver fora de ordem, clique em <strong>CONSERTAR ORDEM DA PLAYLIST</strong>.</div>` : ""}<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-fav-only" aria-pressed="false">♡ Só favoritas</button><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button>${STORE ? `<button class="gbtn" type="button" id="tb-reverse" title="A #1 vira a última e a última vira a #1">Inverter ordem</button><button class="pbtn" type="button" id="tb-fix" title="Cole os links da playlist do Spotify e a ordem é refeita, sem buscar nada">CONSERTAR ORDEM DA PLAYLIST</button>` : ""}<span class="tbcount" id="tb-count"></span></div>
+    <div class="tbscroll"><table class="tb"><thead><tr><th class="fv"></th><th class="ck"></th>${songHead()}</tr></thead><tbody></tbody></table></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `<span class="hintf" id="tb-hint">Marque as faixas que quer remover. Nada é apagado até você salvar.</span><span class="sp"></span><button class="gbtn" type="button" id="tb-cancel">Fechar</button><button class="pbtn danger" type="button" id="tb-save" disabled>Remover faixas</button>`;
   const md = openModal({title: "Músicas da playlist", sub: `${faixas(NN)} · ${IS.art.length} artistas · ${IS.alb.length} álbuns`, body, foot, size: "lg"});
   const q = s => md.m.querySelector(s), tbody = q("tbody");
-  const rowsHtml = list => list.map(t => `<tr data-n="${t.n}" class="${marked.has(t.n) ? "mk" : ""}"><td class="ck"><button type="button" class="rm" aria-pressed="${marked.has(t.n)}" aria-label="${marked.has(t.n) ? "Manter" : "Remover"} ${esc(t.title)}">${ICON.x}</button></td>${songCells(t)}</tr>`).join("");
+  const rowsHtml = list => list.map(t => {
+    const fav = isFavTrack(t); const tgs = trackTagsOf(t);
+    return `<tr data-n="${t.n}" class="${marked.has(t.n) ? "mk" : ""}"><td class="fv"><button type="button" class="hrt-btn fv-hrt${fav ? " on" : ""}" aria-pressed="${fav}" aria-label="Favoritar ${esc(t.title)}" data-n="${t.n}">${fav ? "♥" : "♡"}</button><button type="button" class="tag-btn" aria-label="Etiquetas de ${esc(t.title)}" data-n="${t.n}">${ICON.tag}${tgs.length ? `<span class="tag-ct">${tgs.length}</span>` : ""}</button></td><td class="ck"><button type="button" class="rm" aria-pressed="${marked.has(t.n)}" aria-label="${marked.has(t.n) ? "Manter" : "Remover"} ${esc(t.title)}">${ICON.x}</button></td>${songCells(t)}</tr>`;
+  }).join("");
   let visible = [];
   function draw(){
     const qq = query.trim().toLowerCase();
-    visible = BY_PLAYLIST.filter(t => !qq || (t.title + " " + t.artist + " " + t.album + " " + t.genre).toLowerCase().includes(qq));
+    visible = BY_PLAYLIST.filter(t => (!qq || (t.title + " " + t.artist + " " + t.album + " " + t.genre).toLowerCase().includes(qq)) && (!onlyFav || isFavT(t)));
     visible.sort(cmpSong(sortK, sortDir));
     tbody.innerHTML = visible.length ? rowsHtml(visible) : `<tr><td colspan="${SONG_COLS.length + 1}" class="none">Nenhuma faixa encontrada.</td></tr>`;
     md.m.querySelectorAll("th[data-k]").forEach(th => th.setAttribute("aria-sort", th.dataset.k === sortK ? (sortDir > 0 ? "ascending" : "descending") : "none"));
@@ -4696,6 +4918,8 @@ function openTable({verify = false, query: q0 = ""} = {}){
     q("#tb-hint").innerHTML = k >= NN ? `<span class="warn">A playlist não pode ficar vazia.</span>` : k ? `<strong>${faixas(k)}</strong> marcada${k > 1 ? "s" : ""} para remover.` : "Marque as faixas que quer remover. Nada é apagado até você salvar.";
   }
   tbody.addEventListener("click", e => {
+    if (e.target.closest(".fv-hrt")){ const n = +e.target.closest(".fv-hrt").dataset.n; const t = BY_PLAYLIST.find(x => x.n === n); if (t){ const added = toggleTrackFav(t); draw(); if (added && window.openTagPopover) window.openTagPopover(t, e, () => draw()); else if (!added && window.maybySuggestRemoveCategories) window.maybySuggestRemoveCategories({ label: t.title, getTags: () => trackTagsOf(t), removeAllTags: () => [...trackTagsOf(t)].forEach(tag => removeTagFromTrack(t, tag)), onDone: () => draw() }); } return; }
+    if (e.target.closest(".tag-btn")){ const n = +e.target.closest(".tag-btn").dataset.n; const t = BY_PLAYLIST.find(x => x.n === n); if (t && window.openTagPopover) window.openTagPopover(t, e, () => draw()); return; }
     const b = e.target.closest(".rm"); if (!b) return;
     const tr = b.closest("tr"), n = +tr.dataset.n;
     marked.has(n) ? marked.delete(n) : marked.add(n);
@@ -4705,6 +4929,7 @@ function openTable({verify = false, query: q0 = ""} = {}){
     th.addEventListener("click", go); th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } }); });
   q("#tb-q").value = q0;
   let tmr; q("#tb-q").addEventListener("input", e => { clearTimeout(tmr); tmr = setTimeout(() => { query = e.target.value; draw(); }, 120); });
+  q("#tb-fav-only").addEventListener("click", () => { onlyFav = !onlyFav; q("#tb-fav-only").setAttribute("aria-pressed", onlyFav); q("#tb-fav-only").textContent = onlyFav ? "♥ Só favoritas" : "♡ Só favoritas"; draw(); });
   q("#tb-markall").addEventListener("click", () => { visible.forEach(t => marked.add(t.n)); draw(); });
   q("#tb-clear").addEventListener("click", () => { marked.clear(); draw(); });
   q("#tb-cancel").addEventListener("click", md.close);
@@ -4769,16 +4994,20 @@ function zipStore(files, type = "application/vnd.openxmlformats-officedocument.s
 function exportXlsx(){
   const x = s => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const col = i => String.fromCharCode(65 + i);
-  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento", "gêneros", "explícita", "tipo_lançamento", "link_spotify"];
+  const head = ["numero", "musica", "banda_artista", "album", "duração", "data_lançamento", "gêneros", "explícita", "tipo_lançamento", "link_spotify", "favorita", "etiquetas"];
   const rows = currentRows();
+  const trackByN = new Map(BY_PLAYLIST.map(t => [t.n, t]));
   const extra = r => {
     const m = r[6] || {}, gs = shownGenres((r[2] || "").trim() || NI);
-    return [gs ? gs.join(", ") : "", m.x === undefined ? "" : m.x ? "Sim" : "Não", TYPE_PT[m.ty] || "", m.id ? `https://open.spotify.com/track/${m.id}` : ""];
+    const t = trackByN.get(r[0]);
+    const fav = t ? (isFavT(t) ? "Sim" : "Não") : "";
+    const tgs = t ? trackTagsOf(t).join(", ") : "";
+    return [gs ? gs.join(", ") : "", m.x === undefined ? "" : m.x ? "Sim" : "Não", TYPE_PT[m.ty] || "", m.id ? `https://open.spotify.com/track/${m.id}` : "", fav, tgs];
   };
   const cell = (v, r, i, s) => typeof v === "number" ? `<c r="${col(i)}${r}"${s ? ` s="${s}"` : ""}><v>${v}</v></c>` : `<c r="${col(i)}${r}" t="inlineStr"${s ? ` s="${s}"` : ""}><is><t xml:space="preserve">${x(v)}</t></is></c>`;
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
-<cols><col min="1" max="1" width="9" customWidth="1"/><col min="2" max="2" width="48" customWidth="1"/><col min="3" max="3" width="26" customWidth="1"/><col min="4" max="4" width="38" customWidth="1"/><col min="5" max="5" width="10" customWidth="1"/><col min="6" max="6" width="16" customWidth="1"/></cols>
+<cols><col min="1" max="1" width="9" customWidth="1"/><col min="2" max="2" width="48" customWidth="1"/><col min="3" max="3" width="26" customWidth="1"/><col min="4" max="4" width="38" customWidth="1"/><col min="5" max="5" width="10" customWidth="1"/><col min="6" max="6" width="16" customWidth="1"/><col min="11" max="11" width="12" customWidth="1"/><col min="12" max="12" width="30" customWidth="1"/></cols>
 <sheetData><row r="1">${head.map((h, i) => cell(h, 1, i, 1)).join("")}</row>${rows.map((r, k) => `<row r="${k + 2}">${[r[0], r[1], r[2], r[3], durTxt(r[4]), r[5], ...extra(r)].map((v, i) => cell(v, k + 2, i)).join("")}</row>`).join("")}</sheetData>
 <autoFilter ref="A1:${col(head.length - 1)}${rows.length + 1}"/></worksheet>`;
   const files = [
@@ -5145,6 +5374,7 @@ bootTheme();
 /* ---------- wire the header buttons ---------- */
 $("#dt-theme").innerHTML = `${ICON.palette}<span>Cor</span>`;
 $("#dt-theme").addEventListener("click", openTheme);
+$("#dt-tags").innerHTML = `${ICON.tag}<span>Favoritas</span>`;
 $("#dt-clear").innerHTML = `${ICON.x}<span>Limpar filtros</span>`;
 $("#dt-clear").addEventListener("click", clearFilters);
 $("#dt-table").innerHTML = `${ICON.list}<span>Músicas</span>`;

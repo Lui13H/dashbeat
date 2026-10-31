@@ -5,9 +5,9 @@
 /* orbes de fundo com parallax */
 .fx-orbs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .fx-orbs i{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;will-change:transform}
-.fx-orbs i:nth-child(1){width:46vmax;height:46vmax;left:-14vmax;top:12vh;background:radial-gradient(circle,rgba(16,185,129,.30),transparent 65%)}
-.fx-orbs i:nth-child(2){width:38vmax;height:38vmax;right:-12vmax;top:58vh;background:radial-gradient(circle,rgba(110,231,183,.18),transparent 65%)}
-.fx-orbs i:nth-child(3){width:30vmax;height:30vmax;left:36vw;top:130vh;background:radial-gradient(circle,rgba(5,150,105,.26),transparent 65%)}
+.fx-orbs i:nth-child(1){width:46vmax;height:46vmax;left:-14vmax;top:12vh;background:radial-gradient(circle,hsla(var(--h),70%,48%,.30),transparent 65%)}
+.fx-orbs i:nth-child(2){width:38vmax;height:38vmax;right:-12vmax;top:58vh;background:radial-gradient(circle,hsla(var(--h),65%,62%,.18),transparent 65%)}
+.fx-orbs i:nth-child(3){width:30vmax;height:30vmax;left:36vw;top:130vh;background:radial-gradient(circle,hsla(var(--h),72%,40%,.26),transparent 65%)}
 
 /* revelar ao rolar (scroll trigger) */
 .fx-js .rv{opacity:0;transform:translateY(30px) scale(.985);
@@ -18,7 +18,7 @@
 @media (min-width:900px){
   body[data-fx="dashboard"] .toolbar{position:sticky;top:0;z-index:60;padding:12px 14px;margin-inline:-14px;border-radius:0 0 18px 18px;
     transition:background .3s,box-shadow .3s,border-color .3s}
-  body[data-fx="dashboard"] .toolbar.stuck{background:rgba(4,16,12,.8);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  body[data-fx="dashboard"] .toolbar.stuck{background:hsla(var(--h),55%,4%,.82);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
     border-top-color:transparent;box-shadow:0 20px 40px -26px #000,inset 0 -1px 0 var(--line)}
 }
 

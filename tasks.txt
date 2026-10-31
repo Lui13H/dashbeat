@@ -84,7 +84,7 @@ Casos de borda: localStorage cheio ou bloqueado (não quebrar, só não mostrar)
 Pronto quando: simulando adicionar, remover, reordenar e trocar a playlist (por CDP, alterando o localStorage entre cargas) o resumo bate com a diferença real e some depois do "Entendi".
 
 ---------------------------------------------------------------------
-TASK 5 — FAVORITAS E ETIQUETAS
+✅ TASK 5 — FAVORITAS E ETIQUETAS
 ---------------------------------------------------------------------
 Objetivo: a pessoa marca músicas (e bandas) com coração e etiquetas próprias ("treino", "nostalgia") e filtra o painel por elas.
 
@@ -98,6 +98,9 @@ Comportamento:
 - Backup: botão "Exportar etiquetas" (.json) e "Importar etiquetas"; no Excel exportado, colunas "favorita" e "etiquetas".
 Casos de borda: música sem id (usa ownKey; se o id aparecer depois via Atualizar dados, migrar a chave), apagar música (limpar entradas órfãs só quando a pessoa pedir, nunca automático), playlist de exemplo (permitir, mas avisar que as marcas ficam só neste navegador).
 Pronto quando: marcar, filtrar, remover, recarregar a página e conferir que persiste; filtros combinam com banda/álbum/gênero; testado por CDP com cliques reais.
+
+✅ Extensão v1.5.11: favoritar álbuns e gêneros/subgêneros também (TAGS.albuns, TAGS.generos; isFavAlbum, isFavGenre, toggleAlbumFav, toggleGenreFav; isFavT() estendido; heart nos cards de álbuns e gêneros).
+✅ Extensão v1.5.24: GENRE_ADD com 3 gêneros principais de cada banda da playlist (41 artistas — Slipknot, Lamb of God, Exodus, Sepultura, Gojira, Metallica, Avenged Sevenfold, Death, Iron Maiden, Pantera, System Of A Down, Dream Theater, Machine Head, Burn The Priest, Chimaira, Megadeth, Mudvayne, Slayer, Testament, Korn, Children of Bodom, Accept, Carcass, Adema, Deftones, Hatebreed, HEALTH, Illdisposed, Judas Priest, Limp Bizkit, Linkin Park, Marilyn Manson, Meshuggah, Municipal Waste, Mushroomhead, Pissing Razors, Soulfly, Stone Sour, Strapping Young Lad, Three Days Grace, Trivium); garante que mesmo sem retorno das APIs os gêneros corretos aparecem.
 
 ---------------------------------------------------------------------
 TASK 6 — COMPARAR DOIS RECORTES
