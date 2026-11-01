@@ -160,36 +160,180 @@ function importTagsFromFile(file){
   const btn = document.getElementById("dt-tags");
   if (!btn) return;
 
-  function openTagsModal(){
-    const tags = allTagNames();
+  btn.addEventListener("click", function(){
+    let groupBy = "categoria";
+    let sortBy  = "quantidade";
+    let filterText = "";
+    let compact = true;
+    const showTypes = { faixa: true, banda: true, album: true, genero: true };
+
     const body = document.createElement("div");
-    body.className = "tag-mgr";
-    const hasTags = tags.length > 0;
-    const favCount = typeof T !== "undefined" ? T.filter(t => typeof isFavT === "function" && isFavT(t)).length : 0;
-    const albFavCount = Object.values(TAGS.albuns || {}).filter(v => v.f).length;
-    const genFavCount = Object.values(TAGS.generos || {}).filter(v => v.f).length;
+    body.className = "fav-list-modal";
+    const md = openModal({ title: "Favoritas e Categorias", body, size: "md" });
 
-    body.innerHTML = `<div class="tms-stats">
-      <div class="tms-stat"><b>${favCount}</b><span>música${favCount !== 1 ? "s" : ""} favoritada${favCount !== 1 ? "s" : ""}</span></div>
-      ${albFavCount ? `<div class="tms-stat"><b>${albFavCount}</b><span>álbu${albFavCount !== 1 ? "ns" : "m"} favorito${albFavCount !== 1 ? "s" : ""}</span></div>` : ""}
-      ${genFavCount ? `<div class="tms-stat"><b>${genFavCount}</b><span>gênero${genFavCount !== 1 ? "s" : ""} favorito${genFavCount !== 1 ? "s" : ""}</span></div>` : ""}
-      <div class="tms-stat"><b>${tags.length}</b><span>categoria${tags.length !== 1 ? "s" : ""} criada${tags.length !== 1 ? "s" : ""}</span></div>
-    </div>
-    ${hasTags ? `<div class="tms-pills">${tags.map(tag => `<span class="tag-pill" style="--tc:${tagColor(tag)}">${tag}</span>`).join("")}</div>` : '<p class="muted" style="margin-top:12px">Nenhuma categoria ainda. Favorite um item para adicionar.</p>'}
-    <div class="tms-actions">
-      <button class="gbtn" type="button" id="tms-exp">${ICON.down} Exportar categorias</button>
-      <button class="gbtn" type="button" id="tms-imp">${ICON.up} Importar categorias</button>
-      <input type="file" id="tms-file" accept=".json" style="display:none">
-    </div>
-    <p class="muted" style="margin-top:12px;font-size:12px">As marcações ficam salvas neste navegador. Use exportar/importar para fazer backup ou transferir entre dispositivos.</p>`;
+    function getFavItems(){
+      const items = [];
+      if (typeof T !== "undefined"){
+        T.forEach(t => {
+          if (typeof isFavTrack === "function" && isFavTrack(t)){
+            items.push({
+              type: "faixa",
+              label: t.title || "—",
+              artist: (t.bands || []).join(", "),
+              album: t.album || "",
+              genres: t.ge || [],
+              cats: typeof trackTagsOf === "function" ? trackTagsOf(t) : [],
+              n: t.n || 0,
+              bandKey: (t.bands || [])[0] || "__outros__",
+              albumKey: t.album || "__outros__",
+              genreKeys: t.ge && t.ge.length ? t.ge : ["__outros__"]
+            });
+          }
+        });
+      }
+      Object.entries(TAGS.bandas || {}).forEach(([k, v]) => {
+        if (v.f) items.push({ type:"banda", label:k, artist:k, album:"", genres:[], cats:v.t||[], n:0, bandKey:k, albumKey:"__outros__", genreKeys:["__outros__"] });
+      });
+      Object.entries(TAGS.albuns || {}).forEach(([k, v]) => {
+        if (v.f) items.push({ type:"album", label:k, artist:"", album:k, genres:[], cats:v.t||[], n:0, bandKey:"__outros__", albumKey:k, genreKeys:["__outros__"] });
+      });
+      Object.entries(TAGS.generos || {}).forEach(([k, v]) => {
+        if (v.f) items.push({ type:"genero", label:k, artist:"", album:"", genres:[k], cats:v.t||[], n:0, bandKey:"__outros__", albumKey:"__outros__", genreKeys:[k] });
+      });
+      return items;
+    }
 
-    const md = openModal({title: "Favoritas e Categorias", body, size: "sm"});
-    body.querySelector("#tms-exp").addEventListener("click", exportTags);
-    body.querySelector("#tms-imp").addEventListener("click", () => body.querySelector("#tms-file").click());
-    body.querySelector("#tms-file").addEventListener("change", e => {
+    function buildGroups(items){
+      const map = {};
+      const add = (k, item) => { if (!map[k]) map[k] = []; map[k].push(item); };
+      if (groupBy === "categoria"){
+        items.forEach(item => item.cats.length ? item.cats.forEach(c => add(c, item)) : add("__sem__", item));
+      } else if (groupBy === "banda"){
+        items.forEach(item => add(item.bandKey, item));
+      } else if (groupBy === "album"){
+        items.forEach(item => add(item.albumKey, item));
+      } else {
+        items.forEach(item => item.genreKeys.forEach(g => add(g, item)));
+      }
+      const special = ["__sem__", "__outros__"];
+      const reg  = Object.entries(map).filter(([k]) => !special.includes(k));
+      const spec = Object.entries(map).filter(([k]) => special.includes(k));
+      if (sortBy === "quantidade") reg.sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "pt-BR"));
+      else if (sortBy === "nome")  reg.sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
+      else reg.sort((a, b) => { const mn = arr => Math.min(...arr.map(x => x.n || Infinity)); return mn(a[1]) - mn(b[1]); });
+      spec.sort(([a]) => a === "__outros__" ? -1 : 1);
+      return [...reg, ...spec];
+    }
+
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+    const TLBL = { faixa: "faixa", banda: "banda", album: "álbum", genero: "gênero" };
+
+    function renderList(){
+      let items = getFavItems().filter(item => showTypes[item.type]);
+      if (filterText){
+        const q = filterText.toLowerCase();
+        items = items.filter(item =>
+          item.label.toLowerCase().includes(q) ||
+          item.artist.toLowerCase().includes(q) ||
+          item.album.toLowerCase().includes(q) ||
+          item.cats.some(c => c.toLowerCase().includes(q)));
+      }
+      const listEl = body.querySelector(".flm-list");
+      listEl.className = `flm-list${compact ? " compact" : ""}`;
+      if (!items.length){
+        const tot = getFavItems().length;
+        listEl.innerHTML = tot
+          ? `<p class="flm-empty">Nenhum resultado para os filtros aplicados.</p>`
+          : `<p class="flm-empty">Nenhum favorito ainda.<br>Use os corações ♥ para marcar faixas, bandas, álbuns ou gêneros.</p>`;
+        return;
+      }
+      listEl.innerHTML = buildGroups(items).map(([gk, gitems]) => {
+        const gl = gk === "__sem__" ? "Sem categoria" : gk === "__outros__" ? "Outros" : cap(gk);
+        return `<div class="flm-group">
+          <div class="flm-group-hd">
+            <span class="flm-group-name">${esc(gl)}</span>
+            <span class="flm-group-count">${gitems.length}</span>
+          </div>
+          <div class="flm-group-items">${gitems.map(item => {
+            const sub = item.type === "faixa"
+              ? [item.artist, item.album].filter(Boolean).join(" · ")
+              : "";
+            const catHtml = item.cats.map(c =>
+              `<span class="tag-pill" style="--tc:${tagColor(c)};font-size:10px;padding:1px 6px">${esc(c)}</span>`
+            ).join("");
+            return `<div class="flm-item">
+              <span class="flm-tp flm-tp-${item.type}">${TLBL[item.type]}</span>
+              <span class="flm-name">${esc(item.label)}${sub ? `<span class="flm-sub"> · ${esc(sub)}</span>` : ""}</span>
+              <span class="flm-extra">${catHtml}</span>
+            </div>`;
+          }).join("")}</div>
+        </div>`;
+      }).join("");
+    }
+
+    body.innerHTML = `
+      <div class="flm-top">
+        <div class="flm-ctrl-row">
+          <div class="flm-ctrl-seg">
+            <span class="flm-lbl">Agrupar</span>
+            <div class="seg-btns" data-ctrl="group">
+              <button data-val="categoria" class="seg-btn on">Categoria</button>
+              <button data-val="banda"     class="seg-btn">Banda</button>
+              <button data-val="album"     class="seg-btn">Álbum</button>
+              <button data-val="genero"    class="seg-btn">Gênero</button>
+            </div>
+          </div>
+          <div class="flm-ctrl-seg">
+            <span class="flm-lbl">Ordenar</span>
+            <div class="seg-btns" data-ctrl="sort">
+              <button data-val="quantidade" class="seg-btn on">Quantidade</button>
+              <button data-val="nome"       class="seg-btn">Nome</button>
+              <button data-val="playlist"   class="seg-btn">Playlist</button>
+            </div>
+          </div>
+          <button class="gbtn" type="button" id="flm-expand" style="margin-left:auto">Mostrar todos os dados</button>
+        </div>
+        <div class="flm-ctrl-row">
+          <input class="flm-search" type="search" placeholder="Buscar…" autocomplete="off">
+          <div class="flm-type-row">
+            <button class="flm-type-btn on" data-type="faixa">Faixas</button>
+            <button class="flm-type-btn on" data-type="banda">Bandas</button>
+            <button class="flm-type-btn on" data-type="album">Álbuns</button>
+            <button class="flm-type-btn on" data-type="genero">Gêneros</button>
+          </div>
+        </div>
+      </div>
+      <div class="flm-list compact"></div>
+      <div class="flm-foot">
+        <button class="gbtn" type="button" id="flm-exp">${ICON.down} Exportar</button>
+        <button class="gbtn" type="button" id="flm-imp">${ICON.up} Importar</button>
+        <input type="file" id="flm-file" accept=".json" style="display:none">
+      </div>`;
+
+    renderList();
+
+    body.querySelectorAll("[data-ctrl] .seg-btn").forEach(b => b.addEventListener("click", () => {
+      const ctrl = b.closest("[data-ctrl]").dataset.ctrl;
+      b.closest("[data-ctrl]").querySelectorAll(".seg-btn").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      if (ctrl === "group") groupBy = b.dataset.val; else sortBy = b.dataset.val;
+      renderList();
+    }));
+    body.querySelectorAll(".flm-type-btn").forEach(b => b.addEventListener("click", () => {
+      b.classList.toggle("on"); showTypes[b.dataset.type] = b.classList.contains("on"); renderList();
+    }));
+    body.querySelector(".flm-search").addEventListener("input", e => {
+      filterText = e.target.value.trim(); renderList();
+    });
+    body.querySelector("#flm-expand").addEventListener("click", () => {
+      compact = !compact;
+      body.querySelector(".flm-list").classList.toggle("compact", compact);
+      body.querySelector("#flm-expand").textContent = compact ? "Mostrar todos os dados" : "Ocultar extras";
+    });
+    body.querySelector("#flm-exp").addEventListener("click", exportTags);
+    body.querySelector("#flm-imp").addEventListener("click", () => body.querySelector("#flm-file").click());
+    body.querySelector("#flm-file").addEventListener("change", e => {
       const f = e.target.files[0]; if (f){ importTagsFromFile(f); md.close(); }
     });
-  }
-
-  btn.addEventListener("click", openTagsModal);
+  });
 })();

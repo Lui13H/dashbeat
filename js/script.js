@@ -4891,8 +4891,8 @@ async function askReverse(){
 function openTable({verify = false, query: q0 = ""} = {}){
   const marked = new Set(); let sortK = "n", sortDir = 1, query = q0, onlyFav = false;
   const body = document.createElement("div"); body.className = "tbwrap";
-  body.innerHTML = `${verify ? `<div class="ordnote">Confira a coluna <strong>#</strong>: a playlist deve ir da <strong>primeira música adicionada (#1)</strong> até a <strong>última (#${NN})</strong>. Se estiver fora de ordem, clique em <strong>CONSERTAR ORDEM DA PLAYLIST</strong>.</div>` : ""}<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-fav-only" aria-pressed="false">♡ Só favoritas</button><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button>${STORE ? `<button class="gbtn" type="button" id="tb-reverse" title="A #1 vira a última e a última vira a #1">Inverter ordem</button><button class="pbtn" type="button" id="tb-fix" title="Cole os links da playlist do Spotify e a ordem é refeita, sem buscar nada">CONSERTAR ORDEM DA PLAYLIST</button>` : ""}<span class="tbcount" id="tb-count"></span></div>
-    <div class="tbscroll"><table class="tb"><thead><tr><th class="fv"></th><th class="ck"></th>${songHead()}</tr></thead><tbody></tbody></table></div>`;
+  body.innerHTML = `${verify ? `<div class="ordnote">Confira a coluna <strong>#</strong>: a playlist deve ir da <strong>primeira música adicionada (#1)</strong> até a <strong>última (#${NN})</strong>. Se estiver fora de ordem, clique em <strong>CONSERTAR ORDEM DA PLAYLIST</strong>.</div>` : ""}<div class="tbtools"><input type="search" id="tb-q" placeholder="Buscar por música, artista ou álbum…" aria-label="Buscar"><button class="gbtn" type="button" id="tb-fav-only" aria-pressed="false">♡ Só favoritas</button><button class="gbtn" type="button" id="tb-markall">Marcar resultados</button><button class="gbtn" type="button" id="tb-clear" disabled>Desmarcar tudo</button>${STORE ? `<button class="gbtn" type="button" id="tb-reverse" title="A #1 vira a última e a última vira a #1">Inverter ordem</button><button class="pbtn" type="button" id="tb-fix" title="Cole os links da playlist do Spotify e a ordem é refeita, sem buscar nada">CONSERTAR ORDEM DA PLAYLIST</button>` : ""}<button class="gbtn" type="button" id="tb-expand">Mostrar todos os dados</button><span class="tbcount" id="tb-count"></span></div>
+    <div class="tbscroll"><table class="tb compact"><thead><tr><th class="fv"></th><th class="ck"></th>${songHead()}</tr></thead><tbody></tbody></table></div>`;
   const foot = document.createElement("div"); foot.className = "mfrow";
   foot.innerHTML = `<span class="hintf" id="tb-hint">Marque as faixas que quer remover. Nada é apagado até você salvar.</span><span class="sp"></span><button class="gbtn" type="button" id="tb-cancel">Fechar</button><button class="pbtn danger" type="button" id="tb-save" disabled>Remover faixas</button>`;
   const md = openModal({title: "Músicas da playlist", sub: `${faixas(NN)} · ${IS.art.length} artistas · ${IS.alb.length} álbuns`, body, foot, size: "lg"});
@@ -4932,6 +4932,10 @@ function openTable({verify = false, query: q0 = ""} = {}){
   q("#tb-fav-only").addEventListener("click", () => { onlyFav = !onlyFav; q("#tb-fav-only").setAttribute("aria-pressed", onlyFav); q("#tb-fav-only").textContent = onlyFav ? "♥ Só favoritas" : "♡ Só favoritas"; draw(); });
   q("#tb-markall").addEventListener("click", () => { visible.forEach(t => marked.add(t.n)); draw(); });
   q("#tb-clear").addEventListener("click", () => { marked.clear(); draw(); });
+  q("#tb-expand").addEventListener("click", () => {
+    const compact = q(".tb").classList.toggle("compact");
+    q("#tb-expand").textContent = compact ? "Mostrar todos os dados" : "Ocultar colunas extras";
+  });
   q("#tb-cancel").addEventListener("click", md.close);
   if (STORE) q("#tb-fix").addEventListener("click", openFixOrder);
   if (STORE) q("#tb-reverse").addEventListener("click", askReverse);
