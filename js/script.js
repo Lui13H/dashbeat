@@ -3307,7 +3307,8 @@ const ICON = {
   sync: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 6.5A5.5 5.5 0 0 0 3.3 4.6M2.5 9.5a5.5 5.5 0 0 0 10.2 1.9M3 2v3h3M13 14v-3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
   palette: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 4.4 11.4c.6-.5.5-1.4-.2-1.7a1 1 0 0 1 .8-1.8h.8c.7 0 1.2-.6 1.2-1.4A6.5 6.5 0 0 0 8 1.5z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="5.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="8" cy="4" r=".95" fill="currentColor"/><circle cx="10.5" cy="5.5" r=".95" fill="currentColor"/><circle cx="5" cy="9.5" r=".95" fill="currentColor"/></svg>',
   reset: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 .8-2.7M3 3.5V6h2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
-  tag: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h6l6 6-6 6-6-6V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></svg>'
+  tag: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h6l6 6-6 6-6-6V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></svg>',
+  tools: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" fill="none"><line x1="2" y1="4" x2="14" y2="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="12" x2="14" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="10" cy="8" r="2" fill="currentColor"/><circle cx="6" cy="12" r="2" fill="currentColor"/></svg>'
 };
 const pad2 = n => String(n).padStart(2, "0");
 const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
@@ -5386,6 +5387,22 @@ $("#dt-import").innerHTML = `${ICON.up}<span>Adicionar músicas</span>`;
 $("#dt-export").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
 $("#dt-table").addEventListener("click", () => openTable());
 $("#dt-import").addEventListener("click", () => openImport());
+// Group dropdown triggers
+const _chev = '<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+$("#dt-grp-playlist").innerHTML = `${ICON.list}<span>Playlist</span>${_chev}`;
+$("#dt-grp-export").innerHTML = `${ICON.down}<span>Exportar</span>${_chev}`;
+$("#dt-grp-tools").innerHTML = `${ICON.tools}<span>Ferramentas</span>${_chev}`;
+(function(){
+  function closeAll(){ document.querySelectorAll(".dtool-grp .dtool-drop").forEach(d => { if (!d.hidden){ d.hidden = true; d.closest(".dtool-grp").querySelector(".dtool-trg").setAttribute("aria-expanded","false"); } }); }
+  document.querySelectorAll(".dtool-grp").forEach(grp => {
+    const trg = grp.querySelector(".dtool-trg"), drop = grp.querySelector(".dtool-drop");
+    if (!trg || !drop) return;
+    trg.addEventListener("click", e => { e.stopPropagation(); const was = !drop.hidden; closeAll(); if (!was){ drop.hidden = false; trg.setAttribute("aria-expanded","true"); } });
+    drop.addEventListener("click", () => setTimeout(() => { drop.hidden = true; trg.setAttribute("aria-expanded","false"); }, 80));
+  });
+  document.addEventListener("click", closeAll);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".dtool-grp .dtool-drop:not([hidden])").forEach(d => { d.hidden = true; const t = d.closest(".dtool-grp").querySelector(".dtool-trg"); t?.setAttribute("aria-expanded","false"); t?.focus(); }); });
+})();
 // dúvidas de álbum: avisa uma vez por sessão que dá pra decidir na tela de duplicadas
 if (ALBUM_INFO.doubts.length){ try { if (!sessionStorage.getItem("catalogo-musical:alb-doubt-toast")){ sessionStorage.setItem("catalogo-musical:alb-doubt-toast", "1"); setTimeout(() => toast(`${ALBUM_INFO.doubts.length} álbum${ALBUM_INFO.doubts.length > 1 ? "ns podem" : " pode"} ser o mesmo que outro: veja em Saúde › Álbuns.`), 1800); } } catch (e) {} }
 $("#dt-export").addEventListener("click", openExport);

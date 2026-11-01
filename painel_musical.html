@@ -25,8 +25,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=1.5.26">
-<link rel="stylesheet" href="css/scrollfx.css?v=1.5.26">
+<link rel="stylesheet" href="css/style.css?v=1.5.28">
+<link rel="stylesheet" href="css/scrollfx.css?v=1.5.28">
 </head>
 <body data-fx="dashboard">
 <div class="wrap">
@@ -56,14 +56,29 @@
     <div class="tb-chips"><button class="chip tb-chip" id="tb-time" type="button" style="display:none" title="Voltar o painel para a playlist inteira"></button><button class="chip tb-chip" id="tb-anim" type="button" style="display:none" title="Voltar este gráfico para a playlist inteira"></button></div>
     <div class="dtools">
       <button class="dbtn clr-btn" id="dt-clear" type="button" title="Tirar os filtros de banda, álbum, gênero e ano" hidden></button>
-      <button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button>
-      <button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button>
-      <button class="dbtn" id="dt-cards" type="button" title="Gerar imagens prontas para compartilhar com os destaques da playlist"></button>
-      <button class="dbtn" id="dt-export" type="button" title="Baixar a lista em Excel ou texto"></button>
-      <button class="dbtn" id="dt-theme" type="button" title="Personalizar a cor do site"></button>
+      <div class="dtool-grp">
+        <button class="dbtn dtool-trg" id="dt-grp-playlist" type="button" aria-haspopup="true" aria-expanded="false" title="Playlist"></button>
+        <div class="dtool-drop" hidden>
+          <button class="dbtn" id="dt-table" type="button" title="Ver e remover músicas"></button>
+          <button class="dbtn" id="dt-import" type="button" title="Adicionar músicas ou carregar nova playlist"></button>
+        </div>
+      </div>
       <button class="dbtn" id="dt-tags" type="button" title="Favoritas e etiquetas — marque músicas e bandas favoritas, adicione etiquetas"></button>
-      <button class="dbtn" id="dt-health" type="button" title="Ver o que está faltando ou sujo na playlist, com a correção de cada item" hidden></button>
-      <button class="dbtn" id="dt-update" type="button" title="Buscar no Spotify os dados que faltam (gênero, explícita…)"></button>
+      <div class="dtool-grp">
+        <button class="dbtn dtool-trg" id="dt-grp-export" type="button" aria-haspopup="true" aria-expanded="false" title="Exportar"></button>
+        <div class="dtool-drop" hidden>
+          <button class="dbtn" id="dt-cards" type="button" title="Gerar imagens prontas para compartilhar com os destaques da playlist"></button>
+          <button class="dbtn" id="dt-export" type="button" title="Baixar a lista em Excel ou texto"></button>
+        </div>
+      </div>
+      <div class="dtool-grp">
+        <button class="dbtn dtool-trg" id="dt-grp-tools" type="button" aria-haspopup="true" aria-expanded="false" title="Ferramentas"></button>
+        <div class="dtool-drop" hidden>
+          <button class="dbtn" id="dt-theme" type="button" title="Personalizar a cor do site"></button>
+          <button class="dbtn" id="dt-health" type="button" title="Ver o que está faltando ou sujo na playlist, com a correção de cada item" hidden></button>
+          <button class="dbtn" id="dt-update" type="button" title="Buscar no Spotify os dados que faltam (gênero, explícita…)"></button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -204,10 +219,10 @@
 <div class="tip" id="tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/script.js?v=1.5.26"></script>
-<script src="js/tags.js?v=1.5.26"></script>
-<script src="js/cartoes.js?v=1.5.26"></script>
-<script src="js/saude.js?v=1.5.26"></script>
-<script src="js/scrollfx.js?v=1.5.26"></script>
+<script src="js/script.js?v=1.5.28"></script>
+<script src="js/tags.js?v=1.5.28"></script>
+<script src="js/cartoes.js?v=1.5.28"></script>
+<script src="js/saude.js?v=1.5.28"></script>
+<script src="js/scrollfx.js?v=1.5.28"></script>
 </body>
 </html>

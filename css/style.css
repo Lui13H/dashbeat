@@ -451,9 +451,21 @@ footer{margin-top:40px;color:var(--ink-3);font-size:12px;display:flex;justify-co
 .sp-chip .sp-name{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sp-logout-x{display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:var(--ink-3);padding:3px;margin:-3px -4px -3px 0;border-radius:50%;cursor:pointer;transition:color .2s,background .2s}
 .sp-logout-x:hover{color:var(--ink);background:rgba(255,255,255,.08)}
-.dtools{display:flex;gap:6px;flex-wrap:wrap}
+.dtools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .dbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:hsla(var(--h),54%,5%,.6);color:var(--ink-2);font:600 12.5px var(--body);padding:9px 13px;border-radius:12px;cursor:pointer;transition:all .25s}
 .dbtn:hover{color:var(--ink);border-color:hsla(var(--h),60%,67%,.35);background:hsla(var(--h),52%,10%,.85)}
+.dtool-grp{position:relative;flex:none}
+.dtool-trg{gap:5px}
+.dtool-trg .chev{transition:transform .2s;flex:none}
+.dtool-trg[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.dtool-drop{position:absolute;top:calc(100% + 6px);left:0;z-index:250;
+  background:hsla(var(--h),55%,5%,.97);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border:1px solid var(--line-2);border-radius:14px;padding:6px;
+  display:flex;flex-direction:column;gap:3px;min-width:190px;
+  box-shadow:0 24px 48px -12px #000,0 0 0 1px rgba(0,0,0,.4)}
+.dtool-drop .dbtn{justify-content:flex-start;width:100%;border-color:transparent;border-radius:9px}
+.dtool-drop .dbtn:hover{background:hsla(var(--h),52%,13%,.9);border-color:transparent}
+.dtool-drop[hidden]{display:none!important}
 body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:all .25s}
 .ic.full{grid-column:1 / -1}
 
