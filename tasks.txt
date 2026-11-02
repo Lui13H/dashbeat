@@ -103,6 +103,18 @@ Pronto quando: marcar, filtrar, remover, recarregar a página e conferir que per
 ✅ Extensão v1.5.24: GENRE_ADD com 3 gêneros principais de cada banda da playlist
 ✅ Extensão v1.5.26: ao entrar no site com pelo menos 1 música salva no localStorage, redireciona direto para painel_musical.html sem passar pela tela de tutoriais.
 ✅ Extensão v1.5.28: toolbar reagrupada em 4 botões categorizados — "Playlist ▾" (Músicas + Adicionar músicas), "Favoritas" (solo, sem dropdown), "Exportar ▾" (Cartões + Baixar lista), "Ferramentas ▾" (Cor + Saúde + Atualizar dados). Chevron rotaciona ao abrir; clicar fora fecha.
+✅ Extensão v1.5.29: ajustes de saúde com auto-aplicação — "Revisar títulos" e "Revisar nomes de álbuns" aplicam limpeza automaticamente e abrem modal para confirmar/desfazer por item; ajustes ficam salvos em TRACK_TITLE_CLEAN / ALB_CLEAN e são reversíveis em "Limpar ajustes".
+✅ Extensão v1.5.30: Saúde da playlist reorganizada — itens agrupados por categoria (Música / Álbum / Data / Artista); pendentes aparecem primeiro, sem pendência vão ao final; itens resolvidos mostram badge "Respondido"; gw (duração longa confirmada) e dcr (álbuns próximos confirmados) removidos da lista (redundantes); "Conferir ajustes" também reorganizado por categoria. "Desfazer" nos modais de título/álbum agora adiciona ao IGN para evitar re-flaggeamento.
+✅ Extensão v1.5.34: descrições dos itens de saúde simplificadas — cada item mostra apenas uma linha objetiva do que fazer, sem explicações de custo, fontes ou peso na nota.
+✅ Extensão v1.5.35: modal "Duplicadas e covers" simplificado — removidas descrições longas das abas de álbuns e músicas, legenda explicativa dos botões e parágrafos de "Tratados".
+✅ Extensão v1.5.36: botões "Conferir ajustes feitos" e "Limpar ajustes" aparecem no modal de Saúde assim que houver qualquer ajuste, mesmo quando ainda há problemas pendentes (antes só apareciam com nota 100%).
+✅ Extensão v1.5.37: sufixos de versão em títulos e de edição em álbuns são removidos automaticamente ao carregar a página (sem precisar clicar em "Revisar"); o botão passa a abrir o modal de conferência com "Confirmar e fechar" ou "↩ Desfazer" por item.
+✅ Extensão v1.5.38: modal de conferência de sufixos tem "Confirmar" e "↩ Desfazer" por item (sem botões globais no rodapé); confirmar remove o item da lista e fecha se for o último.
+✅ Extensão v1.5.39: rodapé removido dos modais de conferência de título e álbum — o X no topo já é suficiente para fechar.
+✅ Extensão v1.5.40: ao fechar o modal de conferência (pelo X ou ao confirmar o último item), volta pro modal de Saúde em vez de voltar ao painel.
+✅ Extensão v1.5.41: regex de sufixo de edição expandido para capturar combinações compostas como "(10th Anniversary Deluxe Edition)" — permite descritor extra (Deluxe/Special/Expanded/Limited) entre o tipo e "Edition/Version".
+✅ Extensão v1.5.42: seção "Por década" removida do card 05 · Perfil e adicionada como segunda aba ("Por ano" / "Por década") no card 01 · Linha do tempo.
+✅ Extensão v1.5.43: ao carregar a página, faixas do mesmo artista e álbum (nomes pós-tratamento) com datas diferentes recebem automaticamente a data mais antiga do grupo.
 ✅ Extensão v1.5.25: modal Favoritas refeita — lista agrupada por Categoria/Banda/Álbum/Gênero, ordenação por Quantidade/Nome/Playlist, filtragem por tipo (faixas/bandas/álbuns/gêneros) e busca livre; modo compacto por padrão com botão "Mostrar todos os dados" que revela categorias. Tabela Músicas também começa compacta (só #/♥/Música/Artista/Álbum) com mesmo toggle. (41 artistas — Slipknot, Lamb of God, Exodus, Sepultura, Gojira, Metallica, Avenged Sevenfold, Death, Iron Maiden, Pantera, System Of A Down, Dream Theater, Machine Head, Burn The Priest, Chimaira, Megadeth, Mudvayne, Slayer, Testament, Korn, Children of Bodom, Accept, Carcass, Adema, Deftones, Hatebreed, HEALTH, Illdisposed, Judas Priest, Limp Bizkit, Linkin Park, Marilyn Manson, Meshuggah, Municipal Waste, Mushroomhead, Pissing Razors, Soulfly, Stone Sour, Strapping Young Lad, Three Days Grace, Trivium); garante que mesmo sem retorno das APIs os gêneros corretos aparecem.
 
 ---------------------------------------------------------------------
@@ -210,3 +222,5 @@ possibilidade de trocar quais tabelas mostrar e em quais posições
 quero que no grafico de linhas o nomes quando forem aparecer ao lado avaliem se não precisa quebrar a linha pois está passando do tamamnho da tela e ai se necessário que quebre a linha tlgd, se não fica feio, mas é melhor do que ficar no lugar errado ne kkkkk
 
 botão limpar filtros tamnbém apareça fixado no header que desce (mas só apareça quando tiver algum filtro ativo) ✅
+
+quando der play na maquina do tempo com o ajuste de cor automatico por capa a cor do site mudar conforme a mudança da cor predominante nas capas

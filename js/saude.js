@@ -1,4 +1,4 @@
-/* Saúde da playlist: uma tela que mostra o que está faltando ou sujo na playlist, com botão de correção em cada item.
+﻿/* Saúde da playlist: uma tela que mostra o que está faltando ou sujo na playlist, com botão de correção em cada item.
    Reaproveita o que o painel já tem (script.js carrega antes): BY_PLAYLIST, NI, needsUpdate, needsLink, genreTargets, similarTitles, normC,
    splitArtistsAll, openDataUpdate, openDups, openFixOrder, askReverse, openModal, songTable, faixas, nf, pct, esc.
    Nenhuma ação gasta busca sozinha: os botões só abrem as telas que já pedem confirmação. */
@@ -17,16 +17,20 @@ const TRACK_TITLE_IGN_KEY = "catalogo-musical:track-title-ign";
 const TRACK_TITLE_IGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(TRACK_TITLE_IGN_KEY) || "[]")); } catch(e) { return new Set(); } })();
 const saveTrackTitleIgn = () => { try { localStorage.setItem(TRACK_TITLE_IGN_KEY, JSON.stringify([...TRACK_TITLE_IGN])); } catch(e) {} };
 
+const TRACK_TITLE_CLEAN_KEY = "catalogo-musical:track-title-clean";
+const TRACK_TITLE_CLEAN = (() => { try { return JSON.parse(localStorage.getItem(TRACK_TITLE_CLEAN_KEY) || "[]"); } catch(e) { return []; } })();
+const saveTrackTitleClean = () => { try { localStorage.setItem(TRACK_TITLE_CLEAN_KEY, JSON.stringify(TRACK_TITLE_CLEAN)); } catch(e) {} };
+
 const ALB_CLEAN_KEY = "catalogo-musical:alb-clean";
 const ALB_CLEAN = (() => { try { return JSON.parse(localStorage.getItem(ALB_CLEAN_KEY) || "[]"); } catch(e) { return []; } })();
 const saveAlbClean = () => { try { localStorage.setItem(ALB_CLEAN_KEY, JSON.stringify(ALB_CLEAN)); } catch(e) {} };
 
 // detecta sufixos de edição/versão no final do nome do álbum e sugere o nome limpo
-const EDITION_RE1 = /\s+[-–—]\s*[(\[]?(?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|anniversary|special|limited|collector'?s|platinum)(?:\s+(?:edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]?\s*$/i;
-const EDITION_RE2 = /\s+[(\[](?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|anniversary|special|limited|collector'?s|platinum)(?:\s+(?:edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]\s*$/i;
+const EDITION_RE1 = /\s+[-–—]\s*[(\[]?(?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|(?:\d+(?:st|nd|rd|th)\s+)?anniversary|special|limited|collector'?s|platinum)(?:\s+(?:(?:super\s+)?(?:deluxe|expanded|special|limited)(?:\s+(?:edition|version|remaster))?|edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]?\s*$/i;
+const EDITION_RE2 = /\s+[(\[](?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|(?:\d+(?:st|nd|rd|th)\s+)?anniversary|special|limited|collector'?s|platinum)(?:\s+(?:(?:super\s+)?(?:deluxe|expanded|special|limited)(?:\s+(?:edition|version|remaster))?|edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]\s*$/i;
 
 // detecta sufixos de versão no final do TÍTULO da faixa (remix, remaster, live, acústico, etc.)
-const TRACK_SUFFIX_RE = /\s*[(\[](?:(?:super\s+)?(?:deluxe|expanded|anniversary|special|limited|platinum|collector'?s|bonus\s+tracks?)(?:\s+(?:edition|version))?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|(?:club|radio|extended|dub|progressive|original|acoustic|chill)\s+mix|live(?:\s+(?:at|from|version|recording|session)[\w\s,.'()\[\]-]{0,50})?|acoustic(?:\s+(?:version|mix|session))?|instrumental(?:\s+version)?|(?:early\s+)?demo(?:\s+version)?|(?:radio|single|mono|extended|alternate(?:ive)?|original)\s+(?:edit|version|mix))[)\]]\s*$|\s+[-–—]\s*(?:(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|live(?:\s+(?:version|recording))?|acoustic(?:\s+version)?|instrumental(?:\s+version)?)\s*$/i;
+const TRACK_SUFFIX_RE = /\s*[(\[](?:(?:super\s+)?(?:deluxe|expanded|(?:\d+(?:st|nd|rd|th)\s+)?anniversary|special|limited|platinum|collector'?s|bonus\s+tracks?)(?:\s+(?:edition|version))?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|(?:club|radio|extended|dub|progressive|original|acoustic|chill)\s+mix|live(?:\s+(?:at|from|version|recording|session)[\w\s,.'()\[\]-]{0,50})?|acoustic(?:\s+(?:version|mix|session))?|instrumental(?:\s+version)?|(?:early\s+)?demo(?:\s+version)?|(?:radio|single|mono|extended|alternate(?:ive)?|original|album|video|hyper)\s+(?:edit|version|mix))[)\]]\s*$|\s+[-–—]\s*(?:(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|live(?:\s+(?:version|recording))?|acoustic(?:\s+version)?|instrumental(?:\s+version)?)\s*$/i;
 function suggestCleanName(name){
   if (!name || name === NI) return null;
   const c = name.replace(EDITION_RE1, '').replace(EDITION_RE2, '').trim();
@@ -181,25 +185,25 @@ function healthChecks(list = BY_PLAYLIST){
 }
 
 const META = {
-  a: {t: "Músicas sem dados do Spotify", ok: "Todas as músicas têm os dados do Spotify.", d: n => `${plural(n, "música está", "músicas estão")} sem explícita e tipo do lançamento.`, act: "upd"},
-  b: {t: "Músicas sem o link guardado", ok: "Todas as músicas com dados têm o link guardado.", d: n => `${plural(n, "música tem", "músicas têm")} dados mas não guardou o link (ID) do Spotify. É de graça quando o cache já sabe o link; senão é 1 busca por música.`, act: "upd"},
-  c: {t: "Artistas sem gênero", ok: "Todos os artistas têm gênero do Spotify.", d: n => `${plural(n, "artista está", "artistas estão")} sem gênero do Spotify. A Apple já cobre um gênero provisório nos gráficos, mas continua pendente: “Atualizar dados” busca o do Spotify (1 busca por artista).`, act: "upd"},
-  e: {t: "Campos “Não identificado”", ok: "Nenhum artista, álbum ou data em branco.", d: n => `${plural(n, "faixa tem", "faixas têm")} artista, álbum ou data em branco.`, act: "list"},
-  cv: {t: "Covers", ok: "Nenhum título gravado por artistas diferentes.", d: n => `${plural(n, "título aparece", "títulos aparecem")} com artistas principais diferentes: covers, ou só músicas com o mesmo nome. Escolha Cover, Outra música ou Mesma banda.`, act: "covers"},
-  ad: {t: "Álbuns em dúvida", ok: "Nenhum álbum em dúvida.", d: n => `${plural(n, "par de álbuns pode", "pares de álbuns podem")} ser o mesmo álbum. Escolha “É o mesmo” ou “São diferentes”.`, act: "adoubt"},
-  au: {t: "Álbuns que o site acha iguais", ok: "Nenhum álbum aguardando confirmação.", d: n => `${plural(n, "grupo de álbuns", "grupos de álbuns")} que o site acha serem o mesmo (edições como remaster ou deluxe). Já contam como um só nos gráficos, mas esperam a sua confirmação.`, act: "aauto"},
-  f: {t: "Prováveis duplicadas", ok: "Nenhuma música repetida.", d: n => `${plural(n, "caso de música provavelmente repetida", "casos de músicas provavelmente repetidas")} (mesmo título e artista principal).`, act: "dups"},
-  g: {t: "Duração suspeita", ok: "Nenhuma duração estranha.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração de 0 s ou de mais de 20 minutos.`, act: "dur"},
-  gw: {t: "Duração longa confirmada", ok: "Nenhuma faixa com duração longa confirmada pendente.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração acima de 20 min confirmada. Você pode editar ou confirmar novamente.`, act: "dur"},
-  sg: {t: "Faixas fora de álbum que são de álbum", ok: "Nenhuma faixa fora de álbum com sugestão de álbum.", d: n => `${plural(n, "faixa marcada como single, EP ou coletânea existe", "faixas marcadas como single, EP ou coletânea existem")} num álbum, segundo a Apple. É só uma sugestão: não pesa na nota.`, act: "singles"},
-  dc: {t: "Álbuns próximos do mesmo artista", ok: "Nenhum álbum do mesmo artista lançado tão perto de outro.", d: n => `${plural(n, "álbum saiu", "álbuns saíram")} no mesmo ano ou a menos de 2 meses de outro álbum do mesmo artista. A Apple confere sozinha, mas se a suspeita continuar isso pesa na nota até você responder (está certo, editar a data ou reavaliar).`, act: "near"},
-  dcr: {t: "Álbuns próximos confirmados", ok: "Nenhum álbum próximo confirmado.", d: n => `${plural(n, "álbum próximo foi", "álbuns próximos foram")} confirmados como certos por você. Não pesa na nota, mas ficam aqui para referência.`, act: "nearcfm"},
-  dr: {t: "Datas para conferir à mão", ok: "Nenhuma data pendente de conferência.", d: n => `${plural(n, "faixa tem", "faixas têm")} uma data que o site montou (ano do Spotify com dia e mês da Apple) porque a Apple não confirmou. Confira em Editar: pesa na nota até você ajustar.`, act: "list"},
-  dm: {t: "Datas sem dia e mês (sem solução automática)", ok: "Nenhuma data indefinida.", d: n => `${plural(n, "álbum está", "álbuns estão")} só com o ano — o site tentou Apple Music, MusicBrainz, Deezer e TheAudioDB e não achou a data completa. Corrija manualmente para tirar da nota.`, act: "datefix"},
-  nm: {t: "Nomes com sufixo de edição", ok: "Nenhum nome de álbum com sufixo de edição.", d: n => `${plural(n, "álbum tem", "álbuns têm")} sufixo de edição no nome (Remastered, Deluxe…). Limpar o nome é opcional e não pesa na nota.`, act: "nm"},
-  tn: {t: "Títulos com sufixo de versão", ok: "Nenhum título de faixa com sufixo de versão.", d: n => `${plural(n, "faixa tem", "faixas têm")} sufixo de versão no título (Remix, Remastered, Live…). Você decide se limpa o nome, ignora ou verifica se tem outra versão na playlist. Não pesa na nota.`, act: "tn"},
-  gd: {t: "Gênero divergente entre fontes", ok: "Nenhum gênero divergente detectado.", d: n => `${plural(n, "artista tem", "artistas têm")} gênero no Spotify que não bate com o que a Apple ou o MusicBrainz dizem. É só uma dica — não pesa na nota.`, act: "gd"},
-  h: {t: "Grafias parecidas do mesmo artista", ok: "Nenhum artista escrito de duas formas.", d: n => `${plural(n, "artista aparece", "artistas aparecem")} escrito de mais de um jeito. Se for a mesma banda, junte os nomes.`, act: "spell"}
+  a: {t: "Músicas sem dados do Spotify", ok: "Todas as músicas têm os dados do Spotify.", d: n => `${plural(n, "música está", "músicas estão")} sem os dados do Spotify.`, act: "upd"},
+  b: {t: "Músicas sem o link guardado", ok: "Todas as músicas com dados têm o link guardado.", d: n => `${plural(n, "música tem", "músicas têm")} dados mas não tem o link do Spotify salvo.`, act: "upd"},
+  c: {t: "Artistas sem gênero", ok: "Todos os artistas têm gênero do Spotify.", d: n => `${plural(n, "artista está", "artistas estão")} sem gênero do Spotify.`, act: "upd"},
+  e: {t: "Campos \u201cNão identificado\u201d", ok: "Nenhum artista, álbum ou data em branco.", d: n => `${plural(n, "faixa tem", "faixas têm")} artista, álbum ou data em branco.`, act: "list"},
+  cv: {t: "Covers", ok: "Nenhum título gravado por artistas diferentes.", d: n => `${plural(n, "título aparece", "títulos aparecem")} com artistas diferentes — avalie se é cover ou música distinta.`, act: "covers"},
+  ad: {t: "Álbuns em dúvida", ok: "Nenhum álbum em dúvida.", d: n => `${plural(n, "par de álbuns pode", "pares de álbuns podem")} ser o mesmo álbum.`, act: "adoubt"},
+  au: {t: "Álbuns que o site acha iguais", ok: "Nenhum álbum aguardando confirmação.", d: n => `${plural(n, "grupo de álbuns", "grupos de álbuns")} considerados iguais — confirme ou separe.`, act: "aauto"},
+  f: {t: "Prováveis duplicadas", ok: "Nenhuma música repetida.", d: n => `${plural(n, "caso de música provavelmente repetida", "casos de músicas provavelmente repetidas")} (mesmo título e artista).`, act: "dups"},
+  g: {t: "Duração suspeita", ok: "Nenhuma duração estranha.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração de 0 s ou acima de 20 minutos.`, act: "dur"},
+  gw: {t: "Duração longa confirmada", ok: "Nenhuma faixa com duração longa confirmada pendente.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração longa confirmada — pode editar ou confirmar novamente.`, act: "dur"},
+  sg: {t: "Singles com álbum na Apple", ok: "Nenhuma sugestão de álbum para singles.", d: n => `${plural(n, "faixa marcada como single ou EP existe", "faixas marcadas como single ou EP existem")} num álbum, segundo a Apple.`, act: "singles"},
+  dc: {t: "Álbuns próximos do mesmo artista", ok: "Nenhum álbum com datas próximas.", d: n => `${plural(n, "álbum do mesmo artista tem", "álbuns do mesmo artista têm")} datas próximas — confirme se estão certas.`, act: "near"},
+  dcr: {t: "Álbuns próximos confirmados", ok: "Nenhum álbum próximo confirmado.", d: n => `${plural(n, "álbum próximo foi", "álbuns próximos foram")} confirmados por você.`, act: "nearcfm"},
+  dr: {t: "Datas para conferir à mão", ok: "Nenhuma data pendente de conferência.", d: n => `${plural(n, "faixa tem", "faixas têm")} data montada automaticamente — confirme se está correta.`, act: "list"},
+  dm: {t: "Datas sem dia e mês", ok: "Nenhuma data indefinida.", d: n => `${plural(n, "álbum está", "álbuns estão")} apenas com o ano — adicione a data completa manualmente.`, act: "datefix"},
+  nm: {t: "Nomes com sufixo de edição", ok: "Nenhum nome de álbum com sufixo de edição.", d: n => `${plural(n, "álbum tem", "álbuns têm")} sufixo de edição no nome (Remastered, Deluxe…).`, act: "nm"},
+  tn: {t: "Títulos com sufixo de versão", ok: "Nenhum título de faixa com sufixo de versão.", d: n => `${plural(n, "faixa tem", "faixas têm")} sufixo de versão no título (Remix, Live…).`, act: "tn"},
+  gd: {t: "Gênero divergente entre fontes", ok: "Nenhum gênero divergente detectado.", d: n => `${plural(n, "artista tem", "artistas têm")} gênero divergente entre Spotify, Apple e MusicBrainz.`, act: "gd"},
+  h: {t: "Grafias parecidas do mesmo artista", ok: "Nenhum artista escrito de duas formas.", d: n => `${plural(n, "artista aparece", "artistas aparecem")} escrito de mais de um jeito.`, act: "spell"}
 };
 const LEVEL = {ok: "ok", warn: "atenção", help: "ajuda"};
 
@@ -621,161 +625,207 @@ function openGenreDivergence(issues){
   foot.querySelector("[data-c]").onclick = () => md.close();
 }
 function openTrackTitleClean(issues){
-  let list = [...issues];
-  const pending = new Map();   // trackTitleKey(t) → newTitle (acumula; só commita ao aplicar)
+  const toApply = issues.map(x => ({n: x.t.n, artist: x.t.artist, raw: x.rawTitle, clean: x.cleanTitle}));
+  for (const a of toApply) if (!TRACK_TITLE_CLEAN.some(e => e.n === a.n)) TRACK_TITLE_CLEAN.push(a);
+  saveTrackTitleClean();
+  const nMap = new Map(toApply.map(a => [a.n, a.clean]));
+  ssSet("health", "1");
+  ssSet("tt-clean-undo", "1");
+  commitRows(
+    currentRows().map(r => nMap.has(r[0]) ? [r[0], nMap.get(r[0]), r[2], r[3], r[4], r[5], ...(r[6] ? [r[6]] : [])] : r),
+    `${plural(toApply.length, "título de faixa limpo", "títulos de faixas limpos")} (sufixo removido)`
+  );
+}
+
+function openTrackTitleUndo(back){
+  if (!TRACK_TITLE_CLEAN.length) return;
   const body = document.createElement("div");
-  const foot = document.createElement("div"); foot.className = "mfrow";
 
-  const updateFoot = () => {
-    const n = pending.size;
-    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Fechar${n ? " sem aplicar" : ""}</button>${n ? `<button class="pbtn" type="button" data-apply>Aplicar ${plural(n, "alteração", "alterações")}</button>` : ""}`;
-    foot.querySelector("[data-c]").onclick = () => md.close();
-    const ap = foot.querySelector("[data-apply]");
-    if (ap) ap.onclick = applyAll;
+  const rb = () => {
+    const twNote = x => {
+      const tw = BY_PLAYLIST.filter(t => t.n !== x.n && suggestCleanTrackTitle(t.title) === null && normC(t.title) === normC(x.clean));
+      return tw.length ? `<span class="muted" style="font-size:11px;display:block;margin-top:2px">\u26a0 vers\u00e3o limpa j\u00e1 na playlist: <em>${esc(tw.map(t => `#${t.n} ${t.title}`).join(", "))}</em></span>` : "";
+    };
+    body.innerHTML = `<div class="confirm"><div class="du-rows">${TRACK_TITLE_CLEAN.map(e => `<div class="alb-row">
+        <div class="alb-main">
+          <span class="alb-old">${esc(e.raw)}</span><br>
+          <strong class="alb-new">${esc(e.clean)}</strong>
+          <span class="muted" style="font-size:12px"> \u00b7 ${esc(e.artist)} \u00b7 #${e.n}</span>
+          ${twNote(e)}
+        </div>
+        <div class="alb-btns"><button class="gbtn" type="button" data-cfm-n="${e.n}">Confirmar</button><button class="gbtn nm-red" type="button" data-undo-n="${e.n}">\u21a9 Desfazer</button></div>
+      </div>`).join("")}</div></div>`;
   };
-
-  const applyAll = () => {
-    if (!pending.size) return;
-    ssSet("health", "1");
-    commitRows(currentRows().map(r => {
-      const key = BY_PLAYLIST.find(b => b.n === r[0]);
-      const newTitle = key && pending.get(trackTitleKey(key));
-      return newTitle ? [r[0], newTitle, r[2], r[3], r[4], r[5], ...(r[6] ? [r[6]] : [])] : r;
-    }), `${plural(pending.size, "título de faixa limpo", "títulos de faixas limpos")} (sufixo removido)`);
-  };
-
-  const renderRows = () => {
-    body.innerHTML = `<div class="confirm"><p>Estas faixas têm sufixo de versão no título. Você decide o que fazer com cada uma — <strong>não pesa na nota</strong>.</p>
-      <div class="du-rows">${list.map(x => {
-        const twinNote = x.twins.length ? `<span class="muted" style="font-size:11px;display:block;margin-top:2px">⚠ versão limpa já na playlist: <em>${esc(x.twins.map(tw => `#${tw.n} ${tw.title}`).join(", "))}</em></span>` : "";
-        return `<div class="alb-row" data-raw="${esc(x.rawTitle)}" data-n="${x.t.n}">
-          <div class="alb-main">
-            <span class="alb-old">${esc(x.rawTitle)}</span><br>
-            <strong class="alb-new">${esc(x.cleanTitle)}</strong> <span class="muted" style="font-size:12px">· ${esc(x.t.artist)} · #${x.t.n}</span>
-            ${twinNote}
-          </div>
-          <div class="alb-btns">
-            <button class="gbtn nm-red" type="button" data-ign="${x.t.n}" title="Ignorar sugestão">${ICON.x} Ignorar</button>
-            <button class="pbtn nm-ok"  type="button" data-ok="${x.t.n}"  title="Aceitar nome limpo">${IC_CHECK} Limpar</button>
-          </div>
-        </div>`;
-      }).join("")}</div></div>`;
-  };
-
-  renderRows();
-  updateFoot();
-  const md = openModal({title: "Títulos com sufixo de versão", sub: "Opcional · não pesa na nota", body, foot, size: "lg"});
-
+  rb();
+  const md = openModal({title: `T\u00edtulos com sufixo de vers\u00e3o \u2014 ${plural(TRACK_TITLE_CLEAN.length, "limpeza aplicada", "limpezas aplicadas")}`, sub: "Opcional \u00b7 n\u00e3o pesa na nota", body, size: "lg", onClose: () => { if (back) back(); }});
   body.addEventListener("click", e => {
-    const ignBtn = e.target.closest("[data-ign]"), okBtn = e.target.closest("[data-ok]");
-    if (ignBtn){
-      const x = list.find(i => i.t.n === +ignBtn.dataset.ign); if (!x) return;
-      TRACK_TITLE_IGN.add(trackTitleKey(x.t));
-      saveTrackTitleIgn();
-      pending.delete(trackTitleKey(x.t));
-      list = list.filter(i => i.t.n !== x.t.n);
-      if (!list.length){ md.close(); return; }
-      renderRows(); updateFoot();
-    } else if (okBtn){
-      const x = list.find(i => i.t.n === +okBtn.dataset.ok); if (!x) return;
-      pending.set(trackTitleKey(x.t), x.cleanTitle);
-      list = list.filter(i => i.t.n !== x.t.n);
-      if (!list.length){ applyAll(); return; }
-      renderRows(); updateFoot();
+    const cfm = e.target.closest("[data-cfm-n]");
+    const undo = e.target.closest("[data-undo-n]");
+    if (cfm) {
+      const n = +cfm.dataset.cfmN;
+      const entry = TRACK_TITLE_CLEAN.find(x => x.n === n); if (!entry) return;
+      TRACK_TITLE_CLEAN.splice(TRACK_TITLE_CLEAN.indexOf(entry), 1); saveTrackTitleClean();
+      if (!TRACK_TITLE_CLEAN.length){ md.close(); return; }
+      rb();
+    } else if (undo) {
+      const n = +undo.dataset.undoN;
+      const entry = TRACK_TITLE_CLEAN.find(x => x.n === n); if (!entry) return;
+      TRACK_TITLE_CLEAN.splice(TRACK_TITLE_CLEAN.indexOf(entry), 1); saveTrackTitleClean();
+      TRACK_TITLE_IGN.add(normC(entry.artist) + "|" + normC(entry.raw)); saveTrackTitleIgn();
+      ssSet("health", "1");
+      commitRows(currentRows().map(r => r[0] === n ? [n, entry.raw, r[2], r[3], r[4], r[5], ...(r[6] ? [r[6]] : [])] : r),
+        `T\u00edtulo revertido: "${entry.clean}" \u2192 "${entry.raw}"`);
     }
   });
 }
 
 function openAlbumNameClean(issues){
-  let list = [...issues];
-  const pending = new Map();   // rawName → newName (acumula; só commita ao fechar)
+  const toApply = issues;
+  for (const x of toApply){
+    if (!ALB_CLEAN.some(e => e.raw === x.rawName)){
+      const tracks = currentRows()
+        .filter(r => { const t = BY_PLAYLIST.find(b => b.n === r[0]); return t && t.albumRaw === x.rawName; })
+        .map(r => ({n: r[0], origTitle: r[1]}));
+      ALB_CLEAN.push({raw: x.rawName, clean: x.cleanName, tracks});
+    }
+  }
+  saveAlbClean();
+  const pending = new Map(toApply.map(x => [x.rawName, x.cleanName]));
+  ssSet("health", "1");
+  ssSet("alb-clean-undo", "1");
+  commitRows(currentRows().map(r => {
+    const t = BY_PLAYLIST.find(b => b.n === r[0]);
+    const newName = t && pending.get(t.albumRaw);
+    if (!newName) return r;
+    const newTitle = suggestCleanTrackTitle(r[1]) || r[1];
+    return [r[0], newTitle, r[2], newName, r[4], r[5], ...(r[6] ? [r[6]] : [])];
+  }), `${plural(toApply.length, "álbum renomeado", "álbuns renomeados")} (sufixo removido)`);
+}
+
+function openAlbumNameUndo(back){
+  if (!ALB_CLEAN.length) return;
   const body = document.createElement("div");
-  const foot = document.createElement("div"); foot.className = "mfrow";
 
-  const updateFoot = () => {
-    const n = pending.size;
-    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Fechar${n ? " sem aplicar" : ""}</button>${n ? `<button class="pbtn" type="button" data-apply>Aplicar ${plural(n, "alteração", "alterações")}</button>` : ""}`;
-    foot.querySelector("[data-c]").onclick = () => md.close();
-    const ap = foot.querySelector("[data-apply]");
-    if (ap) ap.onclick = applyAll;
-  };
-
-  const applyAll = () => {
-    if (!pending.size) return;
-    ssSet("health", "1");
-    pending.forEach((cleanName, rawName) => {
-      if (!ALB_CLEAN.some(e => e.raw === rawName)) ALB_CLEAN.push({raw: rawName, clean: cleanName});
-    });
-    saveAlbClean();
-    commitRows(currentRows().map(r => {
-      const t = BY_PLAYLIST.find(b => b.n === r[0]);
-      const newName = t && pending.get(t.albumRaw);
-      if (!newName) return r;
-      const newTitle = suggestCleanTrackTitle(r[1]) || r[1];
-      return [r[0], newTitle, r[2], newName, r[4], r[5], ...(r[6] ? [r[6]] : [])];
-    }), `${plural(pending.size, "álbum renomeado", "álbuns renomeados")} (sufixo removido)`);
-  };
-
-  const renderRows = () => {
-    body.innerHTML = `<div class="confirm"><p>Estes álbuns têm sufixo de edição no nome. Você escolhe o que fazer com cada um — <strong>não pesa na nota</strong>.</p>
-      <div class="du-rows">${list.map(x => `<div class="alb-row" data-raw="${esc(x.rawName)}">
+  const rb = () => {
+    body.innerHTML = `<div class="confirm"><div class="du-rows">${ALB_CLEAN.map((e, i) => `<div class="alb-row">
         <div class="alb-main">
-          <span class="alb-old">${esc(x.rawName)}</span> <span class="alb-arrow">→</span> <strong class="alb-new">${esc(x.cleanName)}</strong> <span class="muted" style="font-size:12px">· ${faixas(x.tracks.length)}</span>
+          <span class="alb-old">${esc(e.raw)}</span> <span class="alb-arrow">\u2192</span>
+          <strong class="alb-new">${esc(e.clean)}</strong>
+          <span class="muted" style="font-size:12px"> \u00b7 ${faixas((e.tracks||[]).length)}</span>
         </div>
-        <div class="alb-btns">
-          <button class="gbtn nm-red" type="button" data-ign="${esc(x.rawName)}"    title="Manter o nome como está">${ICON.x} Ignorar</button>
-          <button class="gbtn nm-amb" type="button" data-manual="${esc(x.rawName)}" title="Editar o nome manualmente">${IC_PEN} Editar</button>
-          <button class="pbtn nm-ok"  type="button" data-ok="${esc(x.rawName)}"     title="Confirmar a alteração sugerida">${IC_CHECK} Confirmar</button>
-        </div>
+        <div class="alb-btns"><button class="gbtn" type="button" data-cfm-i="${i}">Confirmar</button><button class="gbtn nm-red" type="button" data-undo-i="${i}">\u21a9 Desfazer</button></div>
       </div>`).join("")}</div></div>`;
   };
-
-  renderRows();
-  updateFoot();
-  const md = openModal({title: "Nomes com sufixo de edição", sub: "Opcional · não pesa na nota", body, foot, size: "lg"});
-
+  rb();
+  const md = openModal({title: `Nomes com sufixo de edi\u00e7\u00e3o \u2014 ${plural(ALB_CLEAN.length, "limpeza aplicada", "limpezas aplicadas")}`, sub: "Opcional \u00b7 n\u00e3o pesa na nota", body, size: "lg", onClose: () => { if (back) back(); }});
   body.addEventListener("click", e => {
-    const ign = e.target.closest("[data-ign]"), manual = e.target.closest("[data-manual]"), ok = e.target.closest("[data-ok]");
-    if (ign){
-      ALBUM_NAME_IGN.add(ign.dataset.ign);
-      saveAlbumNameIgn();
-      pending.delete(ign.dataset.ign);
-      list = list.filter(x => x.rawName !== ign.dataset.ign);
-      if (!list.length){ md.close(); return; }
-      renderRows(); updateFoot();
-    } else if (ok){
-      const x = list.find(i => i.rawName === ok.dataset.ok); if (!x) return;
-      pending.set(x.rawName, x.cleanName);
-      list = list.filter(i => i.rawName !== x.rawName);
-      if (!list.length){ applyAll(); return; }
-      renderRows(); updateFoot();
-    } else if (manual){
-      const x = list.find(i => i.rawName === manual.dataset.manual); if (!x) return;
-      const inp = document.createElement("div");
-      inp.innerHTML = `<div class="confirm"><p class="muted">Nome atual: <strong>${esc(x.rawName)}</strong></p><label class="sd-f"><span>Novo nome</span><input type="text" id="nm-inp" value="${esc(x.cleanName)}" autocomplete="off" style="width:100%"></label><p class="err" id="nm-err" hidden></p></div>`;
-      const foot2 = document.createElement("div"); foot2.className = "mfrow";
-      foot2.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-save>Confirmar</button>`;
-      const sm = openModal({title: "Renomear álbum", body: inp, foot: foot2, size: "sm"});
-      foot2.querySelector("[data-c]").onclick = sm.close;
-      foot2.querySelector("[data-save]").onclick = () => {
-        const newName = inp.querySelector("#nm-inp").value.trim();
-        const errEl = inp.querySelector("#nm-err");
-        if (!newName || newName === x.rawName){ errEl.hidden = false; errEl.textContent = !newName ? "Digite um nome." : "O nome é igual ao atual."; return; }
-        sm.close();
-        pending.set(x.rawName, newName);
-        list = list.filter(i => i.rawName !== x.rawName);
-        if (!list.length){ applyAll(); return; }
-        renderRows(); updateFoot();
-      };
-      setTimeout(() => inp.querySelector("#nm-inp")?.focus(), 60);
+    const cfm = e.target.closest("[data-cfm-i]");
+    const undo = e.target.closest("[data-undo-i]");
+    if (cfm) {
+      const i = +cfm.dataset.cfmI;
+      const entry = ALB_CLEAN[i]; if (!entry) return;
+      ALB_CLEAN.splice(i, 1); saveAlbClean();
+      if (!ALB_CLEAN.length){ md.close(); return; }
+      rb();
+    } else if (undo) {
+      const i = +undo.dataset.undoI;
+      const entry = ALB_CLEAN[i]; if (!entry) return;
+      ALB_CLEAN.splice(i, 1); saveAlbClean();
+      ALBUM_NAME_IGN.add(entry.raw); saveAlbumNameIgn();
+      ssSet("health", "1");
+      const restoreMap = new Map((entry.tracks||[]).map(t => [t.n, {title: t.origTitle, album: entry.raw}]));
+      commitRows(currentRows().map(r => {
+        const orig = restoreMap.get(r[0]);
+        return orig ? [r[0], orig.title, r[2], orig.album, r[4], r[5], ...(r[6] ? [r[6]] : [])] : r;
+      }), `\u00c1lbum revertido: "${entry.clean}" \u2192 "${entry.raw}"`);
     }
+  });
+}
+
+function openResetAdjustments(parentMd){
+  const RESET_KEYS = [
+    "catalogo-musical:alb-clean",
+    "catalogo-musical:album-name-ign",
+    "catalogo-musical:track-title-ign",
+    "catalogo-musical:track-title-clean",
+    "catalogo-musical:dur-check",
+    "catalogo-musical:album-merges",
+    "catalogo-musical:artist-alias",
+    "catalogo-musical:dups-versions",
+    "catalogo-musical:dups-ignored",
+    "catalogo-musical:dups-confirmed",
+    "catalogo-musical:dups-joined",
+    "catalogo-musical:apple-dates",
+  ];
+  const body = document.createElement("div");
+  body.innerHTML = `
+    <p>Todos os ajustes manuais serão apagados e os títulos/álbuns limpos serão revertidos:</p>
+    <ul class="rst-list">
+      <li>Títulos de faixas limpos (sufixos revertidos)</li>
+      <li>Nomes de álbuns limpos (revertidos)</li>
+      <li>Álbuns e títulos ignorados na verificação</li>
+      <li>Artistas mesclados e duplicatas resolvidas</li>
+      <li>Versões confirmadas de faixas</li>
+      <li>Datas automáticas buscadas pela Apple</li>
+    </ul>
+    <p class="muted" style="font-size:12px;margin-top:10px">A página vai recarregar.</p>
+    <div class="rst-foot">
+      <button type="button" class="gbtn" id="rst-cancel">Cancelar</button>
+      <button type="button" class="gbtn rst-confirm-btn" id="rst-confirm">Limpar tudo</button>
+    </div>`;
+  const md = openModal({title: "Limpar todos os ajustes?", body, size: "sm"});
+  body.querySelector("#rst-cancel").addEventListener("click", () => md.close());
+  body.querySelector("#rst-confirm").addEventListener("click", () => {
+    // Revert track title cleanings and album name cleanings before clearing keys
+    const titleClean = TRACK_TITLE_CLEAN.slice();
+    const albClean = ALB_CLEAN.slice();
+    const titleMap = new Map(titleClean.map(e => [e.n, e.raw]));
+    const albMap = new Map();
+    for (const e of albClean) for (const t of (e.tracks||[])) albMap.set(t.n, {title: t.origTitle, album: e.raw});
+    if (titleMap.size || albMap.size){
+      const stored = readStore();
+      if (stored && stored.rows){
+        stored.rows = stored.rows.map(r => {
+          const n = r[0];
+          const origTitle = titleMap.get(n) || (albMap.has(n) ? albMap.get(n).title : r[1]);
+          const origAlbum = albMap.has(n) ? albMap.get(n).album : r[3];
+          return [n, origTitle, r[2], origAlbum, r[4], r[5], ...(r[6] ? [r[6]] : [])];
+        });
+        writeStore(stored);
+      }
+    }
+    for (const k of RESET_KEYS){ try { localStorage.removeItem(k); } catch(e){} }
+    md.close(); parentMd.close();
+    toast("Ajustes apagados. Recarregando…");
+    setTimeout(() => location.reload(), 900);
   });
 }
 
 function openHealthHistory(){
   const body = document.createElement("div"); body.className = "sd sh";
-  const secs = [];
+  const catSecs = {Música:[], Álbum:[], Artista:[], Data:[]};
   const capF = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
+  // — Música: versões confirmadas, títulos limpos, títulos ignorados —
+
+  // versões de faixas confirmadas (VERS)
+  const versions = Object.entries(typeof VERS!=="undefined"?VERS:{});
+  if (versions.length){
+    const VL = typeof VERS_LABEL!=="undefined"?VERS_LABEL:{};
+    catSecs.Música.push(`<div class="sh-sec"><div class="sh-h"><b>Versões confirmadas</b><small>${versions.length}</small></div><ul class="sh-list">${versions.map(([k,v])=>`<li><span class="sh-lbl">${esc(v.title||k)} <em>${esc(VL[v.type]||"outra versão")}</em></span><button class="gbtn" data-undo="vers" data-id="${esc(k)}">Desfazer</button></li>`).join("")}</ul></div>`);
+  }
+
+  // títulos de faixas limpos (sufixo removido)
+  if (TRACK_TITLE_CLEAN.length){
+    catSecs.Música.push(`<div class="sh-sec"><div class="sh-h"><b>Títulos limpos</b><small>${TRACK_TITLE_CLEAN.length} faixa${TRACK_TITLE_CLEAN.length!==1?"s":""}</small></div><ul class="sh-list">${TRACK_TITLE_CLEAN.map(e=>`<li><span class="sh-lbl"><span style="text-decoration:line-through;opacity:.55">${esc(e.raw)}</span> → <strong>${esc(e.clean)}</strong> <span style="font-size:11px;opacity:.6">· ${esc(e.artist)}</span></span></li>`).join("")}</ul></div>`);
+  }
+
+  // títulos ignorados na Saúde
+  if (TRACK_TITLE_IGN.size){
+    catSecs.Música.push(`<div class="sh-sec"><div class="sh-h"><b>Títulos ignorados na Saúde</b><small>${TRACK_TITLE_IGN.size}</small></div><ul class="sh-list">${[...TRACK_TITLE_IGN].map(k=>{ const [art,ttl]=k.split("|"); return `<li><span class="sh-lbl">${esc(ttl||k)}${art?` <em>${esc(art)}</em>`:""}</span><button class="gbtn" data-undo="tign" data-id="${esc(k)}">Desfazer</button></li>`; }).join("")}</ul></div>`);
+  }
+
+  // — Álbum: álbuns unificados/separados, nomes limpos, álbuns ignorados —
 
   // álbuns unificados / separados manualmente
   const albSim = Object.entries(ALBMERGE||{}).filter(([,v])=>v==="sim");
@@ -783,7 +833,6 @@ function openHealthHistory(){
   if (albSim.length||albNao.length){
     let rows = "";
     for (const [id] of albSim){
-      const [art,,a,,b] = id.split("|"); // id = "art|a|b" mas nomes com | usam encodeURIComponent — separamos pelo último |
       const pts = id.split("|"); const bName = pts.pop(), aName = pts.pop(), artName = pts.join("|");
       rows += `<li><span class="sh-lbl"><em>${esc(capF(artName))}</em> · ${esc(aName)} + ${esc(bName)}</span><button class="gbtn" data-undo="alb" data-id="${esc(id)}">Desfazer</button></li>`;
     }
@@ -791,44 +840,38 @@ function openHealthHistory(){
       const pts = id.split("|"); const bName = pts.pop(), aName = pts.pop(), artName = pts.join("|");
       rows += `<li><span class="sh-lbl sh-neg"><em>${esc(capF(artName))}</em> · ${esc(aName)} ≠ ${esc(bName)}</span><button class="gbtn" data-undo="alb" data-id="${esc(id)}">Desfazer</button></li>`;
     }
-    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Álbuns unificados / separados</b><small>${albSim.length} iguais · ${albNao.length} diferentes</small></div><ul class="sh-list">${rows}</ul></div>`);
-  }
-
-  // artistas mesclados (ALIAS)
-  const aliases = Object.entries(ALIAS||{});
-  if (aliases.length){
-    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Artistas mesclados</b><small>${aliases.length} nome${aliases.length!==1?"s":""}</small></div><ul class="sh-list">${aliases.map(([k,v])=>`<li><span class="sh-lbl">${esc(k)} → <strong>${esc(v)}</strong></span><button class="gbtn" data-undo="alias" data-id="${esc(k)}">Desfazer</button></li>`).join("")}</ul></div>`);
-  }
-
-  // versões de faixas confirmadas (VERS)
-  const versions = Object.entries(typeof VERS!=="undefined"?VERS:{});
-  if (versions.length){
-    const VL = typeof VERS_LABEL!=="undefined"?VERS_LABEL:{};
-    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Versões confirmadas</b><small>${versions.length}</small></div><ul class="sh-list">${versions.map(([k,v])=>`<li><span class="sh-lbl">${esc(v.title||k)} <em>${esc(VL[v.type]||"outra versão")}</em></span><button class="gbtn" data-undo="vers" data-id="${esc(k)}">Desfazer</button></li>`).join("")}</ul></div>`);
-  }
-
-  // títulos ignorados na Saúde
-  if (TRACK_TITLE_IGN.size){
-    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Títulos ignorados na Saúde</b><small>${TRACK_TITLE_IGN.size}</small></div><ul class="sh-list">${[...TRACK_TITLE_IGN].map(k=>{ const [art,ttl]=k.split("|"); return `<li><span class="sh-lbl">${esc(ttl||k)}${art?` <em>${esc(art)}</em>`:""}</span><button class="gbtn" data-undo="tign" data-id="${esc(k)}">Desfazer</button></li>`; }).join("")}</ul></div>`);
-  }
-
-  // nomes de álbuns ignorados na Saúde
-  if (ALBUM_NAME_IGN.size){
-    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Álbuns ignorados na Saúde</b><small>${ALBUM_NAME_IGN.size}</small></div><ul class="sh-list">${[...ALBUM_NAME_IGN].map(n=>`<li><span class="sh-lbl">${esc(n)}</span><button class="gbtn" data-undo="aign" data-id="${esc(n)}">Desfazer</button></li>`).join("")}</ul></div>`);
+    catSecs.Álbum.push(`<div class="sh-sec"><div class="sh-h"><b>Álbuns unificados / separados</b><small>${albSim.length} iguais · ${albNao.length} diferentes</small></div><ul class="sh-list">${rows}</ul></div>`);
   }
 
   // nomes de álbuns limpos (sufixo removido)
   if (ALB_CLEAN.length){
-    secs.push(`<div class="sh-sec"><div class="sh-h"><b>Nomes de álbuns limpos</b><small>${ALB_CLEAN.length} álbum${ALB_CLEAN.length!==1?"s":""}</small></div><ul class="sh-list">${ALB_CLEAN.map(e=>`<li><span class="sh-lbl"><span style="text-decoration:line-through;opacity:.55">${esc(e.raw)}</span> → <strong>${esc(e.clean)}</strong></span></li>`).join("")}</ul></div>`);
+    catSecs.Álbum.push(`<div class="sh-sec"><div class="sh-h"><b>Nomes de álbuns limpos</b><small>${ALB_CLEAN.length} álbum${ALB_CLEAN.length!==1?"s":""}</small></div><ul class="sh-list">${ALB_CLEAN.map(e=>`<li><span class="sh-lbl"><span style="text-decoration:line-through;opacity:.55">${esc(e.raw)}</span> → <strong>${esc(e.clean)}</strong></span></li>`).join("")}</ul></div>`);
   }
 
-  // datas preenchidas pela Apple (informativo)
+  // nomes de álbuns ignorados na Saúde
+  if (ALBUM_NAME_IGN.size){
+    catSecs.Álbum.push(`<div class="sh-sec"><div class="sh-h"><b>Álbuns ignorados na Saúde</b><small>${ALBUM_NAME_IGN.size}</small></div><ul class="sh-list">${[...ALBUM_NAME_IGN].map(n=>`<li><span class="sh-lbl">${esc(n)}</span><button class="gbtn" data-undo="aign" data-id="${esc(n)}">Desfazer</button></li>`).join("")}</ul></div>`);
+  }
+
+  // — Artista: artistas mesclados —
+
+  const aliases = Object.entries(ALIAS||{});
+  if (aliases.length){
+    catSecs.Artista.push(`<div class="sh-sec"><div class="sh-h"><b>Artistas mesclados</b><small>${aliases.length} nome${aliases.length!==1?"s":""}</small></div><ul class="sh-list">${aliases.map(([k,v])=>`<li><span class="sh-lbl">${esc(k)} → <strong>${esc(v)}</strong></span><button class="gbtn" data-undo="alias" data-id="${esc(k)}">Desfazer</button></li>`).join("")}</ul></div>`);
+  }
+
+  // — Data: datas preenchidas automaticamente —
+
   const adCount = Object.keys(typeof ADATES!=="undefined"?ADATES:{}).length;
   if (adCount){
-    secs.push(`<div class="sh-sec sh-info"><div class="sh-h"><b>Datas completadas automaticamente</b><small>${adCount} pela Apple</small></div><p class="sh-note">Preenchidas em segundo plano. O dado original continua intacto na playlist.</p></div>`);
+    catSecs.Data.push(`<div class="sh-sec sh-info"><div class="sh-h"><b>Datas completadas automaticamente</b><small>${adCount} pela Apple</small></div><p class="sh-note">Preenchidas em segundo plano. O dado original continua intacto na playlist.</p></div>`);
   }
 
-  body.innerHTML = secs.length ? secs.join("") : `<p class="muted" style="padding:8px 0">Nenhuma alteração registrada ainda.</p>`;
+  const CAT_LABELS = ["Música","Álbum","Artista","Data"];
+  const allSecs = CAT_LABELS.filter(c => catSecs[c].length).map(c =>
+    `<div class="sh-cat-h">${c}</div>${catSecs[c].join("")}`
+  );
+  body.innerHTML = allSecs.length ? allSecs.join("") : `<p class="muted" style="padding:8px 0">Nenhuma alteração registrada ainda.</p>`;
   const md = openModal({title: "Ajustes feitos", sub: "Automáticos e manuais — clique para desfazer", body, size: "md"});
   body.addEventListener("click", e => {
     const b = e.target.closest("[data-undo]"); if (!b) return;
@@ -989,34 +1032,73 @@ function openHealth(){
     body.addEventListener("click", e => { const b = e.target.closest("[data-edit]"); if (b) editTrack(BY_PLAYLIST.find(t => t.n === +b.dataset.edit)); });
     openModal({title, sub, size: "lg", body});
   };
+  const wasAddressed = it => {
+    const k = it.k;
+    if (k === "tn") return TRACK_TITLE_CLEAN.length > 0 || TRACK_TITLE_IGN.size > 0;
+    if (k === "nm") return ALB_CLEAN.length > 0 || ALBUM_NAME_IGN.size > 0;
+    if (k === "h") return Object.keys(ALIAS||{}).length > 0;
+    if (k === "f" || k === "cv") return typeof VERS !== "undefined" && Object.keys(VERS).length > 0;
+    if (k === "g") return Object.keys(DUR_CHECK||{}).length > 0;
+    if (k === "dc") return (H.items.find(i => i.k === "dcr")||{count:0}).count > 0;
+    if (k === "ad" || k === "au") return Object.entries(ALBMERGE||{}).length > 0;
+    return false;
+  };
   const row = it => {
     const m = META[it.k];
-    if (!it.count) return `<li class="sd-i ok"><span class="sd-dot" aria-hidden="true">✓</span><div class="sd-tx"><b>${m.t}</b><span>${m.ok}</span></div><span class="sd-lv">${LEVEL.ok}</span>${it.k === "h" && Object.keys(ALIAS).length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="spell" data-k="h">Nomes juntados (${Object.keys(ALIAS).length})</button></div>` : ""}</li>`;
+    if (!it.count) {
+      const resp = wasAddressed(it);
+      const okBtn = it.k === "tn" && TRACK_TITLE_CLEAN.length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="tn-undo">Conferir (${TRACK_TITLE_CLEAN.length})</button></div>` : it.k === "nm" && ALB_CLEAN.length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="nm-undo">Conferir (${ALB_CLEAN.length})</button></div>` : it.k === "h" && Object.keys(ALIAS).length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="spell" data-k="h">Nomes juntados (${Object.keys(ALIAS).length})</button></div>` : "";
+      return `<li class="sd-i ok${resp?" sd-resp":""}"><span class="sd-dot" aria-hidden="true">✓</span><div class="sd-tx"><b>${m.t}</b>${resp?`<span class="sd-resp-lbl">Respondido</span>`:""}<span>${m.ok}</span></div><span class="sd-lv">${LEVEL.ok}</span>${okBtn}</li>`;
+    }
     const btn = m.act === "upd" ? `<button class="gbtn" type="button" data-act="upd">Atualizar dados</button>`
-      : m.act === "covers" ? `<button class="gbtn" type="button" data-act="dups" data-o="covers">Revisar covers</button>`
-      : m.act === "adoubt" ? `<button class="gbtn" type="button" data-act="dups" data-o="adoubt">Revisar álbuns</button>`
-      : m.act === "nm" ? `<button class="gbtn" type="button" data-act="nm">Revisar nomes (${nf(it.count)})</button>`
-      : m.act === "tn" ? `<button class="gbtn" type="button" data-act="tn">Revisar títulos (${nf(it.count)})</button>`
-      : m.act === "near" ? `<button class="gbtn" type="button" data-act="near">Responder (${nf(it.count)})</button><button class="gbtn" type="button" data-act="reeval">Reavaliar datas</button>`
-      : m.act === "nearcfm" ? `<button class="gbtn" type="button" data-act="nearcfm">Ver confirmados (${nf(it.count)})</button>`
-      : m.act === "singles" ? `<button class="gbtn" type="button" data-act="singles">Ver sugestões (${nf(it.count)})</button>`
-      : m.act === "aauto" ? `<button class="gbtn" type="button" data-act="dups" data-o="aauto">Revisar álbuns</button>`
-      : m.act === "dups" ? `<button class="gbtn" type="button" data-act="dups" data-o="dups">Revisar duplicadas</button>`
+      : m.act === "covers" ? `<button class="gbtn" type="button" data-act="dups" data-o="covers">Revisar (${nf(it.count)})</button>`
+      : m.act === "adoubt" ? `<button class="gbtn" type="button" data-act="dups" data-o="adoubt">Revisar (${nf(it.count)})</button>`
+      : m.act === "nm" ? `<button class="gbtn" type="button" data-act="nm">Revisar (${nf(it.count)})</button>`
+      : m.act === "tn" ? `<button class="gbtn" type="button" data-act="tn">Revisar (${nf(it.count)})</button>`
+      : m.act === "near" ? `<button class="gbtn" type="button" data-act="near">Revisar (${nf(it.count)})</button><button class="gbtn" type="button" data-act="reeval">Reavaliar datas</button>`
+      : m.act === "nearcfm" ? `<button class="gbtn" type="button" data-act="nearcfm">Revisar (${nf(it.count)})</button>`
+      : m.act === "singles" ? `<button class="gbtn" type="button" data-act="singles">Revisar (${nf(it.count)})</button>`
+      : m.act === "aauto" ? `<button class="gbtn" type="button" data-act="dups" data-o="aauto">Revisar (${nf(it.count)})</button>`
+      : m.act === "dups" ? `<button class="gbtn" type="button" data-act="dups" data-o="dups">Revisar (${nf(it.count)})</button>`
       : m.act === "spell" ? `<button class="gbtn" type="button" data-act="spell" data-k="${it.k}">Juntar nomes (${nf(it.count)})</button>`
-      : m.act === "dur" ? `<button class="gbtn" type="button" data-act="dur" data-k="${it.k}">Revisar durações (${nf(it.count)})</button>`
-      : m.act === "gd" ? `<button class="gbtn" type="button" data-act="gd">Revisar gêneros (${nf(it.count)})</button>`
-      : m.act === "datefix" ? `<button class="gbtn" type="button" data-act="datefix">Corrigir manualmente (${nf(it.count)})</button>`
-      : `<button class="gbtn" type="button" data-act="list" data-k="${it.k}">Ver as ${nf(it.count)}</button>`;
+      : m.act === "dur" ? `<button class="gbtn" type="button" data-act="dur" data-k="${it.k}">Revisar (${nf(it.count)})</button>`
+      : m.act === "gd" ? `<button class="gbtn" type="button" data-act="gd">Revisar (${nf(it.count)})</button>`
+      : m.act === "datefix" ? `<button class="gbtn" type="button" data-act="datefix">Revisar (${nf(it.count)})</button>`
+      : `<button class="gbtn" type="button" data-act="list" data-k="${it.k}">Revisar (${nf(it.count)})</button>`;
     return `<li class="sd-i ${it.level}"><span class="sd-dot" aria-hidden="true">${it.level === "warn" ? "!" : "i"}</span><div class="sd-tx"><b>${m.t}</b><span>${m.d(it.count, it)}</span></div><span class="sd-lv">${LEVEL[it.level]}</span><div class="sd-act">${btn}</div></li>`;
   };
-  const order = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">i</span><div class="sd-tx"><b>Conferir a ordem</b><span>O site não consegue saber sozinho se a ordem de entrada está certa (#1 = a primeira adicionada). Confira com os links do Spotify.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="fix">Conferir/Consertar ordem</button><button class="gbtn" type="button" data-act="rev">Inverter ordem</button></div></li>`;
-  const rescan = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">↺</span><div class="sd-tx"><b>Revisar todos os dados</b><span>Re-busca as datas de todos os álbuns em Apple Music, MusicBrainz, Deezer e TheAudioDB. Útil quando suspeitar que datas vieram de remasters. Não usa o Spotify.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="rescan">Revisar dados</button></div></li>`;
+  const order = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">i</span><div class="sd-tx"><b>Conferir a ordem</b><span>Confirme se #1 é a primeira música adicionada.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="fix">Verificar ordem</button><button class="gbtn" type="button" data-act="rev">Inverter ordem</button></div></li>`;
+  const rescan = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">↺</span><div class="sd-tx"><b>Revisar todos os dados</b><span>Re-busca as datas de todos os álbuns nas fontes disponíveis.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="rescan">Revisar dados</button></div></li>`;
+  const hasAdj = TRACK_TITLE_CLEAN.length > 0 || ALB_CLEAN.length > 0 || Object.keys(ALIAS||{}).length > 0 || (typeof VERS!=="undefined" && Object.keys(VERS).length > 0) || Object.entries(ALBMERGE||{}).length > 0 || Object.keys(DUR_CHECK||{}).length > 0;
   const head = bad.length
-    ? `<div class="sd-top">${ring(H.score)}<div><h4>${H.score >= 85 ? "Quase tudo certo" : H.score >= 60 ? "Dá pra melhorar" : "Precisa de atenção"}</h4><p>${plural(bad.length, "verificação encontrou", "verificações encontraram")} algo em ${faixas(H.N)}.</p></div></div>`
-    : `<div class="sd-top good">${ring(100)}<div><h4>Tudo certo!</h4><p>Nenhum problema encontrado nas ${faixas(H.N)}.</p><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button></div></div>`;
+    ? `<div class="sd-top">${ring(H.score)}<div><h4>${H.score >= 85 ? "Quase tudo certo" : H.score >= 60 ? "Dá pra melhorar" : "Precisa de atenção"}</h4><p>${plural(bad.length, "verificação encontrou", "verificações encontraram")} algo em ${faixas(H.N)}.</p>${hasAdj ? '<div class="sd-hist-row"><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button><button type="button" class="pbtn sd-rst-btn" data-act="reset">Limpar ajustes</button></div>' : ''}</div></div>`
+    : `<div class="sd-top good">${ring(100)}<div><h4>Tudo certo!</h4><p>Nenhum problema encontrado nas ${faixas(H.N)}.</p><div class="sd-hist-row"><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button><button type="button" class="pbtn sd-rst-btn" data-act="reset">Limpar ajustes</button></div></div></div>`;
   const hero = H.noSpotify ? `<div class="sd-hero"><p><strong>Nenhuma música tem dados do Spotify ainda.</strong> Um único <strong>Atualizar dados</strong> resolve o que falta de dados, links e gêneros de uma vez (você confirma as buscas antes).</p><button class="pbtn" type="button" data-act="upd">Atualizar dados</button></div>` : "";
-  const shown = H.noSpotify ? H.items.filter(i => !["a", "b", "c"].includes(i.k)) : (bad.length ? H.items : H.items.filter(i => i.count && !i.w));
-  body.innerHTML = `${head}${hero}<ul class="sd-list">${shown.map(row).join("")}${order}${rescan}</ul>`;
+  const HIDDEN_K = ["gw", "dcr"];
+  const baseItems = H.noSpotify
+    ? H.items.filter(i => !HIDDEN_K.includes(i.k) && !["a","b","c"].includes(i.k))
+    : H.items.filter(i => !HIDDEN_K.includes(i.k));
+  const CAT_MAP = {a:"Música",b:"Música",e:"Música",f:"Música",cv:"Música",g:"Música",tn:"Música",ad:"Álbum",au:"Álbum",nm:"Álbum",sg:"Álbum",dc:"Data",dr:"Data",dm:"Data",c:"Artista",h:"Artista",gd:"Artista"};
+  const CATS_ORDER = ["Música","Álbum","Data","Artista"];
+  const byCat = (its) => {
+    const g = {};
+    for (const it of [...its].sort((a,b)=>b.w-a.w)){ const c=CAT_MAP[it.k]||"Outros"; (g[c]=g[c]||[]).push(it); }
+    return CATS_ORDER.filter(c=>g[c]).map(c=>`<li class="sd-cat-h">${c}</li>${g[c].map(row).join("")}`).join("");
+  };
+  const GRPS = [
+    {label:"Não respondido", sub:"conta na nota",            cls:"warn", f: i => i.count && i.w},
+    {label:"Não respondido", sub:"não obrigatório",          cls:"help", f: i => i.count && !i.w},
+    {label:"Respondido",     sub:null,                       cls:"resp", f: i => !i.count && wasAddressed(i)},
+    {label:"Manutenção",     sub:"verificações periódicas",  cls:"maint", f: null},
+    {label:"Ok",             sub:"nem precisou de resposta", cls:"ok",   f: i => !i.count && !wasAddressed(i)},
+  ];
+  const listHtml = GRPS.map(grp => {
+    if (grp.cls === "maint") return `<li class="sd-grp-h sd-grp-maint">Manutenção <span class="sd-grp-sub">verificações periódicas</span></li>${order}${rescan}`;
+    const its = baseItems.filter(grp.f);
+    if (!its.length) return "";
+    return `<li class="sd-grp-h sd-grp-${grp.cls}">${grp.label}${grp.sub?` <span class="sd-grp-sub">${grp.sub}</span>`:""}</li>${byCat(its)}`;
+  }).join("");
+  body.innerHTML = `${head}${hero}<ul class="sd-list">${listHtml}</ul>`;
   const md = openModal({title: "Saúde da playlist", sub: `${faixas(H.N)}`, body, size: "md"});
   const by = k => H.items.find(i => i.k === k);
   body.addEventListener("click", e => {
@@ -1027,8 +1109,10 @@ function openHealth(){
     else if (a === "fix"){ md.close(); openFixOrder(); }
     else if (a === "rev"){ md.close(); askReverse(); }
     else if (a === "list"){ const it = by(b.dataset.k); list(META[it.k].t, it.tracks, `${faixas(it.tracks.length)} · “—” é o que está em branco`); }
-    else if (a === "nm"){ md.close(); openAlbumNameClean(by("nm").albums); }
-    else if (a === "tn"){ md.close(); openTrackTitleClean(by("tn").tracks); }
+    else if (a === "nm"){ md.close(); openAlbumNameUndo(openHealth); }
+    else if (a === "tn"){ md.close(); openTrackTitleUndo(openHealth); }
+    else if (a === "tn-undo"){ md.close(); openTrackTitleUndo(openHealth); }
+    else if (a === "nm-undo"){ md.close(); openAlbumNameUndo(openHealth); }
     else if (a === "gd"){ md.close(); openGenreDivergence(by("gd").artists); }
     else if (a === "near"){ md.close(); openNear(by("dc").albums); }
     else if (a === "reeval"){ md.close(); openReeval(by("dc").albums); }
@@ -1037,6 +1121,7 @@ function openHealth(){
     else if (a === "singles"){ md.close(); openSingles(by("sg").tracks); }
     else if (a === "dur"){ md.close(); const it = by(b.dataset.k); openDurReview(it.tracks); }
     else if (a === "hist"){ openHealthHistory(); }
+    else if (a === "reset"){ openResetAdjustments(md); }
     else if (a === "rescan"){
       const H2 = healthChecks();
       const byK = k => H2.items.find(i => i.k === k);
@@ -1074,7 +1159,69 @@ function openHealth(){
   });
 }
 
-if (STORE && ssGet("health") === "1"){ ssDel("health"); setTimeout(openHealth, 1300); }
+function autoFixAlbumDates(){
+  const groups = new Map();
+  for (const t of BY_PLAYLIST){
+    if (!t.bands.length || t.bands[0] === NI) continue;
+    if (!t.album || t.album === NI) continue;
+    const key = t.bands[0].toLowerCase() + "\x00" + t.album.toLowerCase();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  }
+  const fixes = new Map();
+  for (const ts of groups.values()){
+    if (ts.length < 2) continue;
+    const dated = ts.filter(t => t.date && /^\d{4}/.test(t.date));
+    if (dated.length < 2) continue;
+    const oldest = dated.reduce((m, t) => t.date < m ? t.date : m, dated[0].date);
+    for (const t of dated) if (t.date !== oldest) fixes.set(t.n, oldest);
+  }
+  if (!fixes.size) return false;
+  ssSet("health", "1");
+  commitRows(currentRows().map(r => {
+    if (!fixes.has(r[0])) return r;
+    return [r[0], r[1], r[2], r[3], r[4], fixes.get(r[0]), ...(r[6] ? [r[6]] : [])];
+  }), `Datas unificadas em ${fixes.size} faixa${fixes.size > 1 ? "s" : ""}`);
+  return true;
+}
+
+function autoApplySuffixClean(){
+  const tnI = trackTitleIssues(BY_PLAYLIST);
+  const nmI = albumNameIssues(BY_PLAYLIST);
+  if (!tnI.length && !nmI.length) return false;
+  const tnMap = new Map(tnI.map(x => [x.t.n, x.cleanTitle]));
+  const nmMap = new Map(nmI.map(x => [x.rawName, x.cleanName]));
+  for (const x of tnI) if (!TRACK_TITLE_CLEAN.some(e => e.n === x.t.n)) TRACK_TITLE_CLEAN.push({n: x.t.n, artist: x.t.artist, raw: x.rawTitle, clean: x.cleanTitle});
+  saveTrackTitleClean();
+  for (const x of nmI){
+    if (!ALB_CLEAN.some(e => e.raw === x.rawName)){
+      const tracks = currentRows().filter(r => { const t = BY_PLAYLIST.find(b => b.n === r[0]); return t && t.albumRaw === x.rawName; }).map(r => ({n: r[0], origTitle: r[1]}));
+      ALB_CLEAN.push({raw: x.rawName, clean: x.cleanName, tracks});
+    }
+  }
+  saveAlbClean();
+  const parts = [];
+  if (tnI.length) parts.push(plural(tnI.length, "titulo corrigido", "titulos corrigidos"));
+  if (nmI.length) parts.push(plural(nmI.length, "album renomeado", "albuns renomeados"));
+  ssSet("health", "1");
+  commitRows(currentRows().map(r => {
+    const t = BY_PLAYLIST.find(b => b.n === r[0]);
+    const newTitle = tnMap.get(r[0]) || r[1];
+    const newAlbum = (t && nmMap.get(t.albumRaw)) || r[3];
+    if (newTitle === r[1] && newAlbum === r[3]) return r;
+    return [r[0], newTitle, r[2], newAlbum, r[4], r[5], ...(r[6] ? [r[6]] : [])];
+  }), "Sufixos removidos: " + parts.join(" / "));
+  return true;
+}
+
+if (STORE){
+  if (!autoFixAlbumDates() && !autoApplySuffixClean() && ssGet("health") === "1"){
+    ssDel("health");
+    if (ssGet("tt-clean-undo") === "1"){ ssDel("tt-clean-undo"); setTimeout(openTrackTitleUndo, 1300); }
+    else if (ssGet("alb-clean-undo") === "1"){ ssDel("alb-clean-undo"); setTimeout(openAlbumNameUndo, 1300); }
+    else { setTimeout(openHealth, 1300); }
+  }
+}
 /* a Apple busca sozinha o que falta: a data dos álbuns próximos do mesmo artista que ainda não foram conferidos com ela (1 busca por álbum, na fila das capas;
    sem gastar o Spotify). Se a Apple trouxer a mesma data, o álbum sai da lista sozinho */
 if (STORE){

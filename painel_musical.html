@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -132,8 +132,8 @@
 
       <div class="grid">
         <article class="card chart rise" style="--d:7">
-          <header><div><div class="eyebrow">01 · Linha do tempo</div><h2>Músicas por ano de lançamento</h2></div><div class="hint">Passe o mouse para ver os álbuns de cada ano · clique para filtrar</div></header>
-          <div class="body"><div class="years" id="years"></div></div>
+          <header><div><div class="eyebrow">01 · Linha do tempo</div><h2>Músicas por ano de lançamento</h2></div><div class="hint" id="years-hint">Passe o mouse para ver os álbuns de cada ano · clique para filtrar</div><div class="card-tools"><span class="seg" id="years-tab" role="group" aria-label="Visualização"><button type="button" data-m="anos" aria-pressed="true">Por ano</button><button type="button" data-m="decadas" aria-pressed="false">Por década</button></span></div></header>
+          <div class="body"><div class="years" id="years"></div><div class="prof" id="years-decades" style="display:none"></div></div>
         </article>
         <article class="card chart rise" style="--d:8">
           <header><div><div class="eyebrow">02 · Participação</div><h2 id="tree-title">Músicas por banda/artista</h2></div><button class="gbtn tree-exp" id="tree-expand" type="button" title="Ver o gráfico em tela cheia"><svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>Tela cheia</button><div class="hint hint-btn"><span class="tree-tools"><span class="seg alb-mode" id="tree-mode" role="group" aria-label="O que o gráfico mostra"><button type="button" data-m="bandas" aria-pressed="true">Bandas</button><button type="button" data-m="albuns" aria-pressed="false">Álbuns</button></span><span id="tree-style-slot"></span></span></div></header>
@@ -219,10 +219,10 @@
 <div class="tip" id="tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/script.js?v=1.5.28"></script>
+<script src="js/script.js?v=1.5.42"></script>
 <script src="js/tags.js?v=1.5.28"></script>
 <script src="js/cartoes.js?v=1.5.28"></script>
-<script src="js/saude.js?v=1.5.28"></script>
+<script src="js/saude.js?v=1.5.43"></script>
 <script src="js/scrollfx.js?v=1.5.28"></script>
 </body>
 </html>
