@@ -365,9 +365,10 @@ function openImportFavoritesModal(onDone) {
 
   const foot = document.createElement("div");
   foot.className = "mfrow";
-  foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" id="ifav-cancel">Cancelar</button><button class="pbtn" type="button" id="ifav-confirm">Favoritar</button>`;
+  foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" id="ifav-cancel">Cancelar</button><button class="pbtn" type="button" id="ifav-confirm" disabled>Favoritar</button>`;
 
   const md = openModal({ title: "Importar Favoritas", body: bodyEl, foot, size: "sm" });
+  ta.addEventListener("input", () => { foot.querySelector("#ifav-confirm").disabled = !ta.value.trim(); });
   foot.querySelector("#ifav-cancel").addEventListener("click", () => md.close());
   foot.querySelector("#ifav-confirm").addEventListener("click", async () => {
     const raw = ta.value.trim();
