@@ -228,7 +228,7 @@
             <div class="bg-base-200 border border-base-300 rounded-2xl p-6 md:p-10 mb-8 min-h-[220px]">
                 <h3 class="text-xl font-bold mb-3 text-white">Como funciona?</h3>
                 <p class="text-base-400 leading-relaxed text-lg mb-8">
-                    Copie e cole dois prompts prontos — um no Grok para coletar os dados da sua playlist, outro no Claude para gerar o painel visual. Não precisa de Spotify pago, mas leva de <strong class="text-white">10 a 25 minutos</strong>.
+                    Use um prompt pronto no Grok para coletar os dados da sua playlist — depois é só colar direto na ferramenta. Não precisa de Spotify pago, mas leva de <strong class="text-white">10 a 15 minutos</strong>.
                 </p>
 
                 <button type="button" onclick="toggleDetails('manual')" id="toggle-manual-btn" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm outline-none focus:outline-none">
@@ -241,7 +241,7 @@
                         <div class="flex items-start">
                             <span class="text-spotify text-xl mr-3">✓</span>
                             <p class="text-gray-200 leading-relaxed">
-                                <strong>Aviso:</strong> Este método <strong>não necessita de Spotify pago</strong> e não possui limite de requisições de músicas da API. Porém, é mais demorado e depende do limite de tokens de contexto do Grok e do Claude.
+                                <strong>Aviso:</strong> Este método <strong>não necessita de Spotify pago</strong> e não possui limite de requisições de músicas da API. Porém, é mais demorado e depende do limite de tokens de contexto do Grok.
                             </p>
                         </div>
                     </div>
@@ -254,7 +254,7 @@
                         <p class="text-sm bg-black/40 p-4 rounded-lg border border-base-300">
                             <em>Teste real (350 músicas):</em><br>
                             ~11 min na coleta (Grok)<br>
-                            ~7:30 min na criação (Claude)<br>
+                            ~1 min para colar e gerar<br>
                             + tempo de transição/leitura.
                         </p>
                     </div>
@@ -370,23 +370,17 @@ Aqui está a lista completa de links:
                         <h3 class="md:hidden text-spotify font-bold text-xl mb-2">Passo 3</h3>
 
                         <div class="flex-grow">
-                            <h3 class="text-2xl font-bold mb-3">Criar o site no Claude</h3>
-                            <p class="text-base-400 mb-4">Copie o resultado que o Grok te entregou. Depois, abra o Claude, cole este prompt abaixo e substitua a última linha com os dados gerados.</p>
+                            <h3 class="text-2xl font-bold mb-3">Adicionar músicas ao Dashbeat</h3>
+                            <p class="text-base-400 mb-6">Copie o resultado completo que o Grok te entregou. Abra a ferramenta, clique em <strong class="text-white">Adicionar músicas</strong>, cole os dados e confirme.</p>
 
-                            <div class="code-container bg-black border border-base-300 rounded-xl overflow-hidden">
-                                <button onclick="copyCode(this, 'prompt-claude')" class="copy-btn bg-base-300 hover:bg-base-400 text-white text-xs py-1.5 px-3 rounded-md flex items-center">
-                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                    Copiar
-                                </button>
-                                <pre id="prompt-claude" class="p-5 text-sm text-gray-300 font-mono overflow-x-auto whitespace-pre-wrap">Crie um site em um único arquivo HTML, com tema escuro preto e verde-esmeralda, bonito e moderno, a partir da minha lista de músicas abaixo (colunas separadas por TAB: numero, musica, artista, album, duração, data_lançamento). A coluna 'numero' é a ordem em que adicionei as faixas na minha playlist: a 1 é a mais antiga.
-Aba 'Painel': 5 cartões (total de músicas maior, artistas únicos, duração média, ano com mais lançamentos, artista com mais faixas). 4 gráficos em grade 2x2 (músicas/ano, músicas/artista, duração/álbum, ranking artistas). Filtros de seleção múltipla. Tooltips e animações.
-Aba 'Insights': 8 cards curtos com insights do catálogo e da ordem da playlist (quem dominou o começo, meio e fim).
-Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", "m:ss", "DD/MM/AAAA"]. Nenhuma biblioteca externa. Tente/catch para erros. Layout responsivo.
-[COLE O RESULTADO DO GROK AQUI]</pre>
+                            <div class="bg-base-200 border border-base-300 rounded-xl p-5 mb-4 text-sm text-gray-300 leading-relaxed">
+                                <p class="mb-2">📋 <strong class="text-white">O que colar:</strong> o bloco de dados gerado pelo Grok, com as colunas separadas por TAB.</p>
+                                <p>✅ A ferramenta reconhece o formato automaticamente e importa tudo de uma vez.</p>
                             </div>
+
                             <div class="mt-4 text-center sm:text-left">
-                                <a href="https://claude.ai/new" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm">
-                                    Abrir o Claude <span>↗</span>
+                                <a href="index.html?import=nova-playlist" class="inline-flex items-center gap-2 bg-spotify hover:bg-spotify-light text-black font-semibold py-2.5 px-5 rounded-full transition-colors text-sm">
+                                    Abrir o Dashbeat e adicionar <span>→</span>
                                 </a>
                             </div>
                         </div>
@@ -407,10 +401,10 @@ Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", 
                                 <div class="text-5xl mb-4 md:mb-0">✨</div>
                                 <div>
                                     <p class="text-lg text-white leading-relaxed">
-                                        Após enviar a mensagem para o Claude, aguarde a resposta. Assim que ele finalizar, um painel lateral (Artifact) vai aparecer na direita.
+                                        Após colar os dados e confirmar a importação, o painel é atualizado na hora com todas as suas músicas.
                                     </p>
                                     <p class="text-spotify font-medium mt-2">
-                                        Basta abrir em tela cheia e o seu Dashboard estará pronto para uso!
+                                        Seu Dashbeat estará pronto para explorar!
                                     </p>
                                 </div>
                             </div>
