@@ -348,11 +348,11 @@ function openImportFavoritesModal(onDone) {
 
   const desc = document.createElement("p");
   desc.style.cssText = "color:#8fa59a;font-size:14px;margin:0";
-  desc.textContent = "Cole links do Spotify ou nomes de músicas (um por linha). Todas as encontradas na sua playlist serão favoritadas.";
+  desc.textContent = "Cole links de faixas, de uma playlist inteira do Spotify, ou nomes de músicas (um por linha). Todas as encontradas no seu catálogo serão favoritadas.";
 
   const ta = document.createElement("textarea");
   ta.rows = 10;
-  ta.placeholder = "https://open.spotify.com/track/...\nou Música - Artista";
+  ta.placeholder = "https://open.spotify.com/track/...\nhttps://open.spotify.com/playlist/...\nou Música - Artista";
   ta.setAttribute("autofocus", "");
   ta.style.cssText = "width:100%;box-sizing:border-box;background:#06140f;border:1px solid #1a3a2e;border-radius:8px;padding:10px;color:#e8f2ed;font-size:13px;font-family:monospace;resize:vertical;outline:none;line-height:1.5";
 
@@ -369,21 +369,55 @@ function openImportFavoritesModal(onDone) {
 
   const md = openModal({ title: "Importar Favoritas", body: bodyEl, foot, size: "sm" });
   foot.querySelector("#ifav-cancel").addEventListener("click", () => md.close());
-  foot.querySelector("#ifav-confirm").addEventListener("click", () => {
-    if (!ta.value.trim()) return;
-    const r = applyImportFavorites(ta.value);
+  foot.querySelector("#ifav-confirm").addEventListener("click", async () => {
+    const raw = ta.value.trim();
+    if (!raw) return;
+    const btn = foot.querySelector("#ifav-confirm");
+    btn.disabled = true;
+
+    // Separar links de playlist dos demais
+    const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const plIds = [], otherLines = [];
+    for (const ln of lines) {
+      const pm = ln.match(/playlist[/:]([A-Za-z0-9]{22})/);
+      if (pm) plIds.push(pm[1]); else otherLines.push(ln);
+    }
+
+    let extraIds = [], fetchError = null;
+    if (plIds.length) {
+      btn.textContent = "Buscando playlist…";
+      resDiv.style.display = "block";
+      resDiv.innerHTML = `<p style="color:#8fa59a;margin:0">Buscando faixas da playlist no Spotify…</p>`;
+      const creds = typeof loadSpotifyCreds === "function" ? loadSpotifyCreds() : {};
+      if (!creds.id || !creds.secret) {
+        fetchError = "Sem credenciais do Spotify configuradas. Configure seu Client ID e Secret na importação de músicas primeiro.";
+      } else {
+        try {
+          const token = await spotifyToken(creds.id, creds.secret);
+          const {rows} = await spotifyFetchPlaylistTracks(plIds, token, null, null, null);
+          extraIds = rows.map(r => r.id).filter(Boolean);
+        } catch (e) {
+          fetchError = `Erro ao buscar a playlist: ${e.message}`;
+        }
+      }
+    }
+
+    const r = applyImportFavorites([...extraIds, ...otherLines].join("\n"));
     let html = "";
+    if (fetchError)    html += `<p style="color:#f87171;margin:0 0 4px">⚠ ${esc(fetchError)}</p>`;
     if (r.added)       html += `<p style="color:#1DB954;margin:0 0 4px">✓ ${r.added} música${r.added!==1?"s":""} favoritada${r.added!==1?"s":""}</p>`;
     if (r.alreadyFav)  html += `<p style="color:#8fa59a;margin:0 0 4px">↩ ${r.alreadyFav} já eram favoritas</p>`;
-    if (r.notFound.length) html += `<p style="color:#f87171;margin:0 0 4px">⚠ ${r.notFound.length} não encontrada${r.notFound.length!==1?"s":""} na sua playlist:</p><ul style="margin:0 0 4px;padding-left:16px;font-size:12px;color:#f87171">${r.notFound.slice(0,20).map(x=>`<li>${esc(x)}</li>`).join("")}${r.notFound.length>20?`<li>…e mais ${r.notFound.length-20}</li>`:""}</ul>`;
+    if (r.notFound.length) html += `<p style="color:#f87171;margin:0 0 4px">⚠ ${r.notFound.length} não encontrada${r.notFound.length!==1?"s":""} na sua playlist (não estão no seu catálogo):</p><ul style="margin:0 0 4px;padding-left:16px;font-size:12px;color:#f87171">${r.notFound.slice(0,20).map(x=>`<li>${esc(x)}</li>`).join("")}${r.notFound.length>20?`<li>…e mais ${r.notFound.length-20}</li>`:""}</ul>`;
     if (r.stale.length) html += `<p style="color:#fbbf24;margin:0">⚠ ${r.stale.length} favorita${r.stale.length!==1?"s":""} existente${r.stale.length!==1?"s":""} sem correspondência no catálogo atual</p>`;
     if (!html) html = `<p style="color:#8fa59a;margin:0">Nenhuma alteração realizada.</p>`;
     resDiv.style.display = "block";
     resDiv.innerHTML = html;
     if (r.added > 0 || r.alreadyFav > 0) {
-      foot.querySelector("#ifav-confirm").disabled = true;
-      foot.querySelector("#ifav-confirm").textContent = "Feito ✓";
+      btn.textContent = "Feito ✓";
       if (onDone) onDone();
+    } else {
+      btn.disabled = false;
+      btn.textContent = "Favoritar";
     }
   });
 }
