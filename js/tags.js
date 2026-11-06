@@ -385,20 +385,43 @@ function openImportFavoritesModal(onDone) {
 
     let extraIds = [], fetchError = null;
     if (plIds.length) {
+      let creds = typeof loadSpotifyCreds === "function" ? loadSpotifyCreds() : {};
+
+      // Se credenciais não salvas, checar se foram preenchidas inline; senão mostrar campos
+      if (!creds.id || !creds.secret) {
+        const cidEl = bodyEl.querySelector("#ifav-cid");
+        const secEl = bodyEl.querySelector("#ifav-sec");
+        if (cidEl && secEl) {
+          // Já existem campos — ler e salvar
+          const id = cidEl.value.trim(), secret = secEl.value.trim();
+          if (!id || !secret) { cidEl.focus(); btn.disabled = false; btn.textContent = "Favoritar"; return; }
+          if (typeof saveSpotifyCreds === "function") saveSpotifyCreds(id, secret);
+          creds = {id, secret};
+          bodyEl.querySelector("#ifav-credbox").remove();
+        } else {
+          // Primeira vez sem creds: injetar campos e aguardar novo clique
+          btn.disabled = false; btn.textContent = "Favoritar";
+          const credBox = document.createElement("div");
+          credBox.id = "ifav-credbox";
+          credBox.style.cssText = "background:#0a1c16;border:1px solid #1a3a2e;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px";
+          credBox.innerHTML = `<p style="color:#fbbf24;margin:0 0 4px">Para importar uma playlist, informe suas credenciais do Spotify:</p>
+            <label style="color:#8fa59a;font-size:12px">Client ID<input id="ifav-cid" type="text" autocomplete="off" spellcheck="false" placeholder="1a2b3c…" style="display:block;width:100%;box-sizing:border-box;margin-top:3px;background:#06140f;border:1px solid #1a3a2e;border-radius:6px;padding:6px 8px;color:#e8f2ed;font-size:13px;outline:none"></label>
+            <label style="color:#8fa59a;font-size:12px">Client Secret<input id="ifav-sec" type="password" autocomplete="off" spellcheck="false" placeholder="••••••••••••" style="display:block;width:100%;box-sizing:border-box;margin-top:3px;background:#06140f;border:1px solid #1a3a2e;border-radius:6px;padding:6px 8px;color:#e8f2ed;font-size:13px;outline:none"></label>`;
+          bodyEl.appendChild(credBox);
+          setTimeout(() => credBox.querySelector("#ifav-cid").focus(), 50);
+          return;
+        }
+      }
+
       btn.textContent = "Buscando playlist…";
       resDiv.style.display = "block";
       resDiv.innerHTML = `<p style="color:#8fa59a;margin:0">Buscando faixas da playlist no Spotify…</p>`;
-      const creds = typeof loadSpotifyCreds === "function" ? loadSpotifyCreds() : {};
-      if (!creds.id || !creds.secret) {
-        fetchError = "Sem credenciais do Spotify configuradas. Configure seu Client ID e Secret na importação de músicas primeiro.";
-      } else {
-        try {
-          const token = await spotifyToken(creds.id, creds.secret);
-          const {rows} = await spotifyFetchPlaylistTracks(plIds, token, null, null, null);
-          extraIds = rows.map(r => r.id).filter(Boolean);
-        } catch (e) {
-          fetchError = `Erro ao buscar a playlist: ${e.message}`;
-        }
+      try {
+        const token = await spotifyToken(creds.id, creds.secret);
+        const {rows} = await spotifyFetchPlaylistTracks(plIds, token, null, null, null);
+        extraIds = rows.map(r => r.id).filter(Boolean);
+      } catch (e) {
+        fetchError = `Erro ao buscar a playlist: ${e.message}`;
       }
     }
 
