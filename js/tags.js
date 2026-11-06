@@ -351,7 +351,7 @@ function openImportFavoritesModal(onDone) {
   desc.textContent = "Cole links de faixas, de uma playlist inteira do Spotify, ou nomes de músicas (um por linha). Todas as encontradas no seu catálogo serão favoritadas.";
 
   const ta = document.createElement("textarea");
-  ta.rows = 10;
+  ta.rows = 5;
   ta.placeholder = "https://open.spotify.com/track/...\nhttps://open.spotify.com/playlist/...\nou Música - Artista";
   ta.setAttribute("autofocus", "");
   ta.style.cssText = "width:100%;box-sizing:border-box;background:#06140f;border:1px solid #1a3a2e;border-radius:8px;padding:10px;color:#e8f2ed;font-size:13px;font-family:monospace;resize:vertical;outline:none;line-height:1.5";
