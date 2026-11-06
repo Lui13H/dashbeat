@@ -386,49 +386,37 @@ function openImportFavoritesModal(onDone) {
 
     let extraIds = [], fetchError = null;
     if (plIds.length) {
-      // 1. Tentar token OAuth do usuário (sessão ativa = melhor opção, funciona pra playlists privadas)
+      // Tentar token OAuth do usuário (sessão ativa) — único que funciona pra playlists
       let token = null;
       try { if (typeof spotifyUserToken === "function") token = await spotifyUserToken(); } catch (e) {}
 
-      // 2. Sem OAuth: usar client credentials (só funciona pra playlists públicas)
       if (!token) {
-        let creds = typeof loadSpotifyCreds === "function" ? loadSpotifyCreds() : {};
-        if (!creds.id || !creds.secret) {
-          const cidEl = bodyEl.querySelector("#ifav-cid");
-          const secEl = bodyEl.querySelector("#ifav-sec");
-          if (cidEl && secEl) {
-            const id = cidEl.value.trim(), secret = secEl.value.trim();
-            if (!id || !secret) { cidEl.focus(); btn.disabled = false; btn.textContent = "Favoritar"; return; }
-            if (typeof saveSpotifyCreds === "function") saveSpotifyCreds(id, secret);
-            creds = {id, secret};
-            bodyEl.querySelector("#ifav-credbox").remove();
-          } else {
-            btn.disabled = false; btn.textContent = "Favoritar";
-            const credBox = document.createElement("div");
-            credBox.id = "ifav-credbox";
-            credBox.style.cssText = "background:#0a1c16;border:1px solid #1a3a2e;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px";
-            credBox.innerHTML = `<p style="color:#fbbf24;margin:0 0 6px">Para importar uma playlist, informe suas credenciais do Spotify:</p>
-              <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#1DB954;color:#06140f;font-weight:700;font-size:12px;padding:5px 12px;border-radius:999px;text-decoration:none;width:fit-content">Abrir Spotify Developer Dashboard ↗</a>
-              <label style="color:#8fa59a;font-size:12px">Client ID<input id="ifav-cid" type="text" autocomplete="off" spellcheck="false" placeholder="1a2b3c…" style="display:block;width:100%;box-sizing:border-box;margin-top:3px;background:#06140f;border:1px solid #1a3a2e;border-radius:6px;padding:6px 8px;color:#e8f2ed;font-size:13px;outline:none"></label>
-              <label style="color:#8fa59a;font-size:12px">Client Secret<input id="ifav-sec" type="password" autocomplete="off" spellcheck="false" placeholder="••••••••••••" style="display:block;width:100%;box-sizing:border-box;margin-top:3px;background:#06140f;border:1px solid #1a3a2e;border-radius:6px;padding:6px 8px;color:#e8f2ed;font-size:13px;outline:none"></label>`;
-            bodyEl.appendChild(credBox);
-            setTimeout(() => credBox.querySelector("#ifav-cid").focus(), 50);
-            return;
-          }
+        // Sem sessão OAuth: exibir botão de conexão
+        btn.disabled = false; btn.textContent = "Favoritar";
+        if (!bodyEl.querySelector("#ifav-authbox")) {
+          const authBox = document.createElement("div");
+          authBox.id = "ifav-authbox";
+          authBox.style.cssText = "background:#0a1c16;border:1px solid #1a3a2e;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;font-size:13px";
+          authBox.innerHTML = `<p style="color:#fbbf24;margin:0">Para importar playlists é necessário estar conectado ao Spotify.</p>
+            <button id="ifav-connect" type="button" style="display:inline-flex;align-items:center;gap:6px;background:#1DB954;color:#06140f;font-weight:700;font-size:13px;padding:7px 16px;border-radius:999px;border:none;cursor:pointer;width:fit-content">Conectar com Spotify →</button>
+            <p style="color:#8fa59a;margin:0;font-size:12px">Após conectar, volte aqui e tente novamente.</p>`;
+          bodyEl.appendChild(authBox);
+          authBox.querySelector("#ifav-connect").addEventListener("click", () => {
+            md.close();
+            if (typeof openPlaylistAuthModal === "function") openPlaylistAuthModal("", "add");
+          });
         }
-        try { token = await spotifyToken(creds.id, creds.secret); } catch (e) { fetchError = e.message; }
+        return;
       }
 
-      if (token && !fetchError) {
-        btn.textContent = "Buscando playlist…";
-        resDiv.style.display = "block";
-        resDiv.innerHTML = `<p style="color:#8fa59a;margin:0">Buscando faixas da playlist no Spotify…</p>`;
-        try {
-          const {rows} = await spotifyFetchPlaylistTracks(plIds, token, null, null, null);
-          extraIds = rows.map(r => r.id).filter(Boolean);
-        } catch (e) {
-          fetchError = `Erro ao buscar a playlist: ${e.message}`;
-        }
+      btn.textContent = "Buscando playlist…";
+      resDiv.style.display = "block";
+      resDiv.innerHTML = `<p style="color:#8fa59a;margin:0">Buscando faixas da playlist no Spotify…</p>`;
+      try {
+        const {rows} = await spotifyFetchPlaylistTracks(plIds, token, null, null, null);
+        extraIds = rows.map(r => r.id).filter(Boolean);
+      } catch (e) {
+        fetchError = `Erro ao buscar a playlist: ${e.message}`;
       }
     }
 
