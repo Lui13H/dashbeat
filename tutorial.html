@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashbeat — Dashboard de Playlist do Spotify</title>
+    <link rel="icon" type="image/png" href="img/favicon.png">
+    <meta name="description" content="Transforme sua playlist do Spotify em um painel de estatísticas: gêneros, anos, artistas e insights. Escolha o método e gere o seu.">
+    <meta name="theme-color" content="#030605">
+    <link rel="canonical" href="https://painel-musical.vercel.app/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Dashbeat">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Dashbeat — Dashboard de Playlist do Spotify">
+    <meta property="og:description" content="Transforme sua playlist do Spotify em um painel de estatísticas: gêneros, anos, artistas e insights. Escolha o método e gere o seu.">
+    <meta property="og:url" content="https://painel-musical.vercel.app/">
+    <meta property="og:image" content="https://painel-musical.vercel.app/img/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Dashbeat — Sinta a batida. Revele o impacto.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Dashbeat — Dashboard de Playlist do Spotify">
+    <meta name="twitter:description" content="Transforme sua playlist do Spotify em um painel de estatísticas: gêneros, anos, artistas e insights. Escolha o método e gere o seu.">
+    <meta name="twitter:image" content="https://painel-musical.vercel.app/img/og-image.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        spotify: {
+                            DEFAULT: '#10B981',
+                            dark: '#047857',
+                            light: '#6EE7B7'
+                        },
+                        base: {
+                            100: '#030605', /* Fundo principal */
+                            200: '#0a1c16', /* Fundo de cards */
+                            300: '#173a2d', /* Fundo de hover/bordas */
+                            400: '#A9C9BC'  /* Texto secundário */
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Manrope', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                        mono: ['"Courier New"', 'Courier', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* mesmo clima do painel: fundo verde-floresta com brilhos suaves e títulos em Sora */
+        body.bg-base-100 {
+            background:
+                radial-gradient(1100px 700px at 8% -10%, rgba(16,185,129,.22), transparent 60%),
+                radial-gradient(900px 700px at 105% 10%, rgba(5,95,70,.30), transparent 60%),
+                radial-gradient(1200px 900px at 50% 120%, rgba(6,78,59,.35), transparent 60%),
+                linear-gradient(180deg, #04100C 0%, #030605 55%, #020504 100%);
+            background-attachment: fixed;
+        }
+        h1, h2, h3 { font-family: 'Sora', 'Manrope', system-ui, sans-serif; }
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030605;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #173a2d;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #10B981;
+        }
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .code-container {
+            position: relative;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            transition: all 0.2s;
+        }
+    </style>
+    <link rel="stylesheet" href="css/scrollfx.css?v=1.5.27">
+</head>
+<body data-fx="guide" class="bg-base-100 text-white font-sans antialiased min-h-screen flex flex-col selection:bg-spotify selection:text-white">
+
+    <!-- Header / Hero -->
+    <header class="pt-10 pb-12 px-6 text-center max-w-4xl mx-auto w-full">
+        <img src="img/banner-transparente.png" alt="Dashbeat — Sinta a batida. Revele o impacto." width="1098" height="717" class="mx-auto w-full max-w-lg mb-4">
+        <div class="inline-block bg-spotify/10 text-spotify px-4 py-1.5 rounded-full text-sm font-semibold mb-6 tracking-wide uppercase">
+            Guia Interativo
+        </div>
+        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-white">
+            Tutorial: Dashboard de <span class="text-spotify">Playlist do Spotify</span>
+        </h1>
+        <p class="text-lg text-base-400 max-w-2xl mx-auto leading-relaxed">
+            Escolha o método ideal para analisar suas músicas e gerar seu site de estatísticas.
+        </p>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow w-full max-w-5xl mx-auto px-4 sm:px-6 pb-24">
+
+        <!-- Tabs Navigation -->
+        <div class="flex border-b border-base-300 mb-8 overflow-x-auto no-scrollbar sticky top-0 z-30 bg-base-100/90 backdrop-blur pt-3">
+            <div class="flex-1 flex flex-col">
+                <p class="text-xs sm:text-sm text-base-400 text-center px-2 pb-2"><strong class="text-white">Tem Spotify Premium (pago)?</strong> Use este método.</p>
+                <button onclick="switchTab('premium')" id="btn-premium" class="w-full py-4 px-6 text-center font-medium text-spotify border-b-2 border-spotify bg-spotify/5 transition-colors whitespace-nowrap outline-none focus:outline-none">
+                    <span class="mr-2">⚡</span> Método Profissional <span class="text-spotify">(Recomendado)</span>
+                </button>
+            </div>
+            <div class="flex-1 flex flex-col">
+                <p class="text-xs sm:text-sm text-base-400 text-center px-2 pb-2"><strong class="text-white">Não tem Spotify Premium?</strong> Use este método.</p>
+                <button onclick="switchTab('manual')" id="btn-manual" class="w-full py-4 px-6 text-center font-medium text-base-400 hover:text-white border-b-2 border-transparent hover:border-base-300 transition-colors whitespace-nowrap outline-none focus:outline-none">
+                    <span class="mr-2">🤖</span> Método Manual (Gratuito/IA)
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab 1: Premium -->
+        <section id="tab-premium" class="tab-content active">
+            <div class="bg-base-200 border border-base-300 rounded-2xl p-6 md:p-10">
+
+                <h3 class="text-xl font-bold mb-3 text-white">Como funciona?</h3>
+                <p class="text-base-400 leading-relaxed text-lg mb-6">
+                    Cole links de faixas ou álbuns do Spotify e a ferramenta busca os dados automaticamente, sem copiar textos ou usar outras IAs. Para uma <strong class="text-white">playlist inteira</strong>, copie o link de cada faixa na ordem certa (é rápido, veja como abaixo) e cole tudo de uma vez. Exige <strong class="text-white">Spotify Premium</strong> e um app criado gratuitamente no painel de desenvolvedor do Spotify.
+                </p>
+
+                <button type="button" onclick="toggleDetails('premium')" id="toggle-premium-btn" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm mb-8 outline-none focus:outline-none">
+                    <span id="toggle-premium-label">Acessar tutorial</span>
+                    <svg id="toggle-premium-icon" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+
+                <div id="details-premium" class="hidden">
+                    <div class="bg-spotify/10 border-l-4 border-spotify p-5 rounded-r-lg mb-8">
+                        <div class="flex items-start">
+                            <span class="text-spotify-light text-xl mr-3">ℹ️</span>
+                            <p class="text-white/90 leading-relaxed">
+                                <strong>Aviso:</strong> Este método é mais rápido e o resultado da análise sai mais profissional, sendo gerado automaticamente por uma ferramenta dedicada.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-8 mb-8">
+                        <div class="bg-black/40 p-6 rounded-xl border border-base-300">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">⭐</span> Requisitos</h3>
+                            <p class="text-base-400">
+                                Precisa de informações exclusivas de contas <strong>Spotify Premium</strong> (pago). A API necessita de permissões ativas para leitura avançada de catálogos. Testado só com conta Premium oficial — <strong>não testamos com contas piratas/modificadas</strong>, então não garantimos que funcionem.
+                            </p>
+                        </div>
+                        <div class="bg-black/40 p-6 rounded-xl border border-base-300">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-yellow-500 mr-2">⏱️</span> Limites</h3>
+                            <p class="text-base-400">
+                                Possui um <strong>limite diário</strong> (consideravelmente grande) de requisições de músicas devido às restrições da API do Spotify para desenvolvedores.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-8 mb-10">
+                        <div class="bg-black/40 p-6 rounded-xl border border-base-300">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">🔑</span> Acesso ao Spotify</h3>
+                            <p class="text-base-400">
+                                Além do Premium, você precisa criar um app gratuito em <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener" class="text-spotify underline">developer.spotify.com/dashboard</a> (login com sua conta Spotify) para conseguir o <strong>Client ID</strong> e o <strong>Client Secret</strong>. Esses dados são gratuitos e levam só alguns minutos para gerar.
+                            </p>
+                        </div>
+                        <div class="bg-black/40 p-6 rounded-xl border border-base-300">
+                            <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-yellow-500 mr-2">⏳</span> Tempo estimado</h3>
+                            <p class="text-base-400">
+                                Listas pequenas são importadas em poucos segundos. Em listas grandes (centenas de faixas), o Spotify passa a limitar as requisições e a ferramenta espera automaticamente entre elas, podendo levar alguns minutos até concluir.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="bg-black/40 p-6 rounded-xl border border-base-300 mb-10">
+                        <h3 class="text-xl font-bold mb-3 flex items-center"><span class="text-spotify mr-2">📋</span> Importando uma playlist inteira</h3>
+                        <p class="text-base-400 mb-4">
+                            O Spotify só entrega as faixas de uma playlist na ordem atual de exibição (que muda se alguém reordenar manualmente), não na ordem real em que cada música foi adicionada — por isso links de playlist não são aceitos diretamente. Para manter a ordem certa, copie o link de cada faixa:
+                        </p>
+                        <ol class="list-decimal pl-5 space-y-2 text-base-400">
+                            <li>Abra o <strong>app de PC do Spotify</strong>.</li>
+                            <li>Vá na sua playlist e ordene a coluna <strong>"Adicionada em"</strong> até ver a seta para cima (músicas antigas no topo).</li>
+                            <li>Pressione <kbd class="bg-black border border-base-300 px-2 py-0.5 rounded text-white text-xs mx-1">Ctrl+A</kbd> para selecionar tudo e <kbd class="bg-black border border-base-300 px-2 py-0.5 rounded text-white text-xs mx-1">Ctrl+C</kbd> para copiar os links.</li>
+                            <li>Cole tudo de uma vez na ferramenta — um link de faixa por linha é reconhecido automaticamente.</li>
+                        </ol>
+                    </div>
+
+                    <div class="bg-yellow-900/20 border-l-4 border-yellow-500 p-5 rounded-r-lg mb-10">
+                        <div class="flex items-start">
+                            <span class="text-yellow-400 text-xl mr-3">⚠️</span>
+                            <p class="text-yellow-100 leading-relaxed">
+                                <strong>Atenção:</strong> Playlists muito pequenas podem gerar gráficos e análises com viés estatístico (enviesadas), pois faltam dados suficientes para conclusões relevantes — isso vale para qualquer método. Use listas maiores para análises mais ricas.
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="text-center pt-4">
+                    <a href="index.html?import=nova-playlist" class="bg-spotify hover:bg-spotify-light text-black font-semibold py-2 px-5 rounded-full transition-transform transform hover:scale-105 shadow-md shadow-spotify/20 text-sm inline-flex items-center justify-center mx-auto">
+                        Acessar Ferramenta <span class="ml-1.5">↗</span>
+                    </a>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Tab 2: Manual (IA) -->
+        <section id="tab-manual" class="tab-content">
+
+            <div class="bg-base-200 border border-base-300 rounded-2xl p-6 md:p-10 mb-8 min-h-[220px]">
+                <h3 class="text-xl font-bold mb-3 text-white">Como funciona?</h3>
+                <p class="text-base-400 leading-relaxed text-lg mb-8">
+                    Copie e cole dois prompts prontos — um no Grok para coletar os dados da sua playlist, outro no Claude para gerar o painel visual. Não precisa de Spotify pago, mas leva de <strong class="text-white">10 a 25 minutos</strong>.
+                </p>
+
+                <button type="button" onclick="toggleDetails('manual')" id="toggle-manual-btn" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm outline-none focus:outline-none">
+                    <span id="toggle-manual-label">Acessar tutorial</span>
+                    <svg id="toggle-manual-icon" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+
+                <div id="details-manual" class="hidden mt-8">
+                    <div class="bg-spotify/10 border-l-4 border-spotify p-5 rounded-r-lg mb-8">
+                        <div class="flex items-start">
+                            <span class="text-spotify text-xl mr-3">✓</span>
+                            <p class="text-gray-200 leading-relaxed">
+                                <strong>Aviso:</strong> Este método <strong>não necessita de Spotify pago</strong> e não possui limite de requisições de músicas da API. Porém, é mais demorado e depende do limite de tokens de contexto do Grok e do Claude.
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-2xl font-bold mb-4 text-white">⏳ Expectativas de Tempo e Dados</h3>
+                    <div class="text-base-400 mb-10">
+                        <p class="mb-3">
+                            O processo pode levar de <strong>10 a 25 minutos</strong> dependendo do tamanho da playlist.
+                        </p>
+                        <p class="text-sm bg-black/40 p-4 rounded-lg border border-base-300">
+                            <em>Teste real (350 músicas):</em><br>
+                            ~11 min na coleta (Grok)<br>
+                            ~7:30 min na criação (Claude)<br>
+                            + tempo de transição/leitura.
+                        </p>
+                    </div>
+
+                    <div class="bg-yellow-900/20 border-l-4 border-yellow-500 p-5 rounded-r-lg">
+                        <div class="flex items-start">
+                            <span class="text-yellow-400 text-xl mr-3">⚠️</span>
+                            <p class="text-yellow-100 leading-relaxed">
+                                <strong>Atenção:</strong> Playlists muito pequenas podem gerar gráficos e análises com viés estatístico (enviesadas), pois faltam dados suficientes para conclusões relevantes — isso vale para qualquer método. Use listas maiores para análises mais ricas.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Steps -->
+            <div id="manual-steps" class="space-y-12 hidden">
+
+                <!-- Step 1 -->
+                <div class="relative pl-8 md:pl-0">
+                    <div class="hidden md:flex absolute left-[-24px] top-0 bottom-0 w-px bg-base-300"></div>
+
+                    <div class="md:flex gap-6 items-start relative">
+                        <div class="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-base-200 border-2 border-spotify text-spotify font-bold text-xl z-10 shrink-0 transform -translate-x-[48px]">
+                            1
+                        </div>
+                        <h3 class="md:hidden text-spotify font-bold text-xl mb-2">Passo 1</h3>
+
+                        <div class="flex-grow">
+                            <h3 class="text-2xl font-bold mb-3">Preparar o Grok</h3>
+                            <p class="text-base-400 mb-4">Copie o texto abaixo e cole no chat do Grok. <strong>Ainda não envie!</strong></p>
+
+                            <div class="code-container bg-black border border-base-300 rounded-xl overflow-hidden">
+                                <button onclick="copyCode(this, 'prompt-grok')" class="copy-btn bg-base-300 hover:bg-base-400 text-white text-xs py-1.5 px-3 rounded-md flex items-center">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    Copiar
+                                </button>
+                                <pre id="prompt-grok" class="p-5 text-sm text-gray-300 font-mono overflow-x-auto whitespace-pre-wrap">Por favor, acesse a lista de links de faixas do Spotify abaixo (um por um) e extraia os metadados de cada música.
+Para cada link, preciso das seguintes informações:
+1. Número sequencial (começando em 1)
+2. Título exato da música
+3. Nome da banda ou artista principal
+4. Nome do álbum
+5. Duração no formato MM:SS
+6. Data de lançamento original no formato DD/MM/AAAA
+
+Depois de coletar tudo, me retorne apenas um único bloco de texto contínuo, sem quebras de linha entre as faixas, com as colunas separadas por TAB, no estilo exatamente assim:
+1	One	Metallica	...And Justice for All	07:27	25/08/1988
+2	For Whom The Bell Tolls - Remastered	Metallica	Ride the Lightning	05:09	27/07/1984
+3	Master Of Puppets	Metallica	Master of Puppets	08:35	03/03/1986
+4	Sad But True	Metallica	Metallica	05:23	12/08/1991
+5	Wherever I May Roam	Metallica	Metallica	06:43	12/08/1991
+6	Enter Sandman	Metallica	Metallica	05:31	12/08/1991
+7	The Unforgiven	Metallica	Metallica	06:26	12/08/1991
+8	Battery	Metallica	Master of Puppets	05:12	03/03/1986
+9	Welcome Home (Sanitarium)	Metallica	Master of Puppets	06:27	03/03/1986
+10	Fade To Black - Remastered	Metallica	Ride the Lightning	06:57	27/07/1984
+11	Blackened	Metallica	...And Justice for All	06:40	25/08/1988
+12	The Shortest Straw	Metallica	...And Justice for All	06:35	25/08/1988
+13	All Nightmare Long	Metallica	Death Magnetic	07:57	01/01/2008
+14	Don't Tread On Me	Metallica	Metallica	04:00	12/08/1991
+15	The Thing That Should Not Be	Metallica	Master of Puppets	06:36	03/03/1986
+16	Murder One	Metallica	Hardwired... to Self-Destruct	05:45	18/11/2016
+17	...And Justice For All	Metallica	...And Justice for All	09:46	25/08/1988
+18	Eye Of The Beholder	Metallica	...And Justice for All	06:30	25/08/1988
+19	Sarcastrophe	Slipknot	.5: The Gray Chapter	05:06	15/10/2014
+
+Não inclua a coluna de links. Não use tabelas ou CSV.
+Aqui está a lista completa de links:
+[COLE OS LINKS AQUI]</pre>
+                            </div>
+                            <div class="mt-4 text-center sm:text-left">
+                                <a href="https://grok.com" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm">
+                                    Abrir o Grok <span>↗</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="relative pl-8 md:pl-0">
+                    <div class="hidden md:flex absolute left-[-24px] top-0 bottom-0 w-px bg-base-300"></div>
+                    <div class="md:flex gap-6 items-start relative">
+                        <div class="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-base-200 border-2 border-spotify text-spotify font-bold text-xl z-10 shrink-0 transform -translate-x-[48px]">
+                            2
+                        </div>
+                        <h3 class="md:hidden text-spotify font-bold text-xl mb-2">Passo 2</h3>
+
+                        <div class="flex-grow">
+                            <h3 class="text-2xl font-bold mb-3">Extrair links no Spotify</h3>
+                            <div class="bg-base-200 p-6 rounded-xl border border-base-300 text-base-400">
+                                <ol class="list-decimal pl-5 space-y-3">
+                                    <li>Abra o <strong>app de PC do Spotify</strong>.</li>
+                                    <li>Vá na sua playlist e ordene a coluna <strong>"Adicionada em"</strong> até ver a seta para cima (músicas antigas no topo).</li>
+                                    <li>Pressione <kbd class="bg-black border border-base-300 px-2 py-0.5 rounded text-white text-xs mx-1">Ctrl+A</kbd> para selecionar tudo.</li>
+                                    <li>Pressione <kbd class="bg-black border border-base-300 px-2 py-0.5 rounded text-white text-xs mx-1">Ctrl+C</kbd> para copiar os links.</li>
+                                    <li>Feche o Spotify, volte ao Grok, e <strong>cole no final do prompt</strong> da etapa anterior (onde diz [COLE OS LINKS AQUI]).</li>
+                                    <li>Envie a mensagem e aguarde a resposta completa.</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="relative pl-8 md:pl-0">
+                    <div class="hidden md:flex absolute left-[-24px] top-0 bottom-0 w-px bg-base-300"></div>
+                    <div class="md:flex gap-6 items-start relative">
+                        <div class="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-base-200 border-2 border-spotify text-spotify font-bold text-xl z-10 shrink-0 transform -translate-x-[48px]">
+                            3
+                        </div>
+                        <h3 class="md:hidden text-spotify font-bold text-xl mb-2">Passo 3</h3>
+
+                        <div class="flex-grow">
+                            <h3 class="text-2xl font-bold mb-3">Criar o site no Claude</h3>
+                            <p class="text-base-400 mb-4">Copie o resultado que o Grok te entregou. Depois, abra o Claude, cole este prompt abaixo e substitua a última linha com os dados gerados.</p>
+
+                            <div class="code-container bg-black border border-base-300 rounded-xl overflow-hidden">
+                                <button onclick="copyCode(this, 'prompt-claude')" class="copy-btn bg-base-300 hover:bg-base-400 text-white text-xs py-1.5 px-3 rounded-md flex items-center">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    Copiar
+                                </button>
+                                <pre id="prompt-claude" class="p-5 text-sm text-gray-300 font-mono overflow-x-auto whitespace-pre-wrap">Crie um site em um único arquivo HTML, com tema escuro preto e verde-esmeralda, bonito e moderno, a partir da minha lista de músicas abaixo (colunas separadas por TAB: numero, musica, artista, album, duração, data_lançamento). A coluna 'numero' é a ordem em que adicionei as faixas na minha playlist: a 1 é a mais antiga.
+Aba 'Painel': 5 cartões (total de músicas maior, artistas únicos, duração média, ano com mais lançamentos, artista com mais faixas). 4 gráficos em grade 2x2 (músicas/ano, músicas/artista, duração/álbum, ranking artistas). Filtros de seleção múltipla. Tooltips e animações.
+Aba 'Insights': 8 cards curtos com insights do catálogo e da ordem da playlist (quem dominou o começo, meio e fim).
+Regras: Dados em JSON válido no formato [numero, "musica", "artista", "album", "m:ss", "DD/MM/AAAA"]. Nenhuma biblioteca externa. Tente/catch para erros. Layout responsivo.
+[COLE O RESULTADO DO GROK AQUI]</pre>
+                            </div>
+                            <div class="mt-4 text-center sm:text-left">
+                                <a href="https://claude.ai/new" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-base-300 hover:bg-base-400 text-white font-medium py-2.5 px-5 rounded-full transition-colors text-sm">
+                                    Abrir o Claude <span>↗</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="relative pl-8 md:pl-0">
+                    <div class="md:flex gap-6 items-start relative">
+                        <div class="hidden md:flex items-center justify-center w-12 h-12 rounded-full bg-spotify border-2 border-spotify text-black font-bold text-xl z-10 shrink-0 transform -translate-x-[48px]">
+                            4
+                        </div>
+                        <h3 class="md:hidden text-spotify font-bold text-xl mb-2">Passo 4</h3>
+
+                        <div class="flex-grow">
+                            <h3 class="text-2xl font-bold mb-3">Finalização</h3>
+                            <div class="bg-gradient-to-r from-base-200 to-base-300 p-8 rounded-xl border border-base-300 text-center md:text-left md:flex items-center gap-6">
+                                <div class="text-5xl mb-4 md:mb-0">✨</div>
+                                <div>
+                                    <p class="text-lg text-white leading-relaxed">
+                                        Após enviar a mensagem para o Claude, aguarde a resposta. Assim que ele finalizar, um painel lateral (Artifact) vai aparecer na direita.
+                                    </p>
+                                    <p class="text-spotify font-medium mt-2">
+                                        Basta abrir em tela cheia e o seu Dashboard estará pronto para uso!
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="text-center py-8 text-base-400 text-sm border-t border-base-300 mt-auto">
+        <p><strong class="text-white">Dashbeat</strong> — Sinta a batida. Revele o impacto.</p>
+    </footer>
+
+    <script>
+        // Expande/recolhe o tutorial original de cada método
+        const toggleLabels = {
+            premium: { open: 'Acessar tutorial', closed: 'Ocultar tutorial' },
+            manual: { open: 'Acessar tutorial', closed: 'Ocultar tutorial' }
+        };
+
+        function toggleDetails(id) {
+            const box = document.getElementById('details-' + id);
+            const icon = document.getElementById('toggle-' + id + '-icon');
+            const label = document.getElementById('toggle-' + id + '-label');
+            const willExpand = box.classList.contains('hidden');
+
+            box.classList.toggle('hidden');
+            label.textContent = willExpand ? toggleLabels[id].closed : toggleLabels[id].open;
+            icon.classList.toggle('rotate-180');
+
+            if (id === 'manual') {
+                document.getElementById('manual-steps').classList.toggle('hidden');
+            }
+        }
+
+        // Tab switching logic
+        function switchTab(tabId) {
+            document.title = tabId === 'manual' ? 'Método manual — Dashbeat' : 'Dashbeat — Dashboard de Playlist do Spotify';
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Reset button styles
+            document.getElementById('btn-premium').className = "flex-1 py-4 px-6 text-center font-medium text-base-400 hover:text-white border-b-2 border-transparent hover:border-base-300 transition-colors whitespace-nowrap outline-none focus:outline-none";
+            document.getElementById('btn-manual').className = "flex-1 py-4 px-6 text-center font-medium text-base-400 hover:text-white border-b-2 border-transparent hover:border-base-300 transition-colors whitespace-nowrap outline-none focus:outline-none";
+
+            // Activate chosen tab and style its button
+            document.getElementById('tab-' + tabId).classList.add('active');
+
+            if (tabId === 'premium') {
+                document.getElementById('btn-premium').className = "flex-1 py-4 px-6 text-center font-medium text-spotify border-b-2 border-spotify bg-spotify/5 transition-colors whitespace-nowrap outline-none focus:outline-none";
+            } else {
+                document.getElementById('btn-manual').className = "flex-1 py-4 px-6 text-center font-medium text-spotify border-b-2 border-spotify bg-spotify/5 transition-colors whitespace-nowrap outline-none focus:outline-none";
+            }
+        }
+
+        // Copy to clipboard logic
+        function copyCode(btnElement, targetId) {
+            const textToCopy = document.getElementById(targetId).innerText;
+
+            // Try modern clipboard API first
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    showCopiedState(btnElement);
+                }).catch(() => fallbackCopyTextToClipboard(textToCopy, btnElement));
+            } else {
+                // Fallback for older browsers or iframes without clipboard permissions
+                fallbackCopyTextToClipboard(textToCopy, btnElement);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text, btnElement) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";  // Avoid scrolling to bottom
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                var successful = document.execCommand('copy');
+                if (successful) {
+                    showCopiedState(btnElement);
+                }
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+            }
+
+            document.body.removeChild(textArea);
+        }
+
+        function showCopiedState(btnElement) {
+            const originalHTML = btnElement.innerHTML;
+            btnElement.innerHTML = `<svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Copiado!`;
+            btnElement.classList.remove('bg-base-300', 'hover:bg-base-400');
+            btnElement.classList.add('bg-spotify', 'text-black', 'hover:bg-spotify-dark');
+
+            setTimeout(() => {
+                btnElement.innerHTML = originalHTML;
+                btnElement.classList.remove('bg-spotify', 'text-black', 'hover:bg-spotify-dark');
+                btnElement.classList.add('bg-base-300', 'hover:bg-base-400');
+            }, 2500);
+        }
+
+        // Initialize on premium tab (since it has the active class by default)
+        // Tab styling is already correct in initial HTML, but we can enforce it:
+        switchTab('premium');
+    </script>
+    <script src="js/scrollfx.js?v=1.5.27"></script>
+</body>
+</html>

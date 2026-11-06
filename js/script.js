@@ -3550,7 +3550,7 @@ function clearSpotifyCreds(){ try { localStorage.removeItem(SPOTIFY_CREDS_KEY); 
 const SPOTIFY_OAUTH_KEY = "catalogo-musical:spotify-oauth";
 const SPOTIFY_PKCE_KEY = "catalogo-musical:spotify-pkce";
 const SPOTIFY_PENDING_KEY = "catalogo-musical:spotify-pending-import";
-function spotifyRedirectUri(){ return location.origin + location.pathname; }
+function spotifyRedirectUri(){ return (location.origin + location.pathname).replace(/index\.html$/, ''); }
 
 function isAllowedSpotifyUser(name){
   if (!name || typeof name !== "string") return false;
