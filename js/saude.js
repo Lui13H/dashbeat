@@ -1177,12 +1177,10 @@ function autoFixAlbumDates(){
     for (const t of dated) if (t.dateRaw !== oldest) fixes.set(t.n, oldest);
   }
   if (!fixes.size) return false;
-  ssSet("health", "1");
-  commitRows(currentRows().map(r => {
-    if (!fixes.has(r[0])) return r;
-    return [r[0], r[1], r[2], r[3], r[4], fixes.get(r[0]), ...(r[6] ? [r[6]] : [])];
-  }), `Datas unificadas em ${fixes.size} faixa${fixes.size > 1 ? "s" : ""}`);
-  return true;
+  const fixedRows = currentRows().map(r => fixes.has(r[0]) ? [r[0], r[1], r[2], r[3], r[4], fixes.get(r[0]), ...(r[6] ? [r[6]] : [])] : r);
+  const sortedFD = [...fixedRows].sort((a, b) => a[0] - b[0]).map((r, i) => r[6] ? [i+1,r[1],r[2],r[3],r[4],r[5],r[6]] : [i+1,r[1],r[2],r[3],r[4],r[5]]);
+  writeStore({rows: sortedFD, updated: Date.now()});
+  return false;
 }
 
 function autoApplySuffixClean(){
@@ -1200,18 +1198,16 @@ function autoApplySuffixClean(){
     }
   }
   saveAlbClean();
-  const parts = [];
-  if (tnI.length) parts.push(plural(tnI.length, "titulo corrigido", "titulos corrigidos"));
-  if (nmI.length) parts.push(plural(nmI.length, "album renomeado", "albuns renomeados"));
-  ssSet("health", "1");
-  commitRows(currentRows().map(r => {
+  const fixedRowsSC = currentRows().map(r => {
     const t = BY_PLAYLIST.find(b => b.n === r[0]);
     const newTitle = tnMap.get(r[0]) || r[1];
     const newAlbum = (t && nmMap.get(t.albumRaw)) || r[3];
     if (newTitle === r[1] && newAlbum === r[3]) return r;
     return [r[0], newTitle, r[2], newAlbum, r[4], r[5], ...(r[6] ? [r[6]] : [])];
-  }), "Sufixos removidos: " + parts.join(" / "));
-  return true;
+  });
+  const sortedSC = [...fixedRowsSC].sort((a, b) => a[0] - b[0]).map((r, i) => r[6] ? [i+1,r[1],r[2],r[3],r[4],r[5],r[6]] : [i+1,r[1],r[2],r[3],r[4],r[5]]);
+  writeStore({rows: sortedSC, updated: Date.now()});
+  return false;
 }
 
 if (STORE){
