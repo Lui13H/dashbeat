@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <script>try{var _s=JSON.parse(localStorage.getItem("catalogo-musical:v1")||"null");if(Array.isArray(_s)&&_s.length>0)location.replace("painel_musical.html");}catch(e){}</script>
+    <script>try{var _s=JSON.parse(localStorage.getItem("catalogo-musical:v1")||"null");if(_s&&Array.isArray(_s.rows)&&_s.rows.length>0)location.replace("painel_musical.html");}catch(e){}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashbeat — Dashboard de Playlist do Spotify</title>
     <link rel="icon" type="image/png" href="img/favicon.png">
