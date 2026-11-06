@@ -1171,10 +1171,10 @@ function autoFixAlbumDates(){
   const fixes = new Map();
   for (const ts of groups.values()){
     if (ts.length < 2) continue;
-    const dated = ts.filter(t => t.date && /^\d{4}/.test(t.date));
+    const dated = ts.filter(t => t.dateRaw && /^\d{4}/.test(t.dateRaw));
     if (dated.length < 2) continue;
-    const oldest = dated.reduce((m, t) => t.date < m ? t.date : m, dated[0].date);
-    for (const t of dated) if (t.date !== oldest) fixes.set(t.n, oldest);
+    const oldest = dated.reduce((m, t) => t.dateRaw < m ? t.dateRaw : m, dated[0].dateRaw);
+    for (const t of dated) if (t.dateRaw !== oldest) fixes.set(t.n, oldest);
   }
   if (!fixes.size) return false;
   ssSet("health", "1");
