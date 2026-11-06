@@ -308,6 +308,8 @@ function importTagsFromFile(file){
         <button class="gbtn" type="button" id="flm-exp">${ICON.down} Exportar</button>
         <button class="gbtn" type="button" id="flm-imp">${ICON.up} Importar</button>
         <input type="file" id="flm-file" accept=".json" style="display:none">
+        <span class="sp"></span>
+        <button class="gbtn" type="button" id="flm-import-list">♥ Importar favoritas</button>
       </div>`;
 
     renderList();
@@ -335,5 +337,108 @@ function importTagsFromFile(file){
     body.querySelector("#flm-file").addEventListener("change", e => {
       const f = e.target.files[0]; if (f){ importTagsFromFile(f); md.close(); }
     });
+    body.querySelector("#flm-import-list").addEventListener("click", () => openImportFavoritesModal(() => renderList()));
   });
 })();
+
+/* ---- importar favoritas por lista de links/nomes ---- */
+function openImportFavoritesModal(onDone) {
+  const bodyEl = document.createElement("div");
+  bodyEl.style.cssText = "display:flex;flex-direction:column;gap:14px";
+
+  const desc = document.createElement("p");
+  desc.style.cssText = "color:#8fa59a;font-size:14px;margin:0";
+  desc.textContent = "Cole links do Spotify ou nomes de músicas (um por linha). Todas as encontradas na sua playlist serão favoritadas.";
+
+  const ta = document.createElement("textarea");
+  ta.rows = 10;
+  ta.placeholder = "https://open.spotify.com/track/...\nou Música - Artista";
+  ta.setAttribute("autofocus", "");
+  ta.style.cssText = "width:100%;box-sizing:border-box;background:#06140f;border:1px solid #1a3a2e;border-radius:8px;padding:10px;color:#e8f2ed;font-size:13px;font-family:monospace;resize:vertical;outline:none;line-height:1.5";
+
+  const resDiv = document.createElement("div");
+  resDiv.style.cssText = "display:none;background:#0a1c16;border:1px solid #1a3a2e;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;max-height:200px;overflow-y:auto";
+
+  bodyEl.appendChild(desc);
+  bodyEl.appendChild(ta);
+  bodyEl.appendChild(resDiv);
+
+  const foot = document.createElement("div");
+  foot.className = "mfrow";
+  foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" id="ifav-cancel">Cancelar</button><button class="pbtn" type="button" id="ifav-confirm">Favoritar</button>`;
+
+  const md = openModal({ title: "Importar Favoritas", body: bodyEl, foot, size: "sm" });
+  foot.querySelector("#ifav-cancel").addEventListener("click", () => md.close());
+  foot.querySelector("#ifav-confirm").addEventListener("click", () => {
+    if (!ta.value.trim()) return;
+    const r = applyImportFavorites(ta.value);
+    let html = "";
+    if (r.added)       html += `<p style="color:#1DB954;margin:0 0 4px">✓ ${r.added} música${r.added!==1?"s":""} favoritada${r.added!==1?"s":""}</p>`;
+    if (r.alreadyFav)  html += `<p style="color:#8fa59a;margin:0 0 4px">↩ ${r.alreadyFav} já eram favoritas</p>`;
+    if (r.notFound.length) html += `<p style="color:#f87171;margin:0 0 4px">⚠ ${r.notFound.length} não encontrada${r.notFound.length!==1?"s":""} na sua playlist:</p><ul style="margin:0 0 4px;padding-left:16px;font-size:12px;color:#f87171">${r.notFound.slice(0,20).map(x=>`<li>${esc(x)}</li>`).join("")}${r.notFound.length>20?`<li>…e mais ${r.notFound.length-20}</li>`:""}</ul>`;
+    if (r.stale.length) html += `<p style="color:#fbbf24;margin:0">⚠ ${r.stale.length} favorita${r.stale.length!==1?"s":""} existente${r.stale.length!==1?"s":""} sem correspondência no catálogo atual</p>`;
+    if (!html) html = `<p style="color:#8fa59a;margin:0">Nenhuma alteração realizada.</p>`;
+    resDiv.style.display = "block";
+    resDiv.innerHTML = html;
+    if (r.added > 0 || r.alreadyFav > 0) {
+      foot.querySelector("#ifav-confirm").disabled = true;
+      foot.querySelector("#ifav-confirm").textContent = "Feito ✓";
+      if (onDone) onDone();
+    }
+  });
+}
+
+function applyImportFavorites(rawText) {
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const tracks = typeof BY_PLAYLIST !== "undefined" ? BY_PLAYLIST : [];
+
+  const byId  = new Map();
+  const byKey = new Map(); // "title|firstartist" → track
+  for (const t of tracks) {
+    if (t.m && t.m.id) byId.set(t.m.id, t);
+    const a0 = (typeof splitArtists === "function" ? splitArtists(t.artist||"") : [t.artist||""])[0] || "";
+    const k = (t.title||"").trim().toLowerCase() + "|" + a0.toLowerCase().trim();
+    if (!byKey.has(k)) byKey.set(k, t);
+    // title-only fallback key
+    const kt = (t.title||"").trim().toLowerCase() + "|~";
+    if (!byKey.has(kt)) byKey.set(kt, t);
+  }
+
+  const toFav = new Set();
+  const notFound = [];
+
+  for (const line of lines) {
+    const idM = line.match(/(?:track[/:]|track=)([A-Za-z0-9]{22})/);
+    if (idM) { const t = byId.get(idM[1]); if (t) toFav.add(t); else notFound.push(line); continue; }
+    if (/^[A-Za-z0-9]{22}$/.test(line)) { const t = byId.get(line); if (t) { toFav.add(t); continue; } }
+
+    let title, artist;
+    const tabI = line.indexOf("\t");
+    if (tabI >= 0) { title = line.slice(0, tabI).trim(); artist = line.slice(tabI+1).trim(); }
+    else { const sm = line.match(/\s[-–—]\s/); if (sm) { title = line.slice(0, sm.index).trim(); artist = line.slice(sm.index+sm[0].length).trim(); } else { title = line; artist = ""; } }
+
+    const a0 = artist ? (typeof splitArtists === "function" ? splitArtists(artist)[0] : artist).toLowerCase().trim() : "";
+    const k  = title.toLowerCase() + "|" + a0;
+    const kt = title.toLowerCase() + "|~";
+    if (byKey.has(k))  { toFav.add(byKey.get(k)); continue; }
+    if (byKey.has(kt)) { toFav.add(byKey.get(kt)); continue; }
+    notFound.push(line);
+  }
+
+  let added = 0, alreadyFav = 0;
+  for (const t of toFav) {
+    const e = tagsEntry(t, true);
+    if (e.f) alreadyFav++; else { e.f = 1; added++; }
+  }
+  if (added > 0) saveTags();
+
+  // stale: favoritas cujas chaves não batem com nenhuma faixa do catálogo atual
+  const stale = [];
+  for (const [k, v] of Object.entries(TAGS.musicas || {})) {
+    if (!v.f) continue;
+    if (/^[A-Za-z0-9]{22}$/.test(k)) { if (!byId.has(k)) stale.push(k); }
+    else { if (!byKey.has(k) && !byKey.has(k.split("|")[0]+"|~")) stale.push(k); }
+  }
+
+  return { added, alreadyFav, notFound, stale };
+}
