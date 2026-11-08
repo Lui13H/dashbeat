@@ -500,6 +500,7 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .gbtn{border:1px solid var(--line-2);background:rgba(0,0,0,.2);color:var(--ink)}
 .gbtn:hover:not(:disabled){border-color:hsla(var(--h),60%,67%,.4)}
 .gbtn:disabled{opacity:.4;cursor:not-allowed}
+.gbtn[aria-pressed="true"]{border-color:hsla(var(--h),60%,67%,.7);background:hsla(var(--h),60%,67%,.13);color:hsla(var(--h),70%,80%,1);box-shadow:0 0 10px hsla(var(--h),60%,67%,.35)}
 .lnk{border:0;background:none;color:var(--ink-3);font:600 12.5px var(--body);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:6px 0}
 .lnk:hover{color:var(--ink)}
 .muted{color:var(--ink-3);font-size:12.5px}

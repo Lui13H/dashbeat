@@ -522,7 +522,7 @@ function buildMS(root, label, all, kind){
   return {root, btn, els, foot: root.querySelector(".foot"), desel};
 }
 document.addEventListener("click", () => document.querySelectorAll(".ms.open").forEach(m => { m.classList.remove("open"); m.querySelector(".ms-btn").setAttribute("aria-expanded", "false"); }));
-document.addEventListener("keydown", e => { if (e.key === "Escape"){ document.body.click(); hideTip(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape"){ document.body.click(); hideTip(); } if (e.key === "Backspace" && !modalStack.length && activeFilters()){ const t = e.target; if (!t || (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA" && t.tagName !== "SELECT" && !t.isContentEditable)) { e.preventDefault(); clearFilters(); } } });
 const MS = {band: buildMS($("#ms-band"), "Banda/Artista", ALL_BANDS, "band"), album: buildMS($("#ms-album"), "Álbum", ALL_ALBUMS, "album")};
 
 function toggle(kind, v){
@@ -2353,9 +2353,12 @@ function getThemePaletteIdx(){
 }
 const EVO_DEFAULT = 10, EVO_TOPS = [1, 3, 5, 10, 25, 50, 100, 250, 500, 750, 1000];
 const evoCol = s => { const pal = EVO_PALETTES[getThemePaletteIdx()]; return s < pal.length ? pal[s] : `hsl(${Math.round(((s - pal.length) * 137.5 + 20) % 360)}, 62%, 62%)`; };
-const evo = {mode: "band", dyn: {band: null, genre: null}, sel: {band: null, genre: null}, slot: {band: new Map(), genre: new Map()}, list: [], map: new Map(), R: [], N: 0};
+const evo = {mode: "band", dyn: {band: null, genre: null}, sel: {band: null, genre: null}, slot: {band: new Map(), genre: new Map()}, list: [], map: new Map(), R: [], N: 0, showPhases: false, phaseCache: null, phaseCfg: {minPct: 0.63, spanLg: 0.0225, spanSm: 0.065, floor: 6}};
 const evoName = k => evo.mode === "genre" ? capFirst(k) : k;
+const EVO_ABBREVS = {"avenged sevenfold": "A7X"};
+const evoAbbr = k => EVO_ABBREVS[k.toLowerCase()] || null;
 function evoBuild(R){
+  evo.phaseCache = null;
   const sorted = [...R].sort((a, b) => a.n - b.n), idx = new Map();
   sorted.forEach((t, i) => {
     const rawKeys = evo.mode === "band" ? (t.artist === NI ? [] : (splitArtistsRaw(t.artist).length ? splitArtistsRaw(t.artist) : [t.artist])) : (t.ge || []);
@@ -2436,20 +2439,45 @@ function evoToggle(k){
 }
 const evoPin = (() => {
   const b = document.createElement("button");
-  b.type = "button"; b.className = "gbtn"; b.hidden = true; b.textContent = "Fixar top"; b.title = "Congela as linhas que estão no gráfico agora, mesmo com a máquina do tempo andando";
-  b.addEventListener("click", () => { evo.dyn[evo.mode] = null; b.hidden = true; evoPanels(); toast("Top fixado: as linhas não mudam mais com o tempo."); });
+  b.type = "button"; b.className = "gbtn"; b.hidden = true; b.setAttribute("aria-pressed", "false");
+  b.textContent = "Fixar top"; b.title = "Congela as linhas que estão no gráfico agora, mesmo com a máquina do tempo andando";
+  b.addEventListener("click", () => {
+    const pinned = b.getAttribute("aria-pressed") === "true";
+    if (pinned) {
+      // desafixar: retoma o top dinâmico salvo
+      const n = b._savedDyn;
+      b._savedDyn = null;
+      b.setAttribute("aria-pressed", "false");
+      b.textContent = "Fixar top";
+      if (n != null) { evo.dyn[evo.mode] = n; evoTop(n); }
+      evoPanels(); drawEvo();
+    } else {
+      // fixar: congela a seleção atual
+      b._savedDyn = evo.dyn[evo.mode];
+      evo.dyn[evo.mode] = null;
+      b.setAttribute("aria-pressed", "true");
+      b.textContent = "Top fixado";
+      toast("Top fixado: as linhas não mudam mais com o tempo.");
+      evoPanels(); drawEvo();
+    }
+  });
   const row = $("#evo-tops"); if (row) row.insertAdjacentElement("afterend", b);
   return b;
 })();
 function drawEvo(){
   const box = $("#evo"); if (!box) return;
-  evoPin.hidden = !(evo.dyn[evo.mode] && state.upTo != null);   // só faz sentido com a máquina do tempo no meio do caminho
+  evoPin.hidden = state.upTo == null;
+  // se o dyn voltou (usuário escolheu Top N manualmente), desmarca o pin
+  if (evo.dyn[evo.mode] != null && evoPin.getAttribute("aria-pressed") === "true") {
+    evoPin.setAttribute("aria-pressed", "false"); evoPin.textContent = "Fixar top"; evoPin._savedDyn = null;
+  }
   const W = box.clientWidth, N = evo.N;
   if (!evo.list.length){ box.innerHTML = `<p class="none">${evo.mode === "genre" ? "Ainda não há gêneros para mostrar. Use \"Atualizar dados\" para buscá-los." : "Sem dados para este recorte."}</p>`; return; }
   if (!W) return;
   const shown = [...evoSel()].filter(k => evo.map.has(k)).sort((a, b) => evo.slot[evo.mode].get(a) - evo.slot[evo.mode].get(b));
   const H = 300, L = 38, Rm = Math.round(Math.min(160, Math.max(60, W * 0.22))), Tp = 14, Bt = 26;   // margem da direita comporta os rótulos empurrados
-  const NA = Math.max(N, evo.axisN || N);
+  // durante a animação o eixo escala pro track atual (gráfico "estica"); fora dela mantém o tamanho total
+  const NA = state.upTo == null ? Math.max(N, evo.axisN || N) : N;
   const X = i => L + (NA <= 1 ? 0 : i / (NA - 1)) * (W - L - Rm);
   const cum = shown.map(k => { const ix = evo.map.get(k).ix, a = new Int32Array(N); let p = 0, c = 0; for (let i = 0; i < N; i++){ if (p < ix.length && ix[p] === i){ c++; p++; } a[i] = c; } return a; });
   const mx = Math.max(1, ...cum.map(a => a[N - 1]));
@@ -2457,6 +2485,227 @@ function drawEvo(){
   const top = Math.ceil(mx / step) * step;
   const Y = v => Tp + (1 - v / top) * (H - Tp - Bt);
   let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução acumulada de faixas por ${evo.mode === "band" ? "banda" : "gênero"}, pela ordem de adição">`;
+  // Phase stripes — only when the toggle is on
+  if (evo.showPhases) {
+    const PHASE_MIN_PCT = evo.phaseCfg.minPct;
+    // N<100: usa spanSm; N>=100: decai suavemente de spanSm→spanLg conforme N cresce (escala 100/N), piso em spanLg
+    const spanPct = N < 100 ? evo.phaseCfg.spanSm : Math.max(evo.phaseCfg.spanLg, evo.phaseCfg.spanSm * (100 / N));
+    const PHASE_MIN_SPAN = Math.max(evo.phaseCfg.floor, Math.ceil(N * spanPct));
+    const cacheKey = shown.slice().sort().join("|") + ":" + N;
+    if (!evo.phaseCache || evo.phaseCache.key !== cacheKey) {
+      const intervals = [];
+      for (const k of shown) {
+        const s = evo.map.get(k); if (!s || !s.ix || !s.ix.length) continue;
+        const p = Array.from(s.ix).sort((a, b) => a - b);
+        const m = p.length; if (m < 2) continue;
+        const valid = [];
+        for (let l = 0; l < m; l++) {
+          // start r at the first index where span is large enough
+          let r = l + 1;
+          while (r < m && p[r] - p[l] + 1 < PHASE_MIN_SPAN) r++;
+          for (; r < m; r++) {
+            const count = r - l + 1, span = p[r] - p[l] + 1;
+            const density = count / span;
+            if (density > PHASE_MIN_PCT) valid.push({start: p[l], end: p[r], count, density});
+          }
+        }
+        if (!valid.length) continue;
+        // keep largest non-overlapping intervals (greedy by count then span)
+        valid.sort((a, b) => b.count - a.count || (b.end - b.start) - (a.end - a.start));
+        const picked = [];
+        for (const iv of valid) {
+          if (picked.some(c => c.start <= iv.end && c.end >= iv.start)) continue;
+          const kIn = p.filter(pos => pos >= iv.start && pos <= iv.end);
+          const span = iv.end - iv.start + 1;
+          const WIN = Math.max(3, Math.ceil(span * 0.25));
+          const N_STOPS = 7;
+          const rawDens = Array.from({length: N_STOPS}, (_, i) => {
+            const center = iv.start + (span - 1) * i / (N_STOPS - 1);
+            const wS = Math.max(iv.start, Math.round(center - WIN / 2));
+            const wE = Math.min(iv.end,   Math.round(center + WIN / 2));
+            const cnt = kIn.filter(x => x >= wS && x <= wE).length;
+            return cnt / (wE - wS + 1);
+          });
+          const maxD = Math.max(...rawDens), minD = Math.min(...rawDens);
+          const dRange = maxD - minD;
+          const gradStops = rawDens.map((d, i) => ({
+            pct: (i / (N_STOPS - 1) * 100).toFixed(1),
+            norm: dRange > 0.05 ? (d - minD) / dRange : 1
+          }));
+          picked.push({key: k, start: iv.start, end: iv.end, count: iv.count, density: iv.density, gradStops});
+        }
+        intervals.push(...picked);
+      }
+      intervals.sort((a, b) => a.start - b.start);
+      evo.phaseCache = {key: cacheKey, intervals};
+    }
+    const phaseStyle = 'personalizado';
+    const phasePts = (ph) => { const j = shown.indexOf(ph.key); if (j < 0) return null; const a = cum[j], end = Math.min(ph.end, N-1); const pts = []; for (let i = ph.start; i <= end; i++) pts.push([X(i), Y(a[i])]); return pts.length >= 2 ? pts : null; };
+    const _bgLum = (() => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.fillStyle = getComputedStyle(document.documentElement).backgroundColor || '#121212'; x.fillRect(0,0,1,1); const d = x.getImageData(0,0,1,1).data; return 0.2126*(d[0]/255)**2.2 + 0.7152*(d[1]/255)**2.2 + 0.0722*(d[2]/255)**2.2; })();
+    const _colLum = (css) => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.fillStyle = css; x.fillRect(0,0,1,1); const d = x.getImageData(0,0,1,1).data; return 0.2126*(d[0]/255)**2.2 + 0.7152*(d[1]/255)**2.2 + 0.0722*(d[2]/255)**2.2; };
+    const _phaseTextCol = (col, op) => { const bl = _colLum(col) * op + _bgLum * (1 - op); return bl > 0.179 ? '#000' : '#fff'; };
+    const phaseLabel = (ph, cx, labelY) => { const stripeW = Math.max(1, X(Math.min(ph.end, N-1)) - X(ph.start)); if (stripeW <= 8) return ''; const charW = 6.2, availW = stripeW, abbr = evoAbbr(ph.key), words = ph.key.split(/\s+/); let raw = ''; for (const word of words) { const c = raw ? raw + ' ' + word : word; if (c.length * charW <= availW) raw = c; else break; } if (!raw && abbr && abbr.length * charW <= availW) raw = abbr; if (!raw) { let pre = ''; for (const ch of (words[0]||'')) { if ((pre+ch).length*charW<=availW) pre+=ch; else break; } raw=pre; } if (!raw) return ''; const lbl = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); return `<text x="${cx}" y="${labelY}" text-anchor="middle" font-size="10" font-family="Manrope,sans-serif" font-weight="800" fill="#fff" paint-order="stroke" stroke="rgba(0,0,0,0.4)" stroke-width="2" stroke-linejoin="round">${lbl}</text>`; };
+    let phaseDefs = '';
+    for (const ph of evo.phaseCache.intervals) {
+      const col = evoColor(ph.key); if (!col) continue;
+      const opacity = 0.3;
+      const px1 = X(ph.start), px2 = X(Math.min(ph.end, N-1));
+      const stripeW = Math.max(1, px2 - px1);
+      const cx = ((px1 + px2) / 2).toFixed(1);
+
+      if (phaseStyle === 'blocao') {
+        const gid = `phg_${ph.start}_${ph.end}_${ph.key.replace(/[^a-z0-9]/gi,'_')}`;
+        const opE = opacity * 0.35;
+        const stopsStr = ph.gradStops.map(s => `<stop offset="${s.pct}%" stop-color="${col}" stop-opacity="${(opE+(opacity-opE)*Math.pow(s.norm,3)).toFixed(2)}"/>`).join('');
+        phaseDefs += `<linearGradient id="${gid}" x1="${px1.toFixed(1)}" y1="0" x2="${px2.toFixed(1)}" y2="0" gradientUnits="userSpaceOnUse">${stopsStr}</linearGradient>`;
+        svg += `<rect x="${px1.toFixed(1)}" y="${Tp}" width="${stripeW.toFixed(1)}" height="${H-Tp-Bt}" fill="url(#${gid})" rx="2"/>`;
+        svg += phaseLabel(ph, cx, (Tp+11).toFixed(1));
+
+      } else if (phaseStyle === 'ribbon' || phaseStyle === 'glow') {
+        const pts = phasePts(ph); if (!pts) continue;
+        const halfW = Math.round(10 + (ph.density - 0.63) / 0.37 * 12);
+        let d = `M${pts[0][0].toFixed(1)},${(pts[0][1]-halfW).toFixed(1)}`;
+        for (const [x,y] of pts.slice(1)) d += ` L${x.toFixed(1)},${(y-halfW).toFixed(1)}`;
+        for (let i = pts.length-1; i >= 0; i--) d += ` L${pts[i][0].toFixed(1)},${(pts[i][1]+halfW).toFixed(1)}`;
+        d += ' Z';
+        if (phaseStyle === 'glow') {
+          const fid = `phf_${ph.start}_${ph.end}`;
+          phaseDefs += `<filter id="${fid}" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="6"/></filter>`;
+          svg += `<path d="${d}" fill="${col}" opacity="${Math.min(0.55, opacity*2).toFixed(2)}" filter="url(#${fid})"/>`;
+        }
+        svg += `<path d="${d}" fill="${col}" opacity="${opacity.toFixed(2)}"/>`;
+        const peakY = Math.max(Tp+11, Math.min(...pts.map(([,y])=>y)) - halfW - 4);
+        svg += phaseLabel(ph, cx, peakY.toFixed(1));
+
+      } else if (phaseStyle === 'arco') {
+        const pts = phasePts(ph); if (!pts) continue;
+        const baseY = H - Bt;
+        let d = `M${pts[0][0].toFixed(1)},${baseY}`;
+        for (const [x,y] of pts) d += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+        d += ` L${pts[pts.length-1][0].toFixed(1)},${baseY} Z`;
+        const gid = `pha_${ph.start}_${ph.end}_${ph.key.replace(/[^a-z0-9]/gi,'_')}`;
+        phaseDefs += `<linearGradient id="${gid}" x1="${px1.toFixed(1)}" y1="0" x2="${px2.toFixed(1)}" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="${col}" stop-opacity="0"/><stop offset="50%" stop-color="${col}" stop-opacity="${opacity.toFixed(2)}"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient>`;
+        svg += `<path d="${d}" fill="url(#${gid})"/>`;
+        const peakY = Math.max(Tp+11, pts[pts.length-1][1] - 4);
+        svg += phaseLabel(ph, cx, peakY.toFixed(1));
+
+      } else if (phaseStyle === 'faixa') {
+        // faixa simples no topo
+        const stripH = 6;
+        const fid = `phfx_${ph.start}_${ph.end}`;
+        phaseDefs += `<filter id="${fid}" x="-20%" y="-80%" width="140%" height="400%"><feGaussianBlur stdDeviation="4"/></filter>`;
+        svg += `<rect x="${px1.toFixed(1)}" y="0" width="${stripeW.toFixed(1)}" height="${stripH}" fill="${col}" opacity="${Math.min(0.5, opacity*2).toFixed(2)}" filter="url(#${fid})"/>`;
+        svg += `<rect x="${px1.toFixed(1)}" y="0" width="${stripeW.toFixed(1)}" height="${stripH}" fill="${col}" opacity="${opacity.toFixed(2)}"/>`;
+        svg += phaseLabel(ph, cx, (stripH + 10).toFixed(1));
+
+      } else if (phaseStyle === 'personalizado') {
+        const pts = phasePts(ph); if (!pts) continue;
+        const stripH = 12;
+        // — glow na linha: segue o path mas clipado na largura do intervalo
+        let dLine = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+        for (const [x,y] of pts.slice(1)) dLine += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+        const gcid = `phgc_${ph.start}_${ph.end}`;
+        const gfid = `phgg_${ph.start}_${ph.end}`;
+        const _hc = document.createElement('canvas'); _hc.width = _hc.height = 1;
+        const _hx = _hc.getContext('2d'); _hx.fillStyle = col; _hx.fillRect(0,0,1,1);
+        const _hd = _hx.getImageData(0,0,1,1).data;
+        const _r = _hd[0]/255, _g = _hd[1]/255, _b = _hd[2]/255;
+        const _mx = Math.max(_r,_g,_b), _mn = Math.min(_r,_g,_b), _dl = _mx - _mn;
+        let _hue = 0;
+        if (_dl > 0) { if (_mx===_r) _hue=(((_g-_b)/_dl)%6+6)%6*60; else if (_mx===_g) _hue=((_b-_r)/_dl+2)*60; else _hue=((_r-_g)/_dl+4)*60; }
+        const _isYellow = _hue >= 25 && _hue <= 75;
+        const _isPink   = _hue >= 300 || _hue <= 15;
+        const _strokeW  = 8;
+        const _blur     = 2;
+        const _op       = _isYellow ? 0.75 : _isPink ? 0.82 : 0.55;
+        phaseDefs += `<filter id="${gfid}" x="-10%" y="-150%" width="120%" height="400%"><feGaussianBlur stdDeviation="${_blur}"/></filter>`;
+        phaseDefs += `<clipPath id="${gcid}"><rect x="${px1.toFixed(1)}" y="0" width="${stripeW.toFixed(1)}" height="${H}"/></clipPath>`;
+        svg += `<path d="${dLine}" fill="none" stroke="${col}" stroke-width="${_strokeW}" stroke-opacity="${_op}" stroke-linecap="round" stroke-linejoin="round" filter="url(#${gfid})" clip-path="url(#${gcid})"/>`;
+        // — cortina: do fundo da faixa até a linha da banda (segue o path, não ultrapassa)
+        const bottomY = Math.max(...pts.map(([,y]) => y));
+        const cid = `phfc_${ph.start}_${ph.end}_${ph.key.replace(/[^a-z0-9]/gi,'_')}`;
+        phaseDefs += `<linearGradient id="${cid}" x1="0" y1="${stripH}" x2="0" y2="${bottomY}" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="${col}" stop-opacity="${(opacity*0.9).toFixed(2)}"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient>`;
+        let dc = `M${px1.toFixed(1)},${stripH} L${px2.toFixed(1)},${stripH}`;
+        for (let i = pts.length - 1; i >= 0; i--) dc += ` L${pts[i][0].toFixed(1)},${pts[i][1].toFixed(1)}`;
+        dc += ' Z';
+        svg += `<path d="${dc}" fill="url(#${cid})"/>`;
+        // — faixa principal no topo (sem borda arredondada, cor sólida)
+        const lfid = `phlg_${ph.start}_${ph.end}`;
+        phaseDefs += `<filter id="${lfid}" x="-25%" y="-80%" width="150%" height="400%"><feGaussianBlur stdDeviation="5"/></filter>`;
+        svg += `<rect x="${px1.toFixed(1)}" y="0" width="${stripeW.toFixed(1)}" height="${stripH}" fill="${col}" opacity="${Math.min(0.55, opacity*2.2).toFixed(2)}" filter="url(#${lfid})"/>`;
+        svg += `<rect x="${px1.toFixed(1)}" y="0" width="${stripeW.toFixed(1)}" height="${stripH}" fill="${col}" opacity="${opacity.toFixed(2)}"/>`;
+        svg += phaseLabel(ph, cx, (stripH - 2).toFixed(1));
+
+      } else if (phaseStyle === 'espessa') {
+        // linha da banda fica grossa durante o intervalo
+        const pts = phasePts(ph); if (!pts) continue;
+        const sw = (3 + (ph.density - 0.63) / 0.37 * 9).toFixed(1);
+        let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+        for (const [x,y] of pts.slice(1)) d += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+        svg += `<path d="${d}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-opacity="${opacity.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+        const peakY = Math.max(Tp+11, Math.min(...pts.map(([,y])=>y)) - 6);
+        svg += phaseLabel(ph, cx, peakY.toFixed(1));
+
+      } else if (phaseStyle === 'pontos') {
+        // bolões semi-transparentes em cada track da banda no intervalo
+        const j = shown.indexOf(ph.key); if (j < 0) continue;
+        const a = cum[j];
+        const r = (3 + (ph.density - 0.63) / 0.37 * 5).toFixed(1);
+        const ixArr = Array.from(evo.map.get(ph.key).ix).filter(i => i >= ph.start && i <= ph.end && i < N);
+        for (const i of ixArr) svg += `<circle cx="${X(i).toFixed(1)}" cy="${Y(a[i]).toFixed(1)}" r="${r}" fill="${col}" opacity="${(opacity * 1.4).toFixed(2)}"/>`;
+        const peakY = Math.max(Tp+11, Math.min(...ixArr.map(i => Y(a[i]))) - parseFloat(r) - 4);
+        svg += phaseLabel(ph, cx, peakY.toFixed(1));
+
+      } else if (phaseStyle === 'tick') {
+        // triângulos na borda superior, um por música da banda no intervalo
+        const ixArr = Array.from(evo.map.get(ph.key).ix).filter(i => i >= ph.start && i <= ph.end && i < N);
+        for (const i of ixArr) { const tx = X(i).toFixed(1); svg += `<polygon points="${tx},${Tp} ${(X(i)-3).toFixed(1)},${Tp-5} ${(X(i)+3).toFixed(1)},${Tp-5}" fill="${col}" opacity="${(opacity*1.5).toFixed(2)}"/>`; }
+        svg += phaseLabel(ph, cx, (Tp + 11).toFixed(1));
+
+      } else if (phaseStyle === 'contorno') {
+        // só a borda do blocão — sem preenchimento
+        svg += `<rect x="${px1.toFixed(1)}" y="${Tp}" width="${stripeW.toFixed(1)}" height="${H-Tp-Bt}" fill="none" stroke="${col}" stroke-opacity="${(opacity*2).toFixed(2)}" stroke-width="1.5" rx="2"/>`;
+        svg += phaseLabel(ph, cx, (Tp + 11).toFixed(1));
+
+      } else if (phaseStyle === 'sombra') {
+        // sombra colorida que cai abaixo da linha da banda
+        const pts = phasePts(ph); if (!pts) continue;
+        const fid = `phsf_${ph.start}_${ph.end}`;
+        phaseDefs += `<filter id="${fid}" x="-5%" y="0%" width="110%" height="300%"><feOffset dy="6"/><feGaussianBlur stdDeviation="4"/><feFlood flood-color="${col}" flood-opacity="${opacity.toFixed(2)}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`;
+        let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+        for (const [x,y] of pts.slice(1)) d += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+        svg += `<path d="${d}" fill="none" stroke="${col}" stroke-width="4" stroke-opacity="0" filter="url(#${fid})"/>`;
+        // linha da banda mais brilhante no intervalo
+        svg += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2.5" stroke-opacity="${(opacity*1.8).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+        const peakY = Math.max(Tp+11, Math.min(...pts.map(([,y])=>y)) - 6);
+        svg += phaseLabel(ph, cx, peakY.toFixed(1));
+
+      } else if (phaseStyle === 'ancora') {
+        // linha vertical fina em cada música da banda: histograma de baixo pra cima até a linha
+        const j = shown.indexOf(ph.key); if (j < 0) continue;
+        const a = cum[j];
+        const ixArr = Array.from(evo.map.get(ph.key).ix).filter(i => i >= ph.start && i <= ph.end && i < N);
+        const baseY = (H - Bt).toFixed(1);
+        for (const i of ixArr) { const lx = X(i).toFixed(1), ly = Y(a[i]).toFixed(1); svg += `<line x1="${lx}" y1="${baseY}" x2="${lx}" y2="${ly}" stroke="${col}" stroke-width="2" stroke-opacity="${(opacity*1.6).toFixed(2)}" stroke-linecap="round"/>`; }
+        const peakY = Math.max(Tp+11, Math.min(...ixArr.map(i => Y(a[i]))) - 4);
+        svg += phaseLabel(ph, cx, peakY.toFixed(1));
+
+      } else if (phaseStyle === 'base') {
+        // preenchimento entre a linha e o eixo zero (contribuição acumulada)
+        const pts = phasePts(ph); if (!pts) continue;
+        const zeroY = Y(0);
+        let d = `M${pts[0][0].toFixed(1)},${zeroY.toFixed(1)}`;
+        for (const [x,y] of pts) d += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+        d += ` L${pts[pts.length-1][0].toFixed(1)},${zeroY.toFixed(1)} Z`;
+        const gid = `phb_${ph.start}_${ph.end}_${ph.key.replace(/[^a-z0-9]/gi,'_')}`;
+        phaseDefs += `<linearGradient id="${gid}" x1="0" y1="${Tp}" x2="0" y2="${zeroY.toFixed(1)}" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="${col}" stop-opacity="${opacity.toFixed(2)}"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient>`;
+        svg += `<path d="${d}" fill="url(#${gid})"/>`;
+        const peakY = Math.max(Tp+11, pts[pts.length-1][1] - 4);
+        svg += phaseLabel(ph, cx, peakY.toFixed(1));
+      }
+    }
+    if (phaseDefs) svg += `<defs>${phaseDefs}</defs>`;
+  }
   for (let v = 0; v <= top; v += step) svg += `<line x1="${L}" x2="${W - Rm}" y1="${Y(v)}" y2="${Y(v)}" stroke="hsla(var(--h),60%,67%,.08)" stroke-dasharray="2 4"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
   [0, .25, .5, .75, 1].forEach((f, j, arr) => { const i = Math.round(f * (NA - 1)); svg += `<text x="${X(i)}" y="${H - 6}" text-anchor="${j === 0 ? "start" : j === arr.length - 1 ? "end" : "middle"}">#${(evo.full[i] || evo.R[Math.min(i, N - 1)]).n}</text>`; });
   const every = Math.max(1, Math.ceil(N / 500));
@@ -2465,8 +2714,8 @@ function drawEvo(){
     const pts = []; for (let i = 0; i < N; i += every) pts.push(i); if (pts[pts.length - 1] !== N - 1) pts.push(N - 1);
     return {a, pts, col: evoCol(evo.slot[evo.mode].get(shown[j])), final: a[N - 1]};
   });
-  // 1º passo — linhas: menor count por último (em cima) → cor de quem chegou por último domina
-  const pathOrd = lineData.map((_, j) => j).sort((a, b) => lineData[b].final - lineData[a].final);
+  // 1º passo — linhas: maior count por último (em cima) → banda dominante sempre sobrepõe
+  const pathOrd = lineData.map((_, j) => j).sort((a, b) => lineData[a].final - lineData[b].final);
   for (const j of pathOrd) {
     const {a, pts, col} = lineData[j];
     svg += `<path d="M${pts.map(i => `${X(i).toFixed(1)},${Y(a[i]).toFixed(1)}`).join("L")}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
@@ -2495,9 +2744,10 @@ function drawEvo(){
   };
   const ends = shown.map((k, j) => {
     const nm = String(evoName(k)).trim(), first = nm.split(/\s+/)[0] || nm;
-    let txt = first.length > maxCh ? first.slice(0, Math.max(1, maxCh - 1)) + "…" : first;
+    const abbr = evoAbbr(k);
+    let txt = abbr ? abbr : (first.length > maxCh ? first.slice(0, Math.max(1, maxCh - 1)) + "…" : first);
     const count = cum[j][N - 1];
-    return {txt, nm, rawY: Y(count), col: evoCol(evo.slot[evo.mode].get(k)), count};
+    return {txt, nm, rawY: Y(count), col: evoCol(evo.slot[evo.mode].get(k)), count, k};
   });
   ends.sort((a, b) => a.rawY - b.rawY);
   // bandas/gêneros com só 1 faixa não recebem rótulo (evita poluição quando há muitos selecionados)
@@ -2515,7 +2765,8 @@ function drawEvo(){
       const nm = g[0].nm, first = nm.split(/\s+/)[0] || nm;
       const compoundLimit = 12;   // nomes compostos acima deste tamanho usam só a primeira palavra
       const fits = nm.includes(" ") ? nm.length <= compoundLimit : nm.length <= maxCh;
-      const lbl = fits ? nm : (first.length > maxCh ? first.slice(0, maxCh - 1) + "…" : first);
+      const abbr = evoAbbr(g[0].k);
+      const lbl = fits ? nm : (abbr || (first.length > maxCh ? first.slice(0, maxCh - 1) + "…" : first));
       g[0].lines = [lbl];
       g[0].finalX = baseX; g[0].finalY = g[0].rawY;
     } else {
@@ -2560,6 +2811,7 @@ function renderEvolution(R){ evoBuild(R); if (!tmBusy) evoPanels(); drawEvo(); }
 $("#evo-mode").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.dataset.m === evo.mode) return; evo.mode = b.dataset.m; evoBuild(rows()); evoPanels(); drawEvo(); });
 $("#evo-tops").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; evoTop(b.dataset.n === "all" ? Infinity : +b.dataset.n); evoPanels(); drawEvo(); });
 $("#evo-none").addEventListener("click", () => { evo.dyn[evo.mode] = null; evo.sel[evo.mode] = new Set(); evo.slot[evo.mode] = new Map(); evoPanels(); drawEvo(); });
+$("#evo-phases").addEventListener("click", () => { evo.showPhases = !evo.showPhases; evo.phaseCache = null; $("#evo-phases").setAttribute("aria-pressed", evo.showPhases); drawEvo(); });
 $("#evo-opts").addEventListener("click", e => { const b = e.target.closest(".evo-opt"); if (b) evoToggle(b.dataset.k); });
 $("#evo-q").addEventListener("input", evoPanels);
 $("#evo-singles").addEventListener("click", openEvoSingles);
@@ -4721,13 +4973,22 @@ function openImport(prefillText = null){
         html: hit.size
           ? `<p>Comparando os links com a playlist: <strong>${faixas(hit.size)}</strong> ${hit.size > 1 ? "são as mesmas" : "é a mesma"} (${hit.size > 1 ? "vão" : "vai"} ser <strong>reordenada${hit.size > 1 ? "s" : ""} pela ordem em que você colou</strong>, sem gastar busca), <strong>${fresh.length}</strong> ${fresh.length === 1 ? "só está" : "só estão"} nos links e <strong>${missing.length}</strong> ${missing.length === 1 ? "só está" : "só estão"} na playlist.</p>
             ${diff}
-            <p class="muted">O que só está na playlist fica no começo, na ordem atual, a não ser que você marque para remover.</p>`
-          : `<p>As faixas entram no fim da playlist, da <strong>#${NN + 1}</strong> à <strong>#${NN + fresh.length}</strong>, e o painel será recalculado com ${faixas(NN + fresh.length)}.</p>`});
+            <p class="muted">O que só está na playlist fica no começo, na ordem atual, a não ser que você marque para remover.</p>
+            ${fresh.length ? `<p class="muted">As ${fresh.length === 1 ? "música nova também será marcada" : `${faixas(fresh.length)} novas também serão marcadas`} como favorita${fresh.length > 1 ? "s" : ""}. Lembre-se de adicioná-las no Spotify também.</p>` : ""}`
+          : `<p>As faixas entram no fim da playlist, da <strong>#${NN + 1}</strong> à <strong>#${NN + fresh.length}</strong>, e o painel será recalculado com ${faixas(NN + fresh.length)}.</p><p class="muted">As músicas novas também serão marcadas como favoritas. Lembre-se de adicioná-las no Spotify também.</p>`});
       const rmCb = document.querySelector("#im-rm-missing");
       const ok = await pending;
       if (!ok) return;
       const dropMissing = !!(rmCb && rmCb.checked);
       ssSet("verify", "1");
+      // auto-fav fresh tracks before reload so they survive the page reset
+      for (const r of fresh){
+        const k = r.id || ((r.title||"").trim().toLowerCase()+"|"+(typeof splitArtists==="function"?splitArtists(r.artist||"")[0]:r.artist||"").toLowerCase());
+        if (!k) continue;
+        if (!TAGS.musicas[k]) TAGS.musicas[k] = {f:1};
+        else if (!TAGS.musicas[k].f) TAGS.musicas[k].f = 1;
+      }
+      if (fresh.length) saveTags();
       if (hit.size){
         const cache = loadTrackCache(), out = []; let n = 0;
         if (!dropMissing) for (const t of missing) out.push(rowOf(t, ++n, null, cache));

@@ -224,3 +224,5 @@ quero que no grafico de linhas o nomes quando forem aparecer ao lado avaliem se 
 botão limpar filtros tamnbém apareça fixado no header que desce (mas só apareça quando tiver algum filtro ativo) ✅
 
 quando der play na maquina do tempo com o ajuste de cor automatico por capa a cor do site mudar conforme a mudança da cor predominante nas capas
+
+opção de compartilhar seus numeros com o site com o aviso dizendo que nada de confidencial será compartilhado, e explicando que só vai ajudar o site a mostrar mais dados e metricas e principalmente ajudar no tratamento de saude de playlist cada vez mais automaticamente para todos os usuarios
