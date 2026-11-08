@@ -169,7 +169,12 @@ function importTagsFromFile(file){
 
     const body = document.createElement("div");
     body.className = "fav-list-modal";
-    const md = openModal({ title: "Favoritas e Categorias", body, size: "md" });
+    const md = openModal({ title: "Favoritas e Categorias", body });
+    md.m.style.maxHeight = "none";
+    md.m.querySelector(".mb").style.overflow = "visible";
+    md.bg.style.overflowY = "auto";
+    md.bg.style.alignItems = "flex-start";
+    md.bg.style.paddingBlock = "24px";
 
     function getFavItems(){
       const items = [];
@@ -240,6 +245,8 @@ function importTagsFromFile(file){
       }
       const listEl = body.querySelector(".flm-list");
       listEl.className = `flm-list${compact ? " compact" : ""}`;
+      listEl.style.height = "450px";
+      listEl.style.overflowY = "scroll";
       if (!items.length){
         const tot = getFavItems().length;
         listEl.innerHTML = tot
@@ -312,8 +319,6 @@ function importTagsFromFile(file){
         <button class="gbtn" type="button" id="flm-import-list">♥ Importar favoritas</button>
       </div>`;
 
-    renderList();
-
     body.querySelectorAll("[data-ctrl] .seg-btn").forEach(b => b.addEventListener("click", () => {
       const ctrl = b.closest("[data-ctrl]").dataset.ctrl;
       b.closest("[data-ctrl]").querySelectorAll(".seg-btn").forEach(x => x.classList.remove("on"));
@@ -338,6 +343,8 @@ function importTagsFromFile(file){
       const f = e.target.files[0]; if (f){ importTagsFromFile(f); md.close(); }
     });
     body.querySelector("#flm-import-list").addEventListener("click", () => openImportFavoritesModal(() => renderList()));
+
+    try { renderList(); } catch(e) { console.error("[Favoritas] renderList error:", e); }
   });
 })();
 
@@ -384,7 +391,7 @@ function openImportFavoritesModal(onDone) {
       if (pm) plIds.push(pm[1]); else otherLines.push(ln);
     }
 
-    let extraIds = [], fetchError = null;
+    let extraIds = [], fetchError = null, idToName = new Map(), sourceRows = [];
     if (plIds.length) {
       // Tentar token OAuth do usuário (sessão ativa) — único que funciona pra playlists
       let token = null;
@@ -415,6 +422,8 @@ function openImportFavoritesModal(onDone) {
       try {
         const {rows} = await spotifyFetchPlaylistTracks(plIds, token, null, null, null);
         extraIds = rows.map(r => r.id).filter(Boolean);
+        idToName = new Map(rows.filter(r => r.id && r.title).map(r => [r.id, r.title + (r.artist ? " — " + r.artist : "")]));
+        sourceRows = rows;
       } catch (e) {
         fetchError = `Erro ao buscar a playlist: ${e.message}`;
       }
@@ -425,11 +434,71 @@ function openImportFavoritesModal(onDone) {
     if (fetchError)    html += `<p style="color:#f87171;margin:0 0 4px">⚠ ${esc(fetchError)}</p>`;
     if (r.added)       html += `<p style="color:#1DB954;margin:0 0 4px">✓ ${r.added} música${r.added!==1?"s":""} favoritada${r.added!==1?"s":""}</p>`;
     if (r.alreadyFav)  html += `<p style="color:#8fa59a;margin:0 0 4px">↩ ${r.alreadyFav} já eram favoritas</p>`;
-    if (r.notFound.length) html += `<p style="color:#f87171;margin:0 0 4px">⚠ ${r.notFound.length} não encontrada${r.notFound.length!==1?"s":""} na sua playlist (não estão no seu catálogo):</p><ul style="margin:0 0 4px;padding-left:16px;font-size:12px;color:#f87171">${r.notFound.slice(0,20).map(x=>`<li>${esc(x)}</li>`).join("")}${r.notFound.length>20?`<li>…e mais ${r.notFound.length-20}</li>`:""}</ul>`;
+    if (r.notFound.length) html += `<p style="color:#f87171;margin:0 0 4px">⚠ ${r.notFound.length} não encontrada${r.notFound.length!==1?"s":""} na sua playlist (não estão no seu catálogo):</p><ul style="margin:0 0 4px;padding-left:16px;font-size:12px;color:#f87171">${r.notFound.slice(0,20).map(x=>`<li>${esc(idToName.get(x) || x)}</li>`).join("")}${r.notFound.length>20?`<li>…e mais ${r.notFound.length-20}</li>`:""}</ul><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" id="ifav-add-to-pl-end" style="background:none;border:1px solid #f87171;color:#f87171;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">Adicionar ao final →</button>${sourceRows.length?`<button type="button" id="ifav-add-to-pl-pos" style="background:none;border:1px solid #1DB954;color:#1DB954;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer">Inserir na posição certa →</button>`:""}</div>`;
     if (r.stale.length) html += `<p style="color:#fbbf24;margin:0">⚠ ${r.stale.length} favorita${r.stale.length!==1?"s":""} existente${r.stale.length!==1?"s":""} sem correspondência no catálogo atual</p>`;
     if (!html) html = `<p style="color:#8fa59a;margin:0">Nenhuma alteração realizada.</p>`;
     resDiv.style.display = "block";
     resDiv.innerHTML = html;
+    const addEndBtn = resDiv.querySelector("#ifav-add-to-pl-end");
+    if (addEndBtn) {
+      addEndBtn.addEventListener("click", () => {
+        const text = r.notFound.map(x => /^[A-Za-z0-9]{22}$/.test(x) ? `https://open.spotify.com/track/${x}` : x).join("\n");
+        md.close();
+        if (typeof openImport === "function") openImport(text);
+      });
+    }
+    const addPosBtn = resDiv.querySelector("#ifav-add-to-pl-pos");
+    if (addPosBtn) {
+      addPosBtn.addEventListener("click", () => {
+        if (typeof BY_PLAYLIST === "undefined" || typeof commitRows !== "function" || typeof currentRows !== "function") {
+          addEndBtn && addEndBtn.click(); return;
+        }
+        // Map source ID → index and row data
+        const srcIdxMap = new Map(sourceRows.map((sr, i) => [sr.id, i]));
+        const srcById   = new Map(sourceRows.map(sr => [sr.id, sr]));
+        // Map site Spotify ID → index in existing rows array
+        const existing = (currentRows()).slice().sort((a, b) => a[0] - b[0]);
+        const siteIdxMap = new Map();
+        existing.forEach((row, i) => { const id = row[6] && row[6].id; if (id) siteIdxMap.set(id, i); });
+        // For each missing track (with known source position), find the last source
+        // predecessor that exists in the site playlist → insert right after it
+        const toInsert = r.notFound
+          .filter(id => /^[A-Za-z0-9]{22}$/.test(id) && srcIdxMap.has(id))
+          .sort((a, b) => srcIdxMap.get(a) - srcIdxMap.get(b));
+        const insertAfter = new Map(); // existingIdx (-1 = prepend) → [sourceRow]
+        for (const missingId of toInsert) {
+          const si = srcIdxMap.get(missingId);
+          let afterIdx = -1;
+          for (let j = si - 1; j >= 0; j--) {
+            const prevId = sourceRows[j] && sourceRows[j].id;
+            if (prevId && siteIdxMap.has(prevId)) { afterIdx = siteIdxMap.get(prevId); break; }
+          }
+          if (!insertAfter.has(afterIdx)) insertAfter.set(afterIdx, []);
+          insertAfter.get(afterIdx).push(srcById.get(missingId));
+        }
+        // Build output: interleave existing rows with insertions
+        const output = [];
+        for (const sr of (insertAfter.get(-1) || [])) {
+          output.push(sr.meta ? [0, sr.title, sr.artist, sr.album, sr.sec||0, sr.date||"", sr.meta] : [0, sr.title, sr.artist, sr.album, sr.sec||0, sr.date||""]);
+        }
+        for (let i = 0; i < existing.length; i++) {
+          output.push(existing[i]);
+          for (const sr of (insertAfter.get(i) || [])) {
+            output.push(sr.meta ? [0, sr.title, sr.artist, sr.album, sr.sec||0, sr.date||"", sr.meta] : [0, sr.title, sr.artist, sr.album, sr.sec||0, sr.date||""]);
+          }
+        }
+        // Renumber sequentially so commitRows sorts correctly
+        const renumbered = output.map((row, i) => { const rr = row.slice(); rr[0] = i + 1; return rr; });
+        // Auto-fav the inserted tracks
+        for (const id of toInsert) {
+          if (!TAGS.musicas[id]) TAGS.musicas[id] = {f:1};
+          else if (!TAGS.musicas[id].f) TAGS.musicas[id].f = 1;
+        }
+        if (toInsert.length && typeof saveTags === "function") saveTags();
+        md.close();
+        commitRows(renumbered, `${toInsert.length} adicionada${toInsert.length!==1?"s":""} na posição certa · playlist com ${renumbered.length}`);
+      });
+    }
     if (r.added > 0 || r.alreadyFav > 0) {
       btn.textContent = "Feito ✓";
       if (onDone) onDone();
