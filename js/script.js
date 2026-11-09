@@ -724,7 +724,7 @@ const wave = $("#wave");
     if (hot !== t){ hot && hot._w.classList.remove("hot"); t._w.classList.add("hot"); hot = t; }
     const mine = T.filter(x => hasBand(x, bandsOfRow(t)[0]));
     showTip(`<div class="eyebrow">#${t.n} na playlist · lançada em ${t.date || NI}</div><div class="t">${esc(t.title)}</div>
-      <div class="k"><span>${esc(t.artist)}</span></div><div class="k"><span>${esc(t.album)}</span></div><hr>
+      <div class="k"><span>${esc(t.artist)}</span></div><div class="k"><span>${t.ty === "single" ? TYPE_PT.single : esc(t.album)}</span></div><hr>
       <div class="k"><span>Duração</span><b>${fmtDur(t.sec)}</b></div>
       <div class="k"><span>Vs. média do catálogo</span><b>${t.sec >= AVG_ALL ? "+" : "−"}${fmtDur(Math.abs(t.sec - AVG_ALL))}</b></div>
       <div class="k"><span>Faixa do artista na playlist</span><b>${mine.filter(x => x.n <= t.n).length}ª de ${mine.length}</b></div>`, e);
@@ -1981,7 +1981,7 @@ const SONG_COLS = [
   {k: "n", l: "#", num: true, cell: t => t.n ?? ""},
   {k: "title", l: "Música", cls: "tt", cell: t => esc(t.title)},
   {k: "artist", l: "Artista", cell: t => esc(t.artist)},
-  {k: "album", l: "Álbum", cls: "al", cell: t => esc(t.album)},
+  {k: "album", l: "Álbum", cls: "al", cell: t => t.ty === "single" ? `<em class="ty-lbl">${TYPE_PT.single}</em>` : esc(t.album)},
   {k: "genre", l: "Gênero", cls: "gn", cell: t => t.genre ? esc(t.genre) : ND},
   {k: "date", l: "Lançamento", cell: t => t.date ? esc(t.date) : ND},
   {k: "sec", l: "Duração", num: true, cell: t => t.sec ? durTxt(t.sec) : ND},
@@ -2559,7 +2559,7 @@ function drawEvo(){
     const _bgLum = (() => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.fillStyle = getComputedStyle(document.documentElement).backgroundColor || '#121212'; x.fillRect(0,0,1,1); const d = x.getImageData(0,0,1,1).data; return 0.2126*(d[0]/255)**2.2 + 0.7152*(d[1]/255)**2.2 + 0.0722*(d[2]/255)**2.2; })();
     const _colLum = (css) => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.fillStyle = css; x.fillRect(0,0,1,1); const d = x.getImageData(0,0,1,1).data; return 0.2126*(d[0]/255)**2.2 + 0.7152*(d[1]/255)**2.2 + 0.0722*(d[2]/255)**2.2; };
     const _phaseTextCol = (col, op) => { const bl = _colLum(col) * op + _bgLum * (1 - op); return bl > 0.179 ? '#000' : '#fff'; };
-    const phaseLabel = (ph, cx, labelY) => { const stripeW = Math.max(1, X(Math.min(ph.end, N-1)) - X(ph.start)); if (stripeW <= 8) return ''; const charW = 6.2, availW = stripeW, abbr = evoAbbr(ph.key), words = ph.key.split(/\s+/); let raw = ''; for (const word of words) { const c = raw ? raw + ' ' + word : word; if (c.length * charW <= availW) raw = c; else break; } if (!raw && abbr && abbr.length * charW <= availW) raw = abbr; if (!raw) { let pre = ''; for (const ch of (words[0]||'')) { if ((pre+ch).length*charW<=availW) pre+=ch; else break; } raw=pre; } if (!raw) return ''; const lbl = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); return `<text x="${cx}" y="${labelY}" text-anchor="middle" font-size="10" font-family="Manrope,sans-serif" font-weight="800" fill="#fff" paint-order="stroke" stroke="rgba(0,0,0,0.4)" stroke-width="2" stroke-linejoin="round">${lbl}</text>`; };
+    const phaseLabel = (ph, cx, labelY) => { const stripeW = Math.max(1, X(Math.min(ph.end, N-1)) - X(ph.start)); if (stripeW <= 8) return ''; const charW = 6.2, availW = stripeW, abbr = evoAbbr(ph.key), words = ph.key.split(/\s+/); let raw = ''; for (const word of words) { const c = raw ? raw + ' ' + word : word; if (c.length * charW <= availW) raw = c; else break; } if (!raw && abbr && abbr.length * charW <= availW) raw = abbr; if (!raw) { let pre = ''; for (const ch of (words[0]||'')) { if ((pre+ch).length*charW<=availW) pre+=ch; else break; } raw=pre; } if (!raw) return ''; const lbl = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); return `<text x="${cx}" y="${labelY}" text-anchor="middle" font-size="11" font-family="Manrope,sans-serif" font-weight="800" style="fill:#fff" paint-order="stroke" stroke="rgba(0,0,0,0.75)" stroke-width="3" stroke-linejoin="round">${lbl}</text>`; };
     let phaseDefs = '';
     for (const ph of evo.phaseCache.intervals) {
       const col = evoColor(ph.key); if (!col) continue;
@@ -3390,6 +3390,51 @@ rule(() => {
     kick: [pc1(favs.length, T.length), "das faixas estão favoritadas"]};
 });
 
+// EVOLUÇÃO · fases de dominância
+rule(() => {
+  if (!IS.journey || BY_PLAYLIST.length < 20) return null;
+  const N = BY_PLAYLIST.length;
+  const PHASE_MIN_PCT = 0.63;
+  const spanPct = N < 100 ? 0.065 : Math.max(0.0225, 0.065 * (100 / N));
+  const PHASE_MIN_SPAN = Math.max(6, Math.ceil(N * spanPct));
+  const artIdx = new Map();
+  BY_PLAYLIST.forEach((t, i) => {
+    if (!t.artist || t.artist === NI) return;
+    const keys = splitArtistsRaw(t.artist).length ? splitArtistsRaw(t.artist) : [t.artist];
+    for (const k of keys) { if (!artIdx.has(k)) artIdx.set(k, []); artIdx.get(k).push(i); }
+  });
+  const allPhases = [];
+  for (const [k, positions] of artIdx) {
+    if (positions.length < 2) continue;
+    const p = positions, m = p.length;
+    const valid = [];
+    for (let l = 0; l < m; l++) {
+      let r = l + 1;
+      while (r < m && p[r] - p[l] + 1 < PHASE_MIN_SPAN) r++;
+      for (; r < m; r++) { const count = r - l + 1, span = p[r] - p[l] + 1, density = count / span; if (density > PHASE_MIN_PCT) valid.push({start: p[l], end: p[r], count, density}); }
+    }
+    if (!valid.length) continue;
+    valid.sort((a, b) => b.count - a.count || (b.end - b.start) - (a.end - a.start));
+    const picked = [];
+    for (const iv of valid) { if (picked.some(c => c.start <= iv.end && c.end >= iv.start)) continue; picked.push({key: k, start: iv.start, end: iv.end, count: iv.count, density: iv.density}); }
+    allPhases.push(...picked);
+  }
+  if (!allPhases.length) return null;
+  allPhases.sort((a, b) => b.count - a.count || b.density - a.density);
+  const nBands = new Set(allPhases.map(ph => ph.key)).size;
+  const topPhases = allPhases.slice(0, 5);
+  const maxCount = topPhases[0].count;
+  const artRank = new Map(IS.art.map((a, i) => [a.k, i]));
+  const getCol = k => { const rank = artRank.get(k); return evoCol(rank != null ? rank : artIdx.size); };
+  const rows = topPhases.map(ph => { const col = getCol(ph.key); return `<div class="fav-art-row"><span class="fav-art-name" style="color:${col}">${esc(ph.key)}</span><div class="fav-art-bar"><i data-w="${Math.round(ph.count / maxCount * 100)}" style="width:0;background:${col}"></i></div><b class="fav-art-n" style="color:${col}">${ph.count}</b></div>`; }).join('');
+  const topBand = allPhases[0], topPct = Math.round(topBand.density * 100);
+  return {kind: "pl", theme: 1, score: 82, wide: true,
+    title: nBands === 1 ? "Uma banda dominou a playlist" : `${nf(nBands)} bandas com fases de dominância`,
+    body: `<p>${B(nf(allPhases.length))} ${allPhases.length === 1 ? "fase" : "fases"} detectadas em ${B(nBands === 1 ? "1 banda" : `${nf(nBands)} bandas`)}. Uma fase é um trecho em que pelo menos ${Math.round(PHASE_MIN_PCT * 100)}% das adições vieram da mesma banda.</p>`,
+    viz: `<div class="fav-arts" style="min-width:140px">${rows}</div>`,
+    kick: [`${topPct}% de densidade`, `na maior fase (${esc(topBand.key)}, ${topBand.count} faixas)`]};
+});
+
 /* ---------- selection, ordering and row packing ---------- */
 /* a aba Insights tem duas visões: simples (resumo e cards principais) e técnica (jornada,
    cards avançados, metodologia). Cada bloco leva data-ins="simple|tech" no HTML, cada card leva tech: true;
@@ -3547,7 +3592,7 @@ function drawScatter(){
     hot.setAttribute("cx", X(best.n)); hot.setAttribute("cy", Y(best.year)); hot.setAttribute("opacity", 1);
     const i = pts.indexOf(best), md = Math.round(median(pts.slice(Math.max(0, i - (win >> 1)), i + (win >> 1) + 1).map(x => x.year)));
     showTip(`<div class="eyebrow">#${best.n} na playlist</div><div class="t">${esc(best.title)}</div>
-      <div class="k"><span>${esc(best.artist)}</span></div><div class="k"><span>${esc(best.album)}</span></div><hr>
+      <div class="k"><span>${esc(best.artist)}</span></div><div class="k"><span>${best.ty === "single" ? TYPE_PT.single : esc(best.album)}</span></div><hr>
       <div class="k"><span>Lançada em</span><b>${best.year}</b></div>
       <div class="k"><span>Mediana do trecho</span><b>${md}</b></div>
       <div class="k"><span>Vs. o trecho</span><b>${best.year === md ? "na média" : (best.year > md ? "+" : "−") + Math.abs(best.year - md) + " anos"}</b></div>`, e);

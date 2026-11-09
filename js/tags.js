@@ -186,6 +186,7 @@ function importTagsFromFile(file){
               label: t.title || "—",
               artist: (t.bands || []).join(", "),
               album: t.album || "",
+              ty: t.ty || "",
               genres: t.ge || [],
               cats: typeof trackTagsOf === "function" ? trackTagsOf(t) : [],
               n: t.n || 0,
@@ -262,8 +263,9 @@ function importTagsFromFile(file){
             <span class="flm-group-count">${gitems.length}</span>
           </div>
           <div class="flm-group-items">${gitems.map(item => {
+            const albSub = item.type === "faixa" && item.ty === "single" ? "Single/EP" : item.album;
             const sub = item.type === "faixa"
-              ? [item.artist, item.album].filter(Boolean).join(" · ")
+              ? [item.artist, albSub].filter(Boolean).join(" · ")
               : "";
             const catHtml = item.cats.map(c =>
               `<span class="tag-pill" style="--tc:${tagColor(c)};font-size:10px;padding:1px 6px">${esc(c)}</span>`

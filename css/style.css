@@ -630,6 +630,7 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 .tb td.tt{white-space:normal;min-width:160px;max-width:260px}
 .tb td.gn,.ptab td.gn{max-width:140px;overflow:hidden;text-overflow:ellipsis;text-transform:capitalize;white-space:nowrap}
 .tb td.al,.ptab td.al{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ty-lbl{font-style:normal;color:var(--ink-3);font-size:11px;font-family:var(--ff-head);font-weight:600;letter-spacing:.04em;text-transform:uppercase;opacity:.8}
 .nd{color:var(--ink-3);opacity:.6}
 .modal.m-lg .ptab{flex:1;min-height:0}
 .genres .row .fl{background:linear-gradient(90deg,var(--emerald),var(--mint))}
