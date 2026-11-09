@@ -227,3 +227,5 @@ quando der play na maquina do tempo com o ajuste de cor automatico por capa a co
 opção de compartilhar seus numeros com o site com o aviso dizendo que nada de confidencial será compartilhado, e explicando que só vai ajudar o site a mostrar mais dados e metricas e principalmente ajudar no tratamento de saude de playlist cada vez mais automaticamente para todos os usuarios
 
 criar um banco de dados pra armazenar dados globais principalmente links das musicas pra que os usuarios gastem menos buscas do spotify
+
+elencar por genero no grafico de musicas por banda/artista de fotos sem repetir foto usando o criterio de exclusividade (se houver uma unica banda no genero vai ser usado essa foto e essa foto não pode ser a foto de mais nenhum outro genero), em casos de empate vence o que tiver mais musicas dentro do genero, nunca deixe nenhum genero sem foto

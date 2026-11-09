@@ -4,7 +4,7 @@
    Nenhuma ação gasta busca sozinha: os botões só abrem as telas que já pedem confirmação. */
 (() => {
 "use strict";
-const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dc: 5, dr: 5, dm: 5, dcr: 0, nm: 0, tn: 0, gd: 0};   // peso de cada verificação na nota (soma 110: nunca zera só por isso; peso 0 = só informa)
+const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dr: 5, dm: 5, nm: 0, tn: 0, gd: 0, sy: 5};   // peso de cada verificação na nota (soma 110: nunca zera só por isso; peso 0 = só informa)
 const FULL_AT = 0.25;                                                       // com 25% das faixas afetadas o item já custa o peso inteiro
 const MAX_SEC = 20 * 60;
 
@@ -25,12 +25,17 @@ const ALB_CLEAN_KEY = "catalogo-musical:alb-clean";
 const ALB_CLEAN = (() => { try { return JSON.parse(localStorage.getItem(ALB_CLEAN_KEY) || "[]"); } catch(e) { return []; } })();
 const saveAlbClean = () => { try { localStorage.setItem(ALB_CLEAN_KEY, JSON.stringify(ALB_CLEAN)); } catch(e) {} };
 
+const SAME_YEAR_CFM_KEY = "catalogo-musical:same-year-cfm";
+const SAME_YEAR_CFM = (() => { try { return new Set(JSON.parse(localStorage.getItem(SAME_YEAR_CFM_KEY) || "[]")); } catch(e) { return new Set(); } })();
+const saveSameYearCfm = () => { try { localStorage.setItem(SAME_YEAR_CFM_KEY, JSON.stringify([...SAME_YEAR_CFM])); } catch(e) {} };
+let _healthRef = null;   // { md, body, rerender } — mantém o modal de saúde aberto ao navegar entre sub-modais
+
 // detecta sufixos de edição/versão no final do nome do álbum e sugere o nome limpo
 const EDITION_RE1 = /\s+[-–—]\s*[(\[]?(?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|(?:\d+(?:st|nd|rd|th)\s+)?anniversary|special|limited|collector'?s|platinum)(?:\s+(?:(?:super\s+)?(?:deluxe|expanded|special|limited)(?:\s+(?:edition|version|remaster))?|edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]?\s*$/i;
 const EDITION_RE2 = /\s+[(\[](?:(?:super\s+)?(?:deluxe|remaster(?:ed)?|expanded|(?:\d+(?:st|nd|rd|th)\s+)?anniversary|special|limited|collector'?s|platinum)(?:\s+(?:(?:super\s+)?(?:deluxe|expanded|special|limited)(?:\s+(?:edition|version|remaster))?|edition|version|remaster))?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|bonus\s+tracks?(?:\s+version)?)[)\]]\s*$/i;
 
 // detecta sufixos de versão no final do TÍTULO da faixa (remix, remaster, live, acústico, etc.)
-const TRACK_SUFFIX_RE = /\s*[(\[](?:(?:super\s+)?(?:deluxe|expanded|(?:\d+(?:st|nd|rd|th)\s+)?anniversary|special|limited|platinum|collector'?s|bonus\s+tracks?)(?:\s+(?:edition|version))?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|(?:club|radio|extended|dub|progressive|original|acoustic|chill)\s+mix|live(?:\s+(?:at|from|version|recording|session)[\w\s,.'()\[\]-]{0,50})?|acoustic(?:\s+(?:version|mix|session))?|instrumental(?:\s+version)?|(?:early\s+)?demo(?:\s+version)?|(?:radio|single|mono|extended|alternate(?:ive)?|original|album|video|hyper)\s+(?:edit|version|mix))[)\]]\s*$|\s+[-–—]\s*(?:(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|live(?:\s+(?:version|recording))?|acoustic(?:\s+version)?|instrumental(?:\s+version)?|from\s+[""“”].+)\s*$/i;
+const TRACK_SUFFIX_RE = /\s*[(\[](?:(?:super\s+)?(?:deluxe|expanded|(?:\d+(?:st|nd|rd|th)\s+)?anniversary|special|limited|platinum|collector'?s|bonus\s+tracks?)(?:\s+(?:edition|version))?(?:\s+\d{4})?|(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|(?:club|radio|extended|dub|progressive|original|acoustic|chill)\s+mix|live(?:\s+(?:at|from|version|recording|session)[\w\s,.'()\[\]-]{0,50})?|acoustic(?:\s+(?:version|mix|session))?|instrumental(?:\s+version)?|(?:early\s+)?demo(?:\s+version)?|(?:radio|single|mono|extended|alternate(?:ive)?|original|album|video|hyper)\s+(?:edit|version|mix))[)\]]\s*$|\s+[-–—]\s*(?:(?:\d{4}\s+)?remaster(?:ed)?(?:\s+\d{4})?|(?:[\w-]+\s+){0,3}remix|live(?:\s+(?:version|recording))?|acoustic(?:\s+version)?|instrumental(?:\s+version)?|from\s+[""""].+)\s*$/i;
 function suggestCleanName(name){
   if (!name || name === NI) return null;
   const c = name.replace(EDITION_RE1, '').replace(EDITION_RE2, '').trim();
@@ -141,12 +146,13 @@ function healthChecks(list = BY_PLAYLIST){
   const oddDur = [...zeroDur, ...longDurPending]; // o que pesa na nota
   const oddDurWarn = longDurWarn; // só aviso
   const sugs = list.filter(t => t.m && t.m.ty && t.m.ty !== "album" && ASING[singleKey(t)] && ASING[singleKey(t)].album && !ASING_IGN.has(singleKey(t)));   // sugestão da Apple: não pesa na nota
-  const sameDay = sameDayAlbums(list), review = list.filter(t => t.dfix);   // dfix: data corrigida pelo site, à espera de conferência manual
+  const review = list.filter(t => t.dfix);   // dfix: data corrigida pelo site, à espera de conferência manual
   const missingDate = missingDateAlbums(list);
   const spell = artistSpellings(list), ai = ALBUM_INFO, autoG = ai.groups.filter(g => !g.confirmed);
   const nmIssues = albumNameIssues(list);
   const tnIssues = trackTitleIssues(list);
   const gdIssues = genreDivergence(list);
+  const syGroups = sameYearAlbums(list);
   const mk = (k, count, frac, level, extra) => ({k, count, frac, level: count ? level : "ok", w: HEALTH_W[k], ...extra});
   const items = [
     // w:25 — crítico
@@ -161,10 +167,9 @@ function healthChecks(list = BY_PLAYLIST){
     mk("cv", sim.covers.length, uniq(sim.covers.flatMap(x => x.rs)).length / N, "warn", {tracks: uniq(sim.covers.flatMap(x => x.rs))}),
     mk("ad", ai.doubts.length, Math.min(1, ai.doubts.reduce((n, e) => n + e.ca + e.cb, 0) / N), "warn", {}),
     mk("au", autoG.length, Math.min(1, autoG.reduce((n, g) => n + g.variants.reduce((m, v) => m + v.count, 0), 0) / N), "warn", {}),
-    mk("dc", sameDay.filter(x => !x.reviewed).length, sameDay.filter(x => !x.reviewed && (x.apple || ADATES[x.k] !== undefined)).reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: sameDay.filter(x => !x.reviewed)}),
-    mk("dcr", sameDay.filter(x => x.reviewed).length, 0, "help", {albums: sameDay.filter(x => x.reviewed)}),
     mk("dr", review.length, review.length / N, "warn", {tracks: review}),
     mk("dm", missingDate.length, missingDate.reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: missingDate}),
+    mk("sy", syGroups.filter(x => !x.confirmed).length, Math.min(1, syGroups.filter(x => !x.confirmed).reduce((n, x) => n + x.tracks.length, 0) / N), "warn", {groups: syGroups}),
     // w:5 — help
     mk("b", noLink.length, noLink.length / N, "help", {tracks: noLink}),
     mk("h", spell.length, Math.min(1, spell.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {groups: spell}),
@@ -196,14 +201,13 @@ const META = {
   g: {t: "Duração suspeita", ok: "Nenhuma duração estranha.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração de 0 s ou acima de 20 minutos.`, act: "dur"},
   gw: {t: "Duração longa confirmada", ok: "Nenhuma faixa com duração longa confirmada pendente.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração longa confirmada — pode editar ou confirmar novamente.`, act: "dur"},
   sg: {t: "Singles com álbum na Apple", ok: "Nenhuma sugestão de álbum para singles.", d: n => `${plural(n, "faixa marcada como single ou EP existe", "faixas marcadas como single ou EP existem")} num álbum, segundo a Apple.`, act: "singles"},
-  dc: {t: "Álbuns próximos do mesmo artista", ok: "Nenhum álbum com datas próximas.", d: n => `${plural(n, "álbum do mesmo artista tem", "álbuns do mesmo artista têm")} datas próximas — confirme se estão certas.`, act: "near"},
-  dcr: {t: "Álbuns próximos confirmados", ok: "Nenhum álbum próximo confirmado.", d: n => `${plural(n, "álbum próximo foi", "álbuns próximos foram")} confirmados por você.`, act: "nearcfm"},
   dr: {t: "Datas para conferir à mão", ok: "Nenhuma data pendente de conferência.", d: n => `${plural(n, "faixa tem", "faixas têm")} data montada automaticamente — confirme se está correta.`, act: "list"},
   dm: {t: "Datas sem dia e mês", ok: "Nenhuma data indefinida.", d: n => `${plural(n, "álbum está", "álbuns estão")} apenas com o ano — adicione a data completa manualmente.`, act: "datefix"},
   nm: {t: "Nomes com sufixo de edição", ok: "Nenhum nome de álbum com sufixo de edição.", d: n => `${plural(n, "álbum tem", "álbuns têm")} sufixo de edição no nome (Remastered, Deluxe…).`, act: "nm"},
   tn: {t: "Títulos com sufixo de versão", ok: "Nenhum título de faixa com sufixo de versão.", d: n => `${plural(n, "faixa tem", "faixas têm")} sufixo de versão no título (Remix, Live…).`, act: "tn"},
   gd: {t: "Gênero divergente entre fontes", ok: "Nenhum gênero divergente detectado.", d: n => `${plural(n, "artista tem", "artistas têm")} gênero divergente entre Spotify, Apple e MusicBrainz.`, act: "gd"},
-  h: {t: "Grafias parecidas do mesmo artista", ok: "Nenhum artista escrito de duas formas.", d: n => `${plural(n, "artista aparece", "artistas aparecem")} escrito de mais de um jeito.`, act: "spell"}
+  h: {t: "Grafias parecidas do mesmo artista", ok: "Nenhum artista escrito de duas formas.", d: n => `${plural(n, "artista aparece", "artistas aparecem")} escrito de mais de um jeito.`, act: "spell"},
+  sy: {t: "Álbuns do mesmo artista no mesmo ano", ok: "Nenhum artista com dois álbuns no mesmo ano.", d: n => `${plural(n, "artista tem", "artistas têm")} dois ou mais álbuns lançados no mesmo ano — confirme se as datas estão certas.`, act: "sameyear"}
 };
 const LEVEL = {ok: "ok", warn: "atenção", help: "ajuda"};
 
@@ -277,7 +281,7 @@ function openSingles(tracks){
   };
 
   renderRows(); updateFoot();
-  const md = openModal({title: "Faixas que são de álbum", sub: "Sugestão da Apple", body, foot, size: "md"});
+  const md = openModal({title: "Faixas que são de álbum", sub: "Sugestão da Apple", body, foot, size: "md", onClose: () => openHealth()});
 
   body.addEventListener("click", e => {
     const skip = e.target.closest("[data-skip]"), ok = e.target.closest("[data-ok]");
@@ -298,6 +302,29 @@ function openSingles(tracks){
   });
 }
 
+/* ---------- álbuns do mesmo artista lançados no mesmo ano (qualquer precisão de data) ---------- */
+function sameYearAlbums(list){
+  const by = new Map();
+  for (const t of list){
+    if (t.artist === NI || t.albumRaw === NI || !t.date) continue;
+    const year = String(t.date).slice(0, 4);
+    if (!/^\d{4}$/.test(year)) continue;
+    const main = (splitArtistsRaw(t.artist)[0] || "").toLowerCase();
+    const k = normC(main) + "|" + year;
+    if (!by.has(k)) by.set(k, {k, art: splitArtistsRaw(t.artist)[0] || t.artist, year, albums: new Map(), tracks: []});
+    const x = by.get(k);
+    if (!x.albums.has(t.album)) x.albums.set(t.album, []);
+    x.albums.get(t.album).push(t);
+    x.tracks.push(t);
+  }
+  const out = [];
+  for (const x of by.values()){
+    if (x.albums.size < 2) continue;
+    out.push({k: x.k, art: x.art, year: x.year, albums: [...x.albums.entries()].map(([name, tracks]) => ({name, tracks, album: tracks[0].albumRaw, date: tracks[0].date, k: adateKey(tracks[0].artist, tracks[0].albumRaw)})), tracks: x.tracks, confirmed: SAME_YEAR_CFM.has(x.k)});
+  }
+  return out;
+}
+
 /* ---------- álbuns do mesmo artista lançados no mesmo ano ou com menos de 2 meses de distância ---------- */
 const isFull = d => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
 // álbuns sem data completa após tentar todas as fontes automáticas: o site tentou e não achou → precisa de correção manual
@@ -313,91 +340,6 @@ function missingDateAlbums(list){
   }
   return [...by.values()];
 }
-// álbuns do mesmo artista que saíram no mesmo ano ou a menos de 2 meses um do outro (com a data vinda da Apple ou do próprio Spotify)
-const DAY = 864e5, near = (a, b) => a.slice(0, 4) === b.slice(0, 4) || Math.abs(Date.parse(a) - Date.parse(b)) < 61 * DAY;
-function sameDayAlbums(list){
-  const by = new Map();   // artista principal → álbum → {date, apple, tracks}
-  for (const t of list){
-    if (t.artist === NI || t.albumRaw === NI || !isFull(t.date)) continue;
-    const art = (splitArtistsRaw(t.artist)[0] || "").toLowerCase(), k = adateKey(t.artist, t.albumRaw);
-    if (!by.has(art)) by.set(art, new Map());
-    const al = by.get(art); if (!al.has(k)) al.set(k, {k, art, album: t.albumRaw, canon: t.album, date: t.date, apple: false, tracks: []});
-    const x = al.get(k); x.tracks.push(t);
-    if (/^\d{4}-01-01$/.test(t.dateRaw || "") && t.date !== t.dateRaw && !(DFIX[k] && DFIX[k].d === t.date)) x.apple = true;
-  }
-  const out = [];
-  for (const al of by.values()){
-    const arr = [...al.values()];
-    for (const x of arr) if (!(!x.apple && ADATES[x.k] === x.date)){   // Apple confirmou a mesma data: some sozinho
-      // edições do mesmo álbum (o site juntou ou você confirmou) e pares ainda em dúvida na revisão de álbuns não contam: lá é que se decide
-      const sameAlbum = y => y.canon === x.canon || ALBUM_INFO.doubts.some(e => (e.a === x.album && e.b === y.album) || (e.a === y.album && e.b === x.album));
-      const others = arr.filter(y => y !== x && !sameAlbum(y) && near(x.date, y.date));
-      if (others.length) out.push({...x, reviewed: DREV.has(x.k), other: others.map(y => y.album)});
-    }
-  }
-  return out;
-}
-
-/* reavalia cada álbum suspeito: 1) Spotify de novo (1 busca por álbum); 2) data real → corrige; 3) mesmo ano da Apple → deixa;
-   4) ano diferente (sem dia/mês) → pede a Apple de novo: se vier certa (ano bate e muda), corrige; se voltar a mesma de antes,
-   não aceita: ano do Spotify + dia e mês da Apple, e fica para conferir à mão (pesa na nota até a pessoa editar) */
-function openReeval(albums){
-  const body = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
-  body.innerHTML = `<div class="confirm"><p><strong>${plural(albums.length, "álbum saiu", "álbuns saíram")} no mesmo ano ou a menos de 2 meses de outro do mesmo artista</strong>. Isso é suspeito: pode ser data de relançamento ou data completada errada.</p>
-    <div class="du-rows"><div><b>${nf(albums.length)}</b><span>${albums.length === 1 ? "busca" : "buscas"} no <strong>Spotify</strong> (1 por álbum) para pedir a data de novo</span></div><div><b>até ${nf(albums.length)}</b><span>${albums.length === 1 ? "busca" : "buscas"} na <strong>Apple</strong>, só se o ano mudar (não gasta o Spotify)</span></div></div>
-    <p>Se o Spotify trouxer a data completa (outra, no caso de data que já era completa), ela corrige. Se vier o mesmo ano da Apple, fica como está. Se o ano mudar e a Apple não confirmar, o ano do Spotify fica com o dia e o mês da Apple e a data vai para <strong>conferir à mão</strong> (pesa na nota até você editar).</p>
-    <p class="muted">Nada é gravado nos seus dados: as correções valem só na visualização.</p></div>`;
-  foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-go autofocus>Reavaliar</button>`;
-  const md = openModal({title: "Reavaliar datas", body, foot, size: "sm"});
-  foot.querySelector("[data-c]").onclick = md.close;
-  foot.querySelector("[data-go]").onclick = () => {
-    const c = loadSpotifyCreds();
-    if (SPOTIFY_ID_RE.test(c.id || "") && SPOTIFY_ID_RE.test(c.secret || "")) run(c.id, c.secret);
-    else openSpotifyAppHelp({returning: hasSpotifyApp(), onDone: (id, secret) => run(id, secret)});
-  };
-  async function run(id, secret){
-    let stop = false, done = 0; const res = {real: [], apple: [], keep: [], manual: [], fail: 0};
-    body.innerHTML = `<div class="confirm"><p id="rv-st">Conectando ao Spotify…</p><div class="ht" style="margin-top:12px"><i id="rv-bar" style="width:0%"></i></div><p class="muted" style="margin-top:12px">Pode parar quando quiser: o que já foi avaliado fica.</p></div>`;
-    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-stop>Parar e ver o resultado</button>`;
-    foot.querySelector("[data-stop]").onclick = () => { stop = true; };
-    try {
-      const token = await spotifyToken(id, secret);
-      for (const al of albums){
-        if (stop) break;
-        const st = body.querySelector("#rv-st"); if (!st) return;
-        st.textContent = `Avaliando ${done + 1} de ${albums.length}: ${al.album}`;
-        const tid = (al.tracks.find(t => t.m && t.m.id) || {m: {}}).m.id, old = al.tracks[0].date;
-        let sp = null;
-        if (tid){
-          const it = await spotifyGetJSON(`https://api.spotify.com/v1/tracks/${tid}`, token);
-          if (it && it.album && it.album.release_date) sp = {d: String(it.album.release_date), prec: it.album.release_date_precision || (isFull(it.album.release_date) ? "day" : "year")};
-        }
-        if (!al.apple){   // data completa do próprio Spotify (sem a Apple): só muda se o Spotify trouxer outra data real
-          if (sp && sp.prec === "day" && isFull(sp.d) && sp.d !== old){ DFIX[al.k] = {d: sp.d, review: false, force: true}; res.real.push(al.album); }
-          else res.keep.push(al.album);
-        }
-        else if (sp && sp.prec === "day" && isFull(sp.d)){ DFIX[al.k] = {d: sp.d, review: false}; res.real.push(al.album); }          // data real do Spotify: corrige
-        else {
-          const sy = sp ? sp.d.slice(0, 4) : al.tracks[0].dateRaw.slice(0, 4), ay = old.slice(0, 4);
-          if (sy === ay) res.keep.push(al.album);                                                                                  // mesmo ano: deixa como está
-          else {
-            await new Promise(r => setTimeout(r, 3200));
-            let a1 = ""; try { const r = pickAlbum(await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(al.art + " " + al.album)}`), al.art, al.album, 3); a1 = r && r.releaseDate ? String(r.releaseDate).slice(0, 10) : ""; } catch (e) { res.fail++; }
-            if (a1 && a1.slice(0, 4) === sy && a1 !== old){ DFIX[al.k] = {d: a1, review: false}; res.apple.push(al.album); }    // a Apple confirmou outra data no ano certo
-            else { DFIX[al.k] = {d: sy + old.slice(4), review: true}; res.manual.push(al.album); }                                // voltou o mesmo: ano do Spotify + dia/mês da Apple e conferir à mão
-          }
-        }
-        DREV.add(al.k); saveDFix(); done++;
-        body.querySelector("#rv-bar").style.width = (100 * done / albums.length) + "%";
-      }
-    } catch (e){ res.fail++; }
-    const li = (n, l) => n.length ? `<li><strong>${n.length}</strong> ${l}: ${esc(n.slice(0, 4).join(", "))}${n.length > 4 ? ` e mais ${n.length - 4}` : ""}</li>` : "";
-    body.innerHTML = `<div class="confirm"><p>Avaliados <strong>${nf(done)} de ${nf(albums.length)}</strong>.</p><ul>${li(res.real, "com a data real do Spotify")}${li(res.apple, "corrigidos pela Apple")}${li(res.keep, "mantidos como estão (mesmo ano)")}${li(res.manual, "para conferir à mão (a Apple não confirmou)")}</ul>${res.fail ? `<p class="muted">Houve falhas de conexão (${res.fail}). Dá para reavaliar de novo mais tarde.</p>` : ""}</div>`;
-    foot.innerHTML = `<span class="sp"></span><button class="pbtn" type="button" data-ok>Fechar</button>`;
-    foot.querySelector("[data-ok]").onclick = () => { md.close(); if (res.real.length || res.apple.length || res.manual.length){ setFlash("Datas reavaliadas."); ssSet("health", "1"); location.reload(); } };
-  }
-}
-
 // busca a data original do álbum (não do remaster): MusicBrainz first-release-date → iTunes discografia (mais antiga) → Deezer
 async function findOriginalDate(artist, album){
   const main = splitArtistsRaw(artist)[0];
@@ -417,49 +359,6 @@ async function findOriginalDate(artist, album){
   } catch(e) {}
   try { const m = await deezerAlbumDate(main, albClean); if (isFull(m)) return m; } catch(e) {}
   return null;
-}
-// responder à suspeita: "Está certo" / "Buscar originais para todos" / "Editar data"
-// busca todos os álbuns de uma vez e aplica em lote; modal só fecha depois de resolver tudo
-function openNear(albums){
-  const body = document.createElement("div");
-  const row = (al, i) => `<div class="alb-row" data-i="${i}"><div class="alb-main"><div><strong>${esc(al.album)}</strong> <span class="alb-art">${esc(splitArtistsRaw(al.tracks[0].artist)[0])} · <span id="alb-date-${i}">${esc(al.date)}</span>${al.apple ? " (data da Apple)" : ""}</span></div><div class="alb-why">perto de: ${esc(al.other.join(", "))}</div><div class="alb-why" id="af-${i}" hidden></div></div><div class="alb-btns"><button class="gbtn" type="button" data-ok="${i}">Está certo</button><button class="gbtn" type="button" data-edit="${i}">Editar data</button></div></div>`;
-  body.innerHTML = `<p class="mdesc">Álbuns do mesmo artista no mesmo ano ou a menos de 2 meses um do outro. <strong>Está certo</strong> mantém as datas; <strong>Buscar originais para todos</strong> consulta todas as fontes e aplica em bloco (recomendado quando a data atual é de um remaster); <strong>Editar data</strong> troca manualmente. Enquanto não responder, pesa na nota.</p><div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="gbtn" type="button" id="btn-search-all">Buscar originais para todos</button><button class="pbtn" type="button" id="btn-apply-all" hidden></button></div>${albums.map(row).join("")}`;
-  let changed = false;
-  const md = openModal({title: "Álbuns próximos do mesmo artista", body, size: "lg", onClose: () => { if (changed) openHealth(); }});
-  const btnSearch = body.querySelector("#btn-search-all");
-  const btnApply = body.querySelector("#btn-apply-all");
-  const found = new Map(); // i → data encontrada
-  btnSearch.addEventListener("click", async () => {
-    btnSearch.disabled = true; btnSearch.textContent = "Buscando…";
-    for (let i = 0; i < albums.length; i++){
-      const al = albums[i];
-      const row = body.querySelector(`#af-${i}`); row.hidden = false; row.innerHTML = `<em>consultando MusicBrainz, iTunes, Deezer e TheAudioDB…</em>`;
-      try {
-        const d = await findOriginalDate(al.tracks[0].artist, al.album);
-        if (d && d !== al.date){ found.set(i, d); row.innerHTML = `<span style="color:var(--ok,#3c3)">Original encontrado: <strong>${esc(d)}</strong></span>`; }
-        else if (d){ row.innerHTML = `Data já está correta: <strong>${esc(d)}</strong>`; }
-        else { row.innerHTML = `Não encontrado — use "Editar data" para corrigir manualmente.`; }
-      } catch(e2){ row.innerHTML = `Erro na busca — tente "Editar data".`; }
-    }
-    btnSearch.hidden = true;
-    if (found.size){
-      btnApply.hidden = false;
-      btnApply.textContent = `Aplicar ${found.size} data${found.size > 1 ? "s" : ""} encontrada${found.size > 1 ? "s" : ""}`;
-    }
-  });
-  btnApply.addEventListener("click", () => {
-    const dateByTrack = new Map();
-    for (const [i, d] of found) for (const t of albums[i].tracks) dateByTrack.set(t.n, d);
-    for (const [i] of found) DREV.add(albums[i].k);
-    saveDFix(); ssSet("health", "1");
-    commitRows(currentRows().map(r => dateByTrack.has(r[0]) ? [r[0], r[1], r[2], r[3], r[4], dateByTrack.get(r[0]), ...(r[6] ? [r[6]] : [])] : r), `Datas originais corrigidas em ${found.size} álbum${found.size > 1 ? "ns" : ""}`);
-    changed = true; md.close();
-  });
-  body.addEventListener("click", e => {
-    const ok = e.target.closest("[data-ok]"), ed = e.target.closest("[data-edit]");
-    if (ok){ const al = albums[+ok.dataset.ok]; DREV.add(al.k); saveDFix(); changed = true; ok.closest(".alb-row").remove(); if (!body.querySelector(".alb-row")) md.close(); }
-    else if (ed) editAlbumDate(albums[+ed.dataset.edit]);
-  });
 }
 function editAlbumDate(al){
   const body = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
@@ -481,7 +380,7 @@ function openDateFix(albums){
   const body = document.createElement("div");
   const row = (al, i) => `<div class="alb-row" data-i="${i}"><div class="alb-main"><div><strong>${esc(al.album)}</strong> <span class="alb-art">${esc(splitArtistsRaw(al.tracks[0].artist)[0])} · ${al.date ? esc(al.date.slice(0, 4)) : "sem data"}</span></div><div class="alb-why">O site tentou Apple Music, MusicBrainz, Deezer e TheAudioDB — nenhum retornou a data completa.</div></div><div class="alb-btns"><button class="gbtn" type="button" data-edit="${i}">Editar data</button></div></div>`;
   body.innerHTML = `<p class="mdesc">Estes álbuns só têm o ano. O site já buscou automaticamente em todas as fontes e não achou o dia e mês. Informe a data manualmente para resolver: pesa ${HEALTH_W.dm} pontos na nota enquanto estiver pendente.</p>${albums.map(row).join("")}`;
-  const md = openModal({title: "Datas sem dia e mês", body, size: "lg"});
+  const md = openModal({title: "Datas sem dia e mês", body, size: "lg", onClose: () => openHealth()});
   body.addEventListener("click", e => {
     const ed = e.target.closest("[data-edit]");
     if (ed) editAlbumDate(albums[+ed.dataset.edit]);
@@ -756,6 +655,7 @@ function openResetAdjustments(parentMd){
     "catalogo-musical:dups-confirmed",
     "catalogo-musical:dups-joined",
     "catalogo-musical:apple-dates",
+    "catalogo-musical:same-year-cfm",
   ];
   const body = document.createElement("div");
   body.innerHTML = `
@@ -1022,15 +922,119 @@ function openRescanProgress(priorityKeys, total){
 
   openModal_();
 }
+function openSameYearDetail(x){
+  // todos os álbuns desse artista na playlist, agrupados por nome de álbum
+  const main = normC((splitArtistsRaw(x.tracks[0].artist)[0] || "").toLowerCase());
+  const byAlbum = new Map();
+  for (const t of BY_PLAYLIST){
+    if (t.artist === NI || t.albumRaw === NI || !t.date) continue;
+    if (normC((splitArtistsRaw(t.artist)[0] || "").toLowerCase()) !== main) continue;
+    if (!byAlbum.has(t.albumRaw)) byAlbum.set(t.albumRaw, {name: t.albumRaw, year: String(t.date).slice(0, 4), tracks: []});
+    byAlbum.get(t.albumRaw).tracks.push(t);
+  }
+  const conflictAlbums = new Set(x.albums.map(a => a.name));
+  const rows = [...byAlbum.values()].sort((a, b) => a.year.localeCompare(b.year));
+  const body = document.createElement("div");
+  body.innerHTML = `<div class="confirm"><div class="du-rows">${rows.map(a => {
+    const conflict = conflictAlbums.has(a.name);
+    return `<div class="alb-row"${conflict ? ' style="background:color-mix(in srgb,var(--warn,#f59e0b) 10%,transparent);border-left:3px solid var(--warn,#f59e0b);padding-left:9px"' : ''}>
+      <div class="alb-main">
+        <strong>${esc(a.name)}</strong>${conflict ? ' <span style="font-size:11px;font-weight:700;color:var(--warn,#f59e0b);letter-spacing:.04em">MESMO ANO</span>' : ''}
+        <span class="muted" style="font-size:12px"> · ${a.year} · ${faixas(a.tracks.length)}</span>
+      </div>
+    </div>`;
+  }).join("")}</div></div>`;
+  openModal({title: `Discografia de ${esc(x.art)} na playlist`, sub: `Destacado: álbuns de ${x.year}`, body, size: "md"});
+}
+
+function openSameYear(groups){
+  let list = groups.filter(x => !x.confirmed);
+  if (!list.length) return;
+  const body = document.createElement("div");
+  const found = new Map(); // "gi-ai" → {gi, ai, d, tracks}
+
+  const render = () => {
+    body.innerHTML = `<p class="mdesc">O site já tentou corrigir estes conflitos automaticamente em background — o que aparece aqui não foi resolvido. Use <strong>Buscar</strong> para tentar de novo, <strong>Editar</strong> para corrigir manualmente ou <strong>Confirmar mesmo ano</strong> se as datas estiverem certas. Enquanto não responder, pesa ${HEALTH_W.sy} pontos na nota.</p>
+      ${list.map((x, gi) => `<div class="alb-row" data-gi="${gi}">
+        <div class="alb-main">
+          <div><strong>${esc(x.art)}</strong> <span class="muted">· ${x.year}</span></div>
+          <div style="margin-top:6px">${x.albums.map((a, ai) => `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px">
+            <span class="alb-art">${esc(a.name)} · <span id="sy-date-${gi}-${ai}">${esc(a.date)}</span></span>
+            <div id="sy-af-${gi}-${ai}" hidden style="font-size:12px"></div>
+            <button class="gbtn" type="button" data-search="${gi}-${ai}" style="font-size:12px;padding:2px 8px">Buscar</button>
+            <button class="gbtn" type="button" data-edit="${gi}-${ai}" style="font-size:12px;padding:2px 8px">Editar</button>
+          </div>`).join("")}</div>
+        </div>
+        <div class="alb-btns">
+          <button class="gbtn" type="button" data-view="${gi}">Verificar</button>
+          <button class="gbtn" type="button" data-cfm="${gi}">Confirmar mesmo ano</button>
+        </div>
+      </div>`).join("")}`;
+  };
+
+  render();
+  let changed = false;
+  const md = openModal({title: "Álbuns do mesmo artista no mesmo ano", body, size: "lg", onClose: () => openHealth()});
+
+  async function searchOne(gi, ai){
+    const x = list[gi], a = x && x.albums[ai]; if (!a) return;
+    const lbl = body.querySelector(`#sy-af-${gi}-${ai}`); if (!lbl) return;
+    lbl.hidden = false; lbl.innerHTML = `<em>consultando…</em>`;
+    try {
+      const d = await findOriginalDate(x.art, a.album);
+      if (d && isFull(d) && d !== a.date){
+        found.set(`${gi}-${ai}`, {gi, ai, d, tracks: a.tracks});
+        lbl.innerHTML = `<span style="color:var(--ok,#3c3)">Original: <strong>${esc(d)}</strong> — aplicando…</span>`;
+        const dateByTrack = new Map(); for (const t of a.tracks) dateByTrack.set(t.n, d);
+        ssSet("health", "1");
+        commitRows(currentRows().map(r => dateByTrack.has(r[0]) ? [r[0], r[1], r[2], r[3], r[4], dateByTrack.get(r[0]), ...(r[6] ? [r[6]] : [])] : r),
+          `Data de "${a.album}" corrigida: ${a.date.slice(0,4)} → ${d.slice(0,4)}`);
+      } else if (d && isFull(d)){
+        lbl.innerHTML = `<span style="color:var(--ok,#3c3)">Data já está correta: <strong>${esc(d)}</strong></span>`;
+      } else if (d){
+        lbl.innerHTML = `Encontrou ${esc(d)}, sem dia/mês — use Editar.`;
+      } else {
+        lbl.innerHTML = `Não encontrado — use Editar.`;
+      }
+    } catch(e){ lbl.innerHTML = `Erro na busca — use Editar.`; }
+  }
+
+  body.addEventListener("click", async e => {
+    const search = e.target.closest("[data-search]"), ed = e.target.closest("[data-edit]"),
+          cfm = e.target.closest("[data-cfm]"), view = e.target.closest("[data-view]");
+    if (search){
+      const [gi, ai] = search.dataset.search.split("-").map(Number);
+      search.disabled = true; search.textContent = "…";
+      await searchOne(gi, ai);
+      search.disabled = false; search.textContent = "Buscar";
+    } else if (ed){
+      const [gi, ai] = ed.dataset.edit.split("-").map(Number);
+      const a = list[gi]?.albums[ai]; if (a) editAlbumDate(a);
+    } else if (view){
+      const x = list[+view.dataset.view]; if (x) openSameYearDetail(x);
+    } else if (cfm){
+      const idx = +cfm.dataset.cfm, x = list[idx]; if (!x) return;
+      SAME_YEAR_CFM.add(x.k); saveSameYearCfm();
+      changed = true;
+      list = list.filter((_, i) => i !== idx);
+      if (!list.length){ md.close(); return; }
+      render();
+    }
+  });
+}
+
 function openHealth(){
-  const H = healthChecks(), bad = H.items.filter(i => i.count && i.w);
+  if (_healthRef){ _healthRef.rerender(); return; }
+
   const body = document.createElement("div"); body.className = "sd";
+  let H = healthChecks();
+
   // lista das faixas afetadas, com "Editar" em cada linha
   const list = (title, tracks, sub) => {
-    const body = document.createElement("div");
-    body.innerHTML = `<div class="ptab"><table><thead><tr><th>#</th><th>Música</th><th>Artista</th><th>Álbum</th><th>Lançamento</th><th class="num">Duração</th><th></th></tr></thead><tbody>${tracks.map(t => `<tr><td>${t.n}</td><td>${esc(t.title)}</td><td>${t.artist === NI ? "—" : esc(t.artist)}</td><td>${t.albumRaw === NI ? "—" : esc(t.albumRaw)}</td><td>${t.dateRaw ? esc(t.dateRaw) : "—"}${t.date && t.date !== t.dateRaw ? ` <span class="muted">→ Apple: ${esc(t.date)}</span>` : ""}</td><td class="num">${t.sec ? durTxt(t.sec) : "—"}</td><td><button class="gbtn" type="button" data-edit="${t.n}">Editar</button></td></tr>`).join("")}</tbody></table></div>`;
-    body.addEventListener("click", e => { const b = e.target.closest("[data-edit]"); if (b) editTrack(BY_PLAYLIST.find(t => t.n === +b.dataset.edit)); });
-    openModal({title, sub, size: "lg", body});
+    const lb = document.createElement("div");
+    lb.innerHTML = `<div class="ptab"><table><thead><tr><th>#</th><th>Música</th><th>Artista</th><th>Álbum</th><th>Lançamento</th><th class="num">Duração</th><th></th></tr></thead><tbody>${tracks.map(t => `<tr><td>${t.n}</td><td>${esc(t.title)}</td><td>${t.artist === NI ? "—" : esc(t.artist)}</td><td>${t.albumRaw === NI ? "—" : esc(t.albumRaw)}</td><td>${t.dateRaw ? esc(t.dateRaw) : "—"}${t.date && t.date !== t.dateRaw ? ` <span class="muted">→ Apple: ${esc(t.date)}</span>` : ""}</td><td class="num">${t.sec ? durTxt(t.sec) : "—"}</td><td><button class="gbtn" type="button" data-edit="${t.n}">Editar</button></td></tr>`).join("")}</tbody></table></div>`;
+    lb.addEventListener("click", e => { const b = e.target.closest("[data-edit]"); if (b) editTrack(BY_PLAYLIST.find(t => t.n === +b.dataset.edit)); });
+    openModal({title, sub, size: "lg", body: lb});
   };
   const wasAddressed = it => {
     const k = it.k;
@@ -1039,7 +1043,7 @@ function openHealth(){
     if (k === "h") return Object.keys(ALIAS||{}).length > 0;
     if (k === "f" || k === "cv") return typeof VERS !== "undefined" && Object.keys(VERS).length > 0;
     if (k === "g") return Object.keys(DUR_CHECK||{}).length > 0;
-    if (k === "dc") return (H.items.find(i => i.k === "dcr")||{count:0}).count > 0;
+    if (k === "sy") return SAME_YEAR_CFM.size > 0;
     if (k === "ad" || k === "au") return Object.entries(ALBMERGE||{}).length > 0;
     return false;
   };
@@ -1055,8 +1059,6 @@ function openHealth(){
       : m.act === "adoubt" ? `<button class="gbtn" type="button" data-act="dups" data-o="adoubt">Revisar (${nf(it.count)})</button>`
       : m.act === "nm" ? `<button class="gbtn" type="button" data-act="nm">Revisar (${nf(it.count)})</button>`
       : m.act === "tn" ? `<button class="gbtn" type="button" data-act="tn">Revisar (${nf(it.count)})</button>`
-      : m.act === "near" ? `<button class="gbtn" type="button" data-act="near">Revisar (${nf(it.count)})</button><button class="gbtn" type="button" data-act="reeval">Reavaliar datas</button>`
-      : m.act === "nearcfm" ? `<button class="gbtn" type="button" data-act="nearcfm">Revisar (${nf(it.count)})</button>`
       : m.act === "singles" ? `<button class="gbtn" type="button" data-act="singles">Revisar (${nf(it.count)})</button>`
       : m.act === "aauto" ? `<button class="gbtn" type="button" data-act="dups" data-o="aauto">Revisar (${nf(it.count)})</button>`
       : m.act === "dups" ? `<button class="gbtn" type="button" data-act="dups" data-o="dups">Revisar (${nf(it.count)})</button>`
@@ -1064,70 +1066,76 @@ function openHealth(){
       : m.act === "dur" ? `<button class="gbtn" type="button" data-act="dur" data-k="${it.k}">Revisar (${nf(it.count)})</button>`
       : m.act === "gd" ? `<button class="gbtn" type="button" data-act="gd">Revisar (${nf(it.count)})</button>`
       : m.act === "datefix" ? `<button class="gbtn" type="button" data-act="datefix">Revisar (${nf(it.count)})</button>`
+      : m.act === "sameyear" ? `<button class="gbtn" type="button" data-act="sameyear">Confirmar (${nf(it.count)})</button>`
       : `<button class="gbtn" type="button" data-act="list" data-k="${it.k}">Revisar (${nf(it.count)})</button>`;
     return `<li class="sd-i ${it.level}"><span class="sd-dot" aria-hidden="true">${it.level === "warn" ? "!" : "i"}</span><div class="sd-tx"><b>${m.t}</b><span>${m.d(it.count, it)}</span></div><span class="sd-lv">${LEVEL[it.level]}</span><div class="sd-act">${btn}</div></li>`;
   };
-  const order = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">i</span><div class="sd-tx"><b>Conferir a ordem</b><span>Confirme se #1 é a primeira música adicionada.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="fix">Verificar ordem</button><button class="gbtn" type="button" data-act="rev">Inverter ordem</button></div></li>`;
-  const rescan = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">↺</span><div class="sd-tx"><b>Revisar todos os dados</b><span>Re-busca as datas de todos os álbuns nas fontes disponíveis.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="rescan">Revisar dados</button></div></li>`;
-  const hasAdj = TRACK_TITLE_CLEAN.length > 0 || ALB_CLEAN.length > 0 || Object.keys(ALIAS||{}).length > 0 || (typeof VERS!=="undefined" && Object.keys(VERS).length > 0) || Object.entries(ALBMERGE||{}).length > 0 || Object.keys(DUR_CHECK||{}).length > 0;
-  const head = bad.length
-    ? `<div class="sd-top">${ring(H.score)}<div><h4>${H.score >= 85 ? "Quase tudo certo" : H.score >= 60 ? "Dá pra melhorar" : "Precisa de atenção"}</h4><p>${plural(bad.length, "verificação encontrou", "verificações encontraram")} algo em ${faixas(H.N)}.</p>${hasAdj ? '<div class="sd-hist-row"><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button><button type="button" class="pbtn sd-rst-btn" data-act="reset">Limpar ajustes</button></div>' : ''}</div></div>`
-    : `<div class="sd-top good">${ring(100)}<div><h4>Tudo certo!</h4><p>Nenhum problema encontrado nas ${faixas(H.N)}.</p><div class="sd-hist-row"><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button><button type="button" class="pbtn sd-rst-btn" data-act="reset">Limpar ajustes</button></div></div></div>`;
-  const hero = H.noSpotify ? `<div class="sd-hero"><p><strong>Nenhuma música tem dados do Spotify ainda.</strong> Um único <strong>Atualizar dados</strong> resolve o que falta de dados, links e gêneros de uma vez (você confirma as buscas antes).</p><button class="pbtn" type="button" data-act="upd">Atualizar dados</button></div>` : "";
-  const HIDDEN_K = ["gw", "dcr"];
-  const baseItems = H.noSpotify
-    ? H.items.filter(i => !HIDDEN_K.includes(i.k) && !["a","b","c"].includes(i.k))
-    : H.items.filter(i => !HIDDEN_K.includes(i.k));
-  const CAT_MAP = {a:"Música",b:"Música",e:"Música",f:"Música",cv:"Música",g:"Música",tn:"Música",ad:"Álbum",au:"Álbum",nm:"Álbum",sg:"Álbum",dc:"Data",dr:"Data",dm:"Data",c:"Artista",h:"Artista",gd:"Artista"};
-  const CATS_ORDER = ["Música","Álbum","Data","Artista"];
-  const byCat = (its) => {
-    const g = {};
-    for (const it of [...its].sort((a,b)=>b.w-a.w)){ const c=CAT_MAP[it.k]||"Outros"; (g[c]=g[c]||[]).push(it); }
-    return CATS_ORDER.filter(c=>g[c]).map(c=>`<li class="sd-cat-h">${c}</li>${g[c].map(row).join("")}`).join("");
+
+  const rerender = () => {
+    H = healthChecks();
+    const bad = H.items.filter(i => i.count && i.w);
+    const hasAdj = TRACK_TITLE_CLEAN.length > 0 || ALB_CLEAN.length > 0 || Object.keys(ALIAS||{}).length > 0 || (typeof VERS!=="undefined" && Object.keys(VERS).length > 0) || Object.entries(ALBMERGE||{}).length > 0 || Object.keys(DUR_CHECK||{}).length > 0;
+    const head = bad.length
+      ? `<div class="sd-top">${ring(H.score)}<div><h4>${H.score >= 85 ? "Quase tudo certo" : H.score >= 60 ? "Dá pra melhorar" : "Precisa de atenção"}</h4><p>${plural(bad.length, "verificação encontrou", "verificações encontraram")} algo em ${faixas(H.N)}.</p>${hasAdj ? '<div class="sd-hist-row"><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button><button type="button" class="pbtn sd-rst-btn" data-act="reset">Limpar ajustes</button></div>' : ''}</div></div>`
+      : `<div class="sd-top good">${ring(100)}<div><h4>Tudo certo!</h4><p>Nenhum problema encontrado nas ${faixas(H.N)}.</p><div class="sd-hist-row"><button type="button" class="pbtn sd-hist-btn" data-act="hist">Conferir ajustes feitos</button><button type="button" class="pbtn sd-rst-btn" data-act="reset">Limpar ajustes</button></div></div></div>`;
+    const hero = H.noSpotify ? `<div class="sd-hero"><p><strong>Nenhuma música tem dados do Spotify ainda.</strong> Um único <strong>Atualizar dados</strong> resolve o que falta de dados, links e gêneros de uma vez (você confirma as buscas antes).</p><button class="pbtn" type="button" data-act="upd">Atualizar dados</button></div>` : "";
+    const HIDDEN_K = ["gw"];
+    const baseItems = H.noSpotify
+      ? H.items.filter(i => !HIDDEN_K.includes(i.k) && !["a","b","c"].includes(i.k))
+      : H.items.filter(i => !HIDDEN_K.includes(i.k));
+    const CAT_MAP = {a:"Música",b:"Música",e:"Música",f:"Música",cv:"Música",g:"Música",tn:"Música",ad:"Álbum",au:"Álbum",nm:"Álbum",sg:"Álbum",dr:"Data",dm:"Data",sy:"Data",c:"Artista",h:"Artista",gd:"Artista"};
+    const CATS_ORDER = ["Música","Álbum","Data","Artista"];
+    const byCat = its => {
+      const g = {};
+      for (const it of [...its].sort((a,b)=>b.w-a.w)){ const c=CAT_MAP[it.k]||"Outros"; (g[c]=g[c]||[]).push(it); }
+      return CATS_ORDER.filter(c=>g[c]).map(c=>`<li class="sd-cat-h">${c}</li>${g[c].map(row).join("")}`).join("");
+    };
+    const GRPS = [
+      {label:"Não respondido", sub:"conta na nota",            cls:"warn", f: i => i.count && i.w},
+      {label:"Não respondido", sub:"não obrigatório",          cls:"help", f: i => i.count && !i.w},
+      {label:"Respondido",     sub:null,                       cls:"resp", f: i => !i.count && wasAddressed(i)},
+      {label:"Manutenção",     sub:"verificações periódicas",  cls:"maint", f: null},
+      {label:"Ok",             sub:"nem precisou de resposta", cls:"ok",   f: i => !i.count && !wasAddressed(i)},
+    ];
+    const order = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">i</span><div class="sd-tx"><b>Conferir a ordem</b><span>Confirme se #1 é a primeira música adicionada.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="fix">Verificar ordem</button><button class="gbtn" type="button" data-act="rev">Inverter ordem</button></div></li>`;
+    const rescan = `<li class="sd-i help"><span class="sd-dot" aria-hidden="true">↺</span><div class="sd-tx"><b>Revisar todos os dados</b><span>Re-busca as datas de todos os álbuns nas fontes disponíveis.</span></div><span class="sd-lv">${LEVEL.help}</span><div class="sd-act"><button class="gbtn" type="button" data-act="rescan">Revisar dados</button></div></li>`;
+    const listHtml = GRPS.map(grp => {
+      if (grp.cls === "maint") return `<li class="sd-grp-h sd-grp-maint">Manutenção <span class="sd-grp-sub">verificações periódicas</span></li>${order}${rescan}`;
+      const its = baseItems.filter(grp.f);
+      if (!its.length) return "";
+      return `<li class="sd-grp-h sd-grp-${grp.cls}">${grp.label}${grp.sub?` <span class="sd-grp-sub">${grp.sub}</span>`:""}</li>${byCat(its)}`;
+    }).join("");
+    body.innerHTML = `${head}${hero}<ul class="sd-list">${listHtml}</ul>`;
   };
-  const GRPS = [
-    {label:"Não respondido", sub:"conta na nota",            cls:"warn", f: i => i.count && i.w},
-    {label:"Não respondido", sub:"não obrigatório",          cls:"help", f: i => i.count && !i.w},
-    {label:"Respondido",     sub:null,                       cls:"resp", f: i => !i.count && wasAddressed(i)},
-    {label:"Manutenção",     sub:"verificações periódicas",  cls:"maint", f: null},
-    {label:"Ok",             sub:"nem precisou de resposta", cls:"ok",   f: i => !i.count && !wasAddressed(i)},
-  ];
-  const listHtml = GRPS.map(grp => {
-    if (grp.cls === "maint") return `<li class="sd-grp-h sd-grp-maint">Manutenção <span class="sd-grp-sub">verificações periódicas</span></li>${order}${rescan}`;
-    const its = baseItems.filter(grp.f);
-    if (!its.length) return "";
-    return `<li class="sd-grp-h sd-grp-${grp.cls}">${grp.label}${grp.sub?` <span class="sd-grp-sub">${grp.sub}</span>`:""}</li>${byCat(its)}`;
-  }).join("");
-  body.innerHTML = `${head}${hero}<ul class="sd-list">${listHtml}</ul>`;
-  const md = openModal({title: "Saúde da playlist", sub: `${faixas(H.N)}`, body, size: "md"});
-  const by = k => H.items.find(i => i.k === k);
+
+  rerender();
+  const md = openModal({title: "Saúde da playlist", sub: `${faixas(H.N)}`, body, size: "md", onClose: () => { _healthRef = null; }});
+  _healthRef = {md, body, rerender};
+
   body.addEventListener("click", e => {
     const b = e.target.closest("[data-act]"); if (!b) return;
     const a = b.dataset.act;
+    const by = k => H.items.find(i => i.k === k);
     if (a === "upd"){ md.close(); openDataUpdate(); }
     else if (a === "dups"){ md.close(); const o = b.dataset.o, back = openHealth; openDups(o === "covers" ? {tab: "covers", kind: "songs", back} : o === "adoubt" ? {kind: "albums", atab: "doubt", back} : o === "aauto" ? {kind: "albums", atab: "doubt", back} : {tab: "dups", kind: "songs", back}); }
     else if (a === "fix"){ md.close(); openFixOrder(); }
     else if (a === "rev"){ md.close(); askReverse(); }
-    else if (a === "list"){ const it = by(b.dataset.k); list(META[it.k].t, it.tracks, `${faixas(it.tracks.length)} · “—” é o que está em branco`); }
+    else if (a === "list"){ const it = by(b.dataset.k); list(META[it.k].t, it.tracks, `${faixas(it.tracks.length)} · "—" é o que está em branco`); }
     else if (a === "nm"){ md.close(); openAlbumNameUndo(openHealth); }
     else if (a === "tn"){ md.close(); openTrackTitleUndo(openHealth); }
     else if (a === "tn-undo"){ md.close(); openTrackTitleUndo(openHealth); }
     else if (a === "nm-undo"){ md.close(); openAlbumNameUndo(openHealth); }
-    else if (a === "gd"){ md.close(); openGenreDivergence(by("gd").artists); }
-    else if (a === "near"){ md.close(); openNear(by("dc").albums); }
-    else if (a === "reeval"){ md.close(); openReeval(by("dc").albums); }
-    else if (a === "nearcfm"){ md.close(); openNear(by("dcr").albums); }
-    else if (a === "datefix"){ md.close(); openDateFix(by("dm").albums); }
-    else if (a === "singles"){ md.close(); openSingles(by("sg").tracks); }
-    else if (a === "dur"){ md.close(); const it = by(b.dataset.k); openDurReview(it.tracks); }
+    else if (a === "gd"){ openGenreDivergence(by("gd").artists); }
+    else if (a === "datefix"){ openDateFix(by("dm").albums); }
+    else if (a === "sameyear"){ openSameYear(by("sy").groups); }
+    else if (a === "singles"){ openSingles(by("sg").tracks); }
+    else if (a === "dur"){ const it = by(b.dataset.k); openDurReview(it.tracks); }
     else if (a === "hist"){ openHealthHistory(); }
     else if (a === "reset"){ openResetAdjustments(md); }
     else if (a === "rescan"){
       const H2 = healthChecks();
       const byK = k => H2.items.find(i => i.k === k);
       const priorityKeys = new Set([
-        ...(byK("dc")?.albums || []).map(x => x.k),
-        ...(byK("dcr")?.albums || []).map(x => x.k),
         ...(byK("dm")?.albums || []).map(x => x.k),
         ...(byK("dr")?.tracks || []).map(t => adateKey(t.artist, t.albumRaw)),
       ]);
@@ -1144,7 +1152,7 @@ function openHealth(){
     else if (a === "spell"){
       const groups = by("h").groups || [], keys = Object.keys(ALIAS);
       const sm = openModal({title: META.h.t, size: "md", sub: "Mesma banda escrita de jeitos diferentes",
-        body: `<div class="confirm">${groups.map((g, i) => `<div class="alb-row"><div class="alb-main"><strong>${g.map(v => `“${esc(v.name)}”`).join(" × ")}</strong> <span class="muted">${g.map(v => faixas(v.count)).join(" · ")}</span></div><div class="alb-btns"><button class="gbtn" type="button" data-join="${i}">Juntar</button></div></div>`).join("")}
+        body: `<div class="confirm">${groups.map((g, i) => `<div class="alb-row"><div class="alb-main"><strong>${g.map(v => `"${esc(v.name)}"`).join(" × ")}</strong> <span class="muted">${g.map(v => faixas(v.count)).join(" · ")}</span></div><div class="alb-btns"><button class="gbtn" type="button" data-join="${i}">Juntar</button></div></div>`).join("")}
           ${keys.length ? `<div class="eyebrow" style="margin:16px 0 6px">Nomes já juntados</div>${keys.map(k => `<div class="alb-row"><div class="alb-main"><strong>${esc(k)}</strong> <span class="alb-x">→</span> <strong>${esc(ALIAS[k])}</strong></div><div class="alb-btns"><button class="gbtn" type="button" data-undo="${esc(k)}">Desfazer</button></div></div>`).join("")}` : ""}</div>`});
       sm.m.addEventListener("click", async e => {
         const j = e.target.closest("[data-join]"), u = e.target.closest("[data-undo]");
@@ -1218,14 +1226,27 @@ if (STORE){
     else { setTimeout(openHealth, 1300); }
   }
 }
-/* a Apple busca sozinha o que falta: a data dos álbuns próximos do mesmo artista que ainda não foram conferidos com ela (1 busca por álbum, na fila das capas;
-   sem gastar o Spotify). Se a Apple trouxer a mesma data, o álbum sai da lista sozinho */
+/* busca automática de datas originais: roda em background assim que a página carrega (ou seja, logo após qualquer
+   adição à playlist). Para cada álbum em conflito de mesmo ano ainda não verificado, consulta MusicBrainz → iTunes → Deezer.
+   Se achar data completa diferente do ano atual, corrige automaticamente sem avisar o usuário. */
 if (STORE){
   const need = new Map();
-  for (const al of sameDayAlbums(BY_PLAYLIST)) if (!al.apple && !(al.k in ADATES) && !need.has(al.k)) need.set(al.k, al);
+  for (const g of sameYearAlbums(BY_PLAYLIST)){
+    if (g.confirmed) continue;
+    for (const a of g.albums){
+      const k = adateKey(a.tracks[0].artist, a.tracks[0].albumRaw);
+      if (!(k in ADATES) && !need.has(k)) need.set(k, {k, art: g.art, album: a.tracks[0].albumRaw, date: a.tracks[0].date, tracks: a.tracks});
+    }
+  }
   for (const [k, al] of need) coverQueue.push({job: async () => {
-    const r = pickAlbum(await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(al.art + " " + al.album)}`), al.art, al.album, 3);   // só vale o mesmo álbum
-    ADATES[k] = r && r.releaseDate ? String(r.releaseDate).slice(0, 10) : ""; saveADates();
+    const d = await findOriginalDate(al.art, al.album).catch(() => null);
+    ADATES[k] = d || ""; saveADates();
+    if (d && isFull(d) && d.slice(0, 4) !== al.date.slice(0, 4)){
+      const ns = new Set(al.tracks.map(t => t.n));
+      ssSet("health", "1");
+      commitRows(currentRows().map(r => ns.has(r[0]) ? [r[0], r[1], r[2], r[3], r[4], d, ...(r[6] ? [r[6]] : [])] : r),
+        `Data de "${al.album}" corrigida automaticamente: ${al.date.slice(0,4)} → ${d.slice(0,4)}`);
+    }
   }});
   if (need.size) pumpCovers();
 }

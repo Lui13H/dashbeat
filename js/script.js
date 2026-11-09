@@ -5746,6 +5746,7 @@ $("#dt-clear").addEventListener("click", clearFilters);
 $("#dt-table").innerHTML = `${ICON.list}<span>Músicas</span>`;
 $("#dt-import").innerHTML = `${ICON.up}<span>Adicionar músicas</span>`;
 $("#dt-export").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
+$("#dt-export-pl").innerHTML = `${ICON.down}<span>Baixar lista</span>`;
 $("#dt-table").addEventListener("click", () => openTable());
 $("#dt-import").addEventListener("click", () => openImport());
 // Group dropdown triggers
@@ -5767,11 +5768,13 @@ $("#dt-grp-tools").innerHTML = `${ICON.tools}<span>Ferramentas</span>${_chev}`;
 // dúvidas de álbum: avisa uma vez por sessão que dá pra decidir na tela de duplicadas
 if (ALBUM_INFO.doubts.length){ try { if (!sessionStorage.getItem("catalogo-musical:alb-doubt-toast")){ sessionStorage.setItem("catalogo-musical:alb-doubt-toast", "1"); setTimeout(() => toast(`${ALBUM_INFO.doubts.length} álbum${ALBUM_INFO.doubts.length > 1 ? "ns podem" : " pode"} ser o mesmo que outro: veja em Saúde › Álbuns.`), 1800); } } catch (e) {} }
 $("#dt-export").addEventListener("click", openExport);
+$("#dt-export-pl").addEventListener("click", openExport);
 $("#dt-update").innerHTML = `${ICON.sync}<span>Atualizar dados</span>`;
 $("#dt-update").addEventListener("click", openDataUpdate);
 // mesma conta do openDataUpdate: música sem dados do Spotify ou artista sem gênero pesquisado
 // playlist de exemplo (nada salvo no navegador): baixar ou completar dados não faz sentido
 $("#dt-export").hidden = !STORE;
+$("#dt-export-pl").hidden = !STORE;
 $("#dt-update").hidden = !STORE || !BY_PLAYLIST.some(needsUpdate) && !genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m}))).length;
 $("#foot-src").textContent = STORE ? `Lista editada neste navegador · ${faixas(NN)} · ${new Date(STORE.updated || Date.now()).toLocaleDateString("pt-BR")}` : `Fonte: lista de ${faixas(NN)} fornecida · sem dados externos`;
 if (STORE) $("#srcline").textContent += " · lista editada";
