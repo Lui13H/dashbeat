@@ -2076,7 +2076,7 @@ function tmSync(){
 const CARD_DEF = {
   wave: () => { const R = rows(); renderHeroTotal(R); renderWave(R); },
   years: () => renderYears(rows(true, true, true, true, false)), tree: () => renderTree(), albums: () => renderAlbums(), rank: () => renderRank(),
-  genres: () => renderGenres(), profile: () => renderProfile(rows()), evo: () => renderEvolution(rows())
+  genres: () => renderGenres(), profile: () => renderProfile(rows()), evo: () => renderEvolution(rows()), disc: () => renderDisc()
 };
 const CARDS = {};
 for (const k in CARD_DEF) CARDS[k] = {name: k, playing: false, n: null, raf: 0, t0: 0, pos: 1, last: 0, uis: []};   // uis: conjuntos de botões (no card e, no gráfico de quadrados, também na tela cheia)
@@ -2104,7 +2104,7 @@ function cardUI(name){
   toolbarChip();
 }
 /* "Até a #n": em vez de repetir em cada card, aparece UMA vez no cabeçalho do site (a barra fixa que desce junto com a tela) */
-const CARD_LABEL = {wave: "Total", years: "Linha do tempo", tree: "Quadrados", albums: "Álbuns", rank: "Ranking", genres: "Gêneros", profile: "Perfil", evo: "Evolução"};
+const CARD_LABEL = {wave: "Total", years: "Linha do tempo", tree: "Quadrados", albums: "Álbuns", rank: "Ranking", genres: "Gêneros", profile: "Perfil", evo: "Evolução", disc: "Descoberta"};
 function toolbarChip(){
   const b = $("#tb-anim"); if (!b) return;
   const c = Object.values(CARDS).find(x => x.n != null);
@@ -3316,7 +3316,7 @@ rule(() => {
 
   return {tech: true, kind: "pl", theme: 4, score: 66,
     title: slow ? "A descoberta desacelerou" : "A playlist segue descobrindo artistas",
-    body: `<div class="dsc-keys"><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><path d="M0,5L28,5" fill="none" stroke="hsl(var(--h),55%,68%)" stroke-width="2"/></svg>artistas únicos acumulados</div><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><line x1="0" y1="5" x2="28" y2="5" stroke="hsla(var(--h),50%,80%,.5)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>ritmo ideal constante</div></div><p class="dsc-how">Cada ponto da curva mostra quantos artistas únicos já entraram até aquela faixa da playlist.</p><div class="dsc-stats"><div class="dsc-chip"><b>${rate}</b><span>faixas por artista novo</span></div><div class="dsc-chip"><b>${+(total / NN * 100).toFixed(2)}%</b><span>média de novidades por faixa</span></div><div class="dsc-chip"><b>${halfPct}%</b><span>da playlist até a metade dos artistas</span></div><div class="dsc-chip"><b>#${lastNew.n}</b><span>último artista novo</span></div><div class="dsc-chip" id="dsc-peak-chip"><b>—</b><span>pico de descoberta</span></div>${(() => { const [t] = curveInterpretShort.split(' — '); return `<div class="dsc-chip"><b>${midArtPctStr}%</b><span>dos artistas na 1ª metade · ${t.toLowerCase()}</span></div>`; })()}</div><div class="dsc-zones"></div>`,
+    body: `<div class="dsc-keys"><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><path d="M0,5L28,5" fill="none" stroke="hsl(var(--h),55%,68%)" stroke-width="2"/></svg>artistas únicos acumulados</div><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><line x1="0" y1="5" x2="28" y2="5" stroke="hsla(var(--h),50%,80%,.5)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>ritmo ideal constante</div></div><p class="dsc-how">Cada ponto da curva mostra quantos artistas únicos já entraram até aquela faixa da playlist.</p><div class="dsc-stats"><div class="dsc-chip" id="dsc-rate-chip"><b>${rate}</b><span>faixas por artista novo</span></div><div class="dsc-chip" id="dsc-avg-chip"><b>${+(total / NN * 100).toFixed(2)}%</b><span>média de novidades por faixa</span></div><div class="dsc-chip" id="dsc-half-chip"><b>${halfPct}%</b><span>da playlist até a metade dos artistas</span></div><div class="dsc-chip" id="dsc-last-chip"><b>#${lastNew.n}</b><span>último artista novo</span></div><div class="dsc-chip" id="dsc-peak-chip"><b>—</b><span>pico de descoberta</span></div>${(() => { const [t] = curveInterpretShort.split(' — '); return `<div class="dsc-chip" id="dsc-curve-chip"><b>${midArtPctStr}%</b><span>dos artistas na 1ª metade · ${t.toLowerCase()}</span></div>`; })()}</div><div class="dsc-zones"></div>`,
     wide: true, noSplit: true, viz: V.disc(), mvClass: "disc",
     kick: [nf(fresh.length), `artista${fresh.length === 1 ? "" : "s"} novo${fresh.length === 1 ? "" : "s"} nas últimas ${nf(NN - cut)} adições${col.length ? `, ${col.length} ${col.length > 1 ? "deles parcerias" : "deles parceria"}${colOwner ? ` de ${colOwner}` : ""}` : ""}`]};
 });
@@ -3678,7 +3678,8 @@ function drawScatter(){
 }
 function renderDisc(){
   const el = $("#disc"); if (!el) return;
-  const seen = new Set(); const cum = BY_PLAYLIST.map(t => (seen.add(t.artist), seen.size));
+  const pl = state.upTo != null ? BY_PLAYLIST.filter(t => t.n <= state.upTo) : BY_PLAYLIST;
+  const seen = new Set(); const cum = pl.map(t => (seen.add(t.artist), seen.size));
   const W = 300, H = 300, n = cum.length, mx = cum[n - 1];
   // Curva começa em (0, H-4) = origem do gráfico (0 faixas → 0 artistas)
   const P = `0,${(H - 4).toFixed(1)}L` + cum.map((c, i) => `${(i / Math.max(1, n - 1) * W).toFixed(1)},${(H - 4 - (c / mx) * (H - 8)).toFixed(1)}`).join("L");
@@ -3811,13 +3812,12 @@ function renderDisc(){
     return `<stop offset="${pct}%" stop-color="hsla(var(--h),${Math.round(25 + t * 60)}%,${Math.round(32 + t * 32)}%,${(0.06 + t * 0.44).toFixed(2)})"/>`;
   }).join("") + (() => { const t = segRates[NSEG - 1] / rMax; return `<stop offset="100%" stop-color="hsla(var(--h),${Math.round(25 + t * 60)}%,${Math.round(32 + t * 32)}%,${(0.06 + t * 0.44).toFixed(2)})">`; })();
   // Pico: faixa com maior distância euclidiana até a diagonal (0,H)→(W,4)
-  const diagA = 4 - H, diagB = -W, diagC = W * H;
-  const diagLen = Math.sqrt(diagA * diagA + diagB * diagB);
-  let peakK = 0, peakDist = -1;
+  let peakK = 0, peakDist = -Infinity;
   for (let k = 0; k < n; k++) {
-    const d = Math.abs(diagA * tX(k) + diagB * tY(k) + diagC) / diagLen;
-    if (d > peakDist) { peakDist = d; peakK = k; }
+    const d = cum[k] / mx - k / Math.max(1, n - 1);
+    if (d > 0 && d > peakDist) { peakDist = d; peakK = k; }
   }
+  const hasPeak = peakDist > 0;
   const pkXv = tX(peakK), pkYv = tY(peakK);
   const pkX = pkXv.toFixed(1), pkY = pkYv.toFixed(1);
   const PEAK_COL = `hsl(calc(var(--h) + 180),55%,68%)`;
@@ -3889,7 +3889,7 @@ function renderDisc(){
   const midX = (W/2).toFixed(1), midY = ((H-4+4)/2).toFixed(1);
   const midKx = Math.min(Math.round((n-1)/2), cum.length-1);
   const midCurveArt = cum[midKx];
-  const midCurveTrack = BY_PLAYLIST[half] ? BY_PLAYLIST[half].n : half + 1;
+  const midCurveTrack = pl[half] ? pl[half].n : half + 1;
   // Posição dos labels — desviam de fases e do pico
   let midArtTopY = 2;
   const midArtCollides = y =>
@@ -3976,12 +3976,12 @@ function renderDisc(){
       ${phaseSvg}
       <path d="M${P}" fill="none" stroke="hsl(var(--h),55%,68%)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
       ${phaseGlow}
-      <line x1="${pkX}" x2="${pkX}" y1="${pkTopY}" y2="${H}" stroke="${PEAK_COL}" stroke-opacity=".45" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+      ${hasPeak ? `<line x1="${pkX}" x2="${pkX}" y1="${pkTopY}" y2="${H}" stroke="${PEAK_COL}" stroke-opacity=".45" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
       <line x1="${pkLeftX}" y1="${pkY}" x2="${W}" y2="${pkY}" stroke="${PEAK_COL}" stroke-opacity=".45" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
       ${hidePeakCircle ? '' : `<circle cx="${pkX}" cy="${pkY}" r="4" fill="none" stroke="${PEAK_COL}" stroke-width="1.5" opacity=".9" filter="url(#pk-glow)" vector-effect="non-scaling-stroke"/>
       <circle cx="${pkX}" cy="${pkY}" r="4" fill="none" stroke="${PEAK_COL}" stroke-width="1.5" opacity=".9" vector-effect="non-scaling-stroke"/>`}
-      <text font-size="9" fill="${PEAK_COL}" font-family="var(--body)" text-anchor="${pkAnchorX}" x="${pkLblX.toFixed(1)}" y="${pkTopY}" dominant-baseline="auto" font-weight="700">#${BY_PLAYLIST[peakK] ? BY_PLAYLIST[peakK].n : peakK + 1}</text>
-      <text font-size="9" fill="${PEAK_COL}" font-family="var(--body)" text-anchor="end" x="${pkLeftX}" y="${pkLblY.toFixed(1)}" font-weight="700">${cum[peakK]}</text>
+      <text font-size="9" fill="${PEAK_COL}" font-family="var(--body)" text-anchor="${pkAnchorX}" x="${pkLblX.toFixed(1)}" y="${pkTopY}" dominant-baseline="auto" font-weight="700">#${pl[peakK] ? pl[peakK].n : peakK + 1}</text>
+      <text font-size="9" fill="${PEAK_COL}" font-family="var(--body)" text-anchor="end" x="${pkLeftX}" y="${pkLblY.toFixed(1)}" font-weight="700">${cum[peakK]}</text>` : ''}
       ${axisArrowsSvg}
     </g>
     <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="middle" x="${pad}"      y="${H + 11}">#0</text>
@@ -3993,23 +3993,46 @@ function renderDisc(){
   el.style.display = "flex"; el.style.flexDirection = "column";
   const peakChip = document.getElementById('dsc-peak-chip');
   if (peakChip) {
-    const pTrack = BY_PLAYLIST[peakK];
+    const pTrack = pl[peakK];
     const peakCovPct = +(cum[peakK] / mx * 100).toFixed(2);
-    const xn = peakK / Math.max(1, n - 1), yn = cum[peakK] / mx;
-    const triRatio = xn > 0 ? Math.round((yn - xn) ** 2 / (xn * yn) * 100) : 0;
-    peakChip.innerHTML = `<b>#${pTrack ? pTrack.n : peakK + 1}</b><span>${cum[peakK]} artistas · ${peakCovPct}% do total descoberto</span>`;
+    peakChip.innerHTML = hasPeak
+      ? `<b>#${pTrack ? pTrack.n : peakK + 1}</b><span>${cum[peakK]} artistas · ${peakCovPct}% do total descoberto</span>`
+      : `<b>—</b><span>pico de descoberta</span>`;
+  }
+  // Atualizar chips do card durante a animação
+  const rateChip  = document.getElementById('dsc-rate-chip');
+  const avgChip   = document.getElementById('dsc-avg-chip');
+  const halfChip  = document.getElementById('dsc-half-chip');
+  const lastChip  = document.getElementById('dsc-last-chip');
+  const curveChip = document.getElementById('dsc-curve-chip');
+  if (rateChip || avgChip || halfChip || lastChip || curveChip) {
+    const liveRate = Math.round(n / Math.max(1, mx));
+    const liveAvg  = +(mx / Math.max(1, n) * 100).toFixed(2);
+    const liveHalf = cum.findIndex(c => c >= Math.ceil(mx / 2));
+    const liveHalfPct = +(liveHalf / Math.max(1, n - 1) * 100).toFixed(2);
+    let lastNewK = 0; for (let k = n - 1; k > 0; k--) if (cum[k] > cum[k - 1]) { lastNewK = k; break; }
+    const liveLastN = pl[lastNewK] ? pl[lastNewK].n : lastNewK + 1;
+    const midK = Math.round((n - 1) / 2);
+    const liveMidArtRaw = cum[midK] / Math.max(1, mx) * 100;
+    const liveMidArtStr = +liveMidArtRaw.toFixed(2);
+    const curveT = liveMidArtRaw >= 65 ? 'curva acima da linha' : liveMidArtRaw <= 40 ? 'curva abaixo da linha' : 'curva próxima da linha';
+    if (rateChip)  rateChip.innerHTML  = `<b>${liveRate}</b><span>faixas por artista novo</span>`;
+    if (avgChip)   avgChip.innerHTML   = `<b>${liveAvg}%</b><span>média de novidades por faixa</span>`;
+    if (halfChip)  halfChip.innerHTML  = `<b>${liveHalfPct}%</b><span>da playlist até a metade dos artistas</span>`;
+    if (lastChip)  lastChip.innerHTML  = `<b>#${liveLastN}</b><span>último artista novo</span>`;
+    if (curveChip) curveChip.innerHTML = `<b>${liveMidArtStr}%</b><span>dos artistas na 1ª metade · ${curveT}</span>`;
   }
 
   const zonesEl = el.closest('.disc-row')?.querySelector('.dsc-zones');
   if (zonesEl) {
-    const tn = k => BY_PLAYLIST[k] ? `#${BY_PLAYLIST[k].n}` : `#${k+1}`;
+    const tn = k => pl[k] ? `#${pl[k].n}` : `#${k+1}`;
     const pct = z => `${+(z.density * 100).toFixed(2)}%`;
     const row = z => { const c = zoneCol(z); return `<div class="dsc-zrow" style="color:${c}"><span class="dsc-zrank">${z.rank}ª</span><span class="dsc-zrange">${tn(z.tS)}–${tn(z.tE)}</span><span class="dsc-zpct">${pct(z)} novas</span></div>`; };
     const disc = zones.filter(z => z.type === 'disc');
     const fam  = zones.filter(z => z.type === 'fam');
     const avgDensity = cum[n - 1] / n;
-    const peakTrackStr = BY_PLAYLIST[peakK] ? `#${BY_PLAYLIST[peakK].n}` : `#${peakK+1}`;
-    const peakDensityNum = cum[peakK] / (BY_PLAYLIST[peakK] ? BY_PLAYLIST[peakK].n : peakK + 1);
+    const peakTrackStr = pl[peakK] ? `#${pl[peakK].n}` : `#${peakK+1}`;
+    const peakDensityNum = cum[peakK] / (pl[peakK] ? pl[peakK].n : peakK + 1);
     const five = [
       {z: fam[0],  label: 'Familiar 1ª', numVal: fam[0]?.density ?? 0},
       {z: fam[1],  label: 'Familiar 2ª', numVal: fam[1]?.density ?? 0},
@@ -4025,6 +4048,20 @@ function renderDisc(){
       return `<div class="dsc-five-item" style="color:${c}"><span class="dsc-five-pct">${valStr}</span><span class="dsc-five-lbl">${p.label}</span>${rangeStr ? `<span class="dsc-five-range">${rangeStr}</span>` : ''}</div>`;
     }).join('');
     zonesEl.innerHTML = `<div class="dsc-five">${fiveHtml}</div>`;
+  }
+  if (TM_N >= 2 && !TM_REDUCE) {
+    const article = el.closest('article');
+    if (article && !article._discCtrl) {
+      let tools = article.querySelector(':scope > .card-tools');
+      if (!tools) {
+        tools = document.createElement('div'); tools.className = 'card-tools';
+        const discRow = article.querySelector('.disc-row');
+        article.insertBefore(tools, discRow || article.querySelector('.kick') || null);
+      }
+      const ctrl = makeCardControls('disc', false, true);
+      tools.appendChild(ctrl.grp);
+      article._discCtrl = ctrl;
+    }
   }
 }
 function renderNote(){
