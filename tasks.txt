@@ -120,6 +120,7 @@ Pronto quando: marcar, filtrar, remover, recarregar a página e conferir que per
 ✅ Extensão v1.5.61: card e modal de favoritas redesenhados — card Insights com layout wide (donut + barras de artistas), modal de lista compactado (gaps, paddings e fontes reduzidos pra caber sem scroll); correção de datas erradas de Death e Megadeth.
 ✅ Extensão v1.5.62: título de "Not Ready to Die" corrigido (removido sufixo "- From \"Call of the Dead\"") no DEFAULT_RAW e via TRACK_SUFFIX_RE (auto-limpeza para usuários existentes); campo `ty` adicionado ao objeto de item no modal Favoritas (para exibir "Single/EP" em vez do nome do single).
 ✅ Extensão v1.5.63: faixas de single exibem "Single/EP" no lugar do nome do álbum em toda a UI (tabelas, tooltips, modal Favoritas); rótulos de fase no gráfico Evolução com cor dinâmica via _phaseTextCol (claro/escuro conforme a cor da banda) e stroke mais suave; novo card de insights "Fases de dominância" listando as fases com maior concentração de faixas por banda.
+✅ Extensão v1.5.66: card Ritmo de Descoberta — chips com 2 casas decimais (sem zeros finais), bloco de 6 zonas (grid 3×2: Familiar/Expansão/Pico) com range embutido, cores de zona invertidas (Expansão↔Familiar), ordenação do maior para o menor, "artistas" girado 180°.
 
 ---------------------------------------------------------------------
 TASK 6 — COMPARAR DOIS RECORTES
@@ -184,7 +185,7 @@ ao adicionar musicas quero que o site analise se quais cards de painel e insight
 
 testar se alterando a ordem da playlist pelos 3 tracinhos e não pelo ordenador em cima da coluna, não é possível finalmente adicionar as musicas só colando o link da playlist
 
-quero que no final da pagina dos paineis apareça um botão de visualizar inssights
+✅ quero que no final da pagina dos paineis apareça um botão de visualizar inssights
 
 
 habilitar compartilhamento de playlist
@@ -229,3 +230,35 @@ opção de compartilhar seus numeros com o site com o aviso dizendo que nada de 
 criar um banco de dados pra armazenar dados globais principalmente links das musicas pra que os usuarios gastem menos buscas do spotify
 
 elencar por genero no grafico de musicas por banda/artista de fotos sem repetir foto usando o criterio de exclusividade (se houver uma unica banda no genero vai ser usado essa foto e essa foto não pode ser a foto de mais nenhum outro genero), em casos de empate vence o que tiver mais musicas dentro do genero, nunca deixe nenhum genero sem foto
+
+
+------------------------------------------------------
+13
+Playlist
+O trecho mais fértil
+No meio da playlist — faixas #131 a #196 — foram apresentados 24 artistas novos em apenas 66 faixas: 1 novo a cada 2.8 músicas.
+
+Nenhum outro trecho chegou perto dessa densidade de descobertas.
+
+Municipal Waste
+#136 → #136 · 1 faixa
+Carcass
+#137 → #384 · 3 faixas
+Illdisposed
+#143 → #143 · 1 faixa
+Limp Bizkit
+#162 → #162 · 1 faixa
+Pissing Razors
+#168 → #168 · 1 faixa
+Mushroomhead
+#172 → #172 · 1 faixa
+#1
+início → fim
+#392
+24
+artistas novos em 66 faixas — 3.6 a cada 10
+
+diminui o tamanho desse card tirando uma das bandas dele, tá muito comprido
+------------------------------------------------------------------
+
+comente caso haja (caso tenha acontecido no grafico) o quão raro é fases de expansão depois da metade da playlist e/ou fases de familiaridade antes da metade da playlist

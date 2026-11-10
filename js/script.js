@@ -2409,16 +2409,21 @@ function evoSel(){ if (!evo.sel[evo.mode]) evoReset(); return evo.sel[evo.mode];
 const evoColor = k => evoCol(evo.slot[evo.mode].get(k));
 const EVO_SPLIT = 25;
 const evoOptHtml = s => { const on = evoSel().has(s.k); return `<button type="button" class="evo-opt${on ? " on" : ""}" data-k="${esc(s.k)}" aria-pressed="${on}"${on ? ` style="--sc:${evoColor(s.k)}"` : ""}>${on ? "<i></i>" : ""}${esc(evoName(s.k))}<em>${s.c}</em></button>`; };
+let _evoHidden = []; // itens cortados pelas 2 linhas + singles — atualizado em evoPanels
+let _panelInsTopics = new Set(); // panelCard topics que existem em alguma regra — atualizado em buildCards
+let _panelScrollY = 0; // scroll do painel salvo ao sair para insights
 function openEvoSingles(){
+  const word = evo.mode === "band" ? "Artistas" : "Gêneros";
   const body = document.createElement("div");
-  body.innerHTML = `<p class="mdesc">${evo.mode === "band" ? "Artistas" : "Gêneros"} com <strong>só 1 faixa</strong> na playlist. Uma linha de 1 faixa é só um degrau no gráfico, por isso ficam escondidos da lista principal. Clique para ligar ou desligar a linha.</p>
+  body.innerHTML = `<p class="mdesc">${word} que ficaram fora da lista principal — os que não couberam nas primeiras linhas e os com só 1 faixa. Clique para ligar ou desligar a linha no gráfico.</p>
     <input type="search" id="evs-q" placeholder="Buscar…" aria-label="Buscar" style="width:100%;max-width:340px;border:1px solid var(--line-2);background:hsla(var(--h),55%,9%,.8);color:var(--ink);font:500 13px var(--body);padding:9px 12px;border-radius:12px;outline:none">
     <div class="evo-opts big" id="evs-list"></div>`;
-  const md = openModal({title: `${evo.mode === "band" ? "Artistas" : "Gêneros"} com 1 faixa`, body, size: "md"});
+  const md = openModal({title: `${word} ocultos`, body, size: "md"});
   const list = md.m.querySelector("#evs-list"), inp = md.m.querySelector("#evs-q");
   const draw = () => {
     const q = inp.value.trim().toLowerCase();
-    list.innerHTML = evo.list.filter(s => s.c === 1 && (!q || evoName(s.k).toLowerCase().includes(q))).map(evoOptHtml).join("") || `<span class="muted" style="font-size:12.5px">Nada encontrado.</span>`;
+    const pool = _evoHidden.length ? _evoHidden : evo.list.filter(s => s.c === 1);
+    list.innerHTML = pool.filter(s => !q || evoName(s.k).toLowerCase().includes(q)).map(evoOptHtml).join("") || `<span class="muted" style="font-size:12.5px">Nada encontrado.</span>`;
   };
   list.addEventListener("click", e => { const b = e.target.closest(".evo-opt"); if (b){ evoToggle(b.dataset.k); draw(); } });
   inp.addEventListener("input", draw);
@@ -2431,11 +2436,23 @@ function evoPanels(){
   const split = evo.list.length > EVO_SPLIT, singles = split ? evo.list.filter(s => s.c === 1) : [];
   const opts = evo.list.filter(s => q ? evoName(s.k).toLowerCase().includes(q) : !split || s.c > 1);
   $("#evo-opts").innerHTML = opts.map(evoOptHtml).join("") || `<span class="muted" style="font-size:12.5px">Nada encontrado.</span>`;
-  const sb = $("#evo-singles");
-  $("#evo-singles-row").style.display = singles.length ? "" : "none";
-  const on1 = singles.filter(s => sel.has(s.k)).length;
-  $("#evo-singles-x").style.display = on1 ? "inline-flex" : "none";
-  sb.textContent = `Ver os ${singles.length} ${evo.mode === "band" ? "artistas" : "gêneros"} com só 1 faixa${on1 ? ` · ${on1} no gráfico` : ""}`;
+  const optsEl = $("#evo-opts"), sb = $("#evo-singles"), row = $("#evo-singles-row");
+  requestAnimationFrame(() => {
+    const allBtns = [...optsEl.querySelectorAll(".evo-opt")];
+    if (!allBtns.length){ _evoHidden = [...singles]; const total = _evoHidden.length; row.style.display = total ? "" : "none"; $("#evo-singles-x").style.display = "none"; const word2 = evo.mode === "band" ? "artistas" : "gêneros"; sb.textContent = `Ver os ${total} ${word2} ocultos`; return; }
+    const firstH = allBtns[0].offsetHeight;
+    const twoRowCut = (firstH + 6) * 2; // offsetTop onde começa a 3ª linha
+    const overflowBtns = allBtns.filter(b => b.offsetTop >= twoRowCut);
+    const overflowKeys = new Set(overflowBtns.map(b => b.dataset.k));
+    overflowBtns.forEach(b => b.remove());
+    _evoHidden = [...evo.list.filter(s => overflowKeys.has(s.k)), ...singles];
+    const total = _evoHidden.length;
+    const on1 = _evoHidden.filter(s => sel.has(s.k)).length;
+    row.style.display = total ? "" : "none";
+    $("#evo-singles-x").style.display = on1 ? "inline-flex" : "none";
+    const word = evo.mode === "band" ? "artistas" : "gêneros";
+    sb.textContent = `Ver os ${total} ${word} ocultos${on1 ? ` · ${on1} no gráfico` : ""}`;
+  });
   $("#evo-what").textContent = evo.mode === "band" ? "banda" : "gênero";
   $("#evo-hint").textContent = `${evo.list.length} ${evo.mode === "band" ? "bandas/artistas" : "gêneros"} · acumulado de faixas pela ordem de adição`;
   document.querySelectorAll("#evo-mode button").forEach(b => b.setAttribute("aria-pressed", b.dataset.m === evo.mode));
@@ -2445,6 +2462,7 @@ function evoPanels(){
   const isTop = n => cur.length === Math.min(n, total) && evo.list.slice(0, n).every(s => sel.has(s.k));
   $("#evo-tops").innerHTML = [...EVO_TOPS.filter(n => n < total).map(n => `<button type="button" data-n="${n}" aria-pressed="${isTop(n)}">Top ${n}</button>`),
     ...(total ? [`<button type="button" data-n="all" aria-pressed="${isTop(total)}">Todas · ${total}</button>`] : [])].join("");
+  const trg = $("#evo-tops-trg"); if (trg){ const active = EVO_TOPS.find(n => n < total && isTop(n)); const lbl = active ? `Top ${active}` : (isTop(total) ? "Todas" : "Exibir"); trg.firstChild.textContent = lbl; }
 }
 function evoToggle(k){
   evo.dyn[evo.mode] = null;   // escolha manual: deixa de acompanhar o top
@@ -2476,7 +2494,7 @@ const evoPin = (() => {
       evoPanels(); drawEvo();
     }
   });
-  const row = $("#evo-tops"); if (row) row.insertAdjacentElement("afterend", b);
+  const row = $("#evo-tops"); if (row) (row.closest(".dtool-grp") || row).insertAdjacentElement("afterend", b);
   return b;
 })();
 function drawEvo(){
@@ -2836,12 +2854,13 @@ $("#evo-singles-x").addEventListener("click", () => { evo.dyn[evo.mode] = null; 
 const tabs = [...document.querySelectorAll(".tabs button")];
 function placePill(){ const on = tabs.find(t => t.getAttribute("aria-selected") === "true"); const p = $(".tabs .pill"); p.style.left = on.offsetLeft + "px"; p.style.width = on.offsetWidth + "px"; }
 function showTab(id){
+  if (id === "insights") _panelScrollY = window.scrollY;
   tabs.forEach(t => t.setAttribute("aria-selected", t.getAttribute("aria-controls") === id));
   document.querySelectorAll(".tabpanel").forEach(p => p.classList.toggle("on", p.id === id));
   placePill(); hideTip();
   document.title = id === "insights" ? "Dashbeat — Insights" : "Dashbeat — Painel";
   try { history.replaceState(null, "", id === "insights" ? "#insights" : "#"); } catch (e) {}
-  if (id === "insights") animateInsights(); else requestAnimationFrame(() => { renderTree(); renderYears(rows()); drawEvo(); });
+  if (id === "insights") animateInsights(); else requestAnimationFrame(() => { renderTree(); renderYears(rows()); drawEvo(); window.scrollTo({top: _panelScrollY, behavior: "smooth"}); });
   dispatchEvent(new Event("fx:refresh"));
 }
 tabs.forEach(t => t.addEventListener("click", () => showTab(t.getAttribute("aria-controls"))));
@@ -3191,7 +3210,7 @@ rule(() => {
   return {tech: true, kind: "pl", theme: 2, score: 72,
     title: stopped.length >= 2 ? pickV("waves", ["Cada fase teve um dono, e as ondas não voltam", "Paixões em ondas: intensas e passageiras"]) : `${c.a.k} foi uma febre concentrada`,
     body: `<p>${esc(c.a.k)} ${pickV("wv" + c.a.k, ["foi uma febre concentrada.", "chegou como uma onda."])}${stopped.length ? ` ${stopped.map((a, i) => `${esc(a.k)} parou na #${a.rs[a.rs.length - 1].n}`).join(", ")}.` : ""}</p>`,
-    viz: V.strips([c.a.k]), kick: [`${c.need}/${c.a.c}`, `faixas de ${c.a.k} entraram entre #${c.from} e #${c.to}`]};
+    viz: V.strips([c.a.k, ...stopped.map(a => a.k)]), kick: [`${c.need}/${c.a.c}`, `faixas de ${c.a.k} entraram entre #${c.from} e #${c.to}`]};
 });
 
 // PLAYLIST · the loyal ones
@@ -3245,6 +3264,29 @@ rule(() => {
     viz: V.runs(top, "maiores sequências seguidas do mesmo artista"), kick: [pc0(inBig, NN), `das faixas entraram em sequências de 5+ do mesmo artista`]};
 });
 
+// PLAYLIST · richest discovery segment
+rule(() => {
+  if (!IS.journey || !CHI || !CHI.length) return null;
+  const best = [...CHI].sort((a, b) => b.arts - a.arts)[0];
+  if (!best || best.arts < 3) return null;
+  const seg = best.seg, segStart = seg[0].n, segEnd = seg[seg.length - 1].n;
+  const seen = new Set(), newInSeg = [];
+  for (const t of BY_PLAYLIST) {
+    if (!seen.has(t.artist)) { seen.add(t.artist); if (t.n >= segStart && t.n <= segEnd) newInSeg.push(t.artist); }
+  }
+  if (newInSeg.length < 2) return null;
+  const findKey = name => (IS.art.find(a => a.k === name) || IS.art.find(a => a.k.toLowerCase() === name.toLowerCase()) || {}).k;
+  const keys = newInSeg.slice(0, 6).map(findKey).filter(Boolean);
+  if (keys.length < 2) return null;
+  const pos = chapPos(best.i, CHI.length);
+  const density = (best.arts / best.seg.length * 10).toFixed(1);
+  return {tech: false, kind: "pl", theme: 4, score: 67,
+    title: "O trecho mais fértil",
+    body: `<p>${pos.replace(/^./, c => c.toUpperCase())} da playlist — faixas #${segStart} a #${segEnd} — foram apresentados ${best.arts} artistas novos em apenas ${best.seg.length} faixas: 1 novo a cada ${(best.seg.length / best.arts).toFixed(1)} músicas.</p><p>Nenhum outro trecho chegou perto dessa densidade de descobertas.</p>`,
+    viz: V.strips(keys),
+    kick: [nf(best.arts), `artistas novos em ${nf(best.seg.length)} faixas — ${density} a cada 10`]};
+});
+
 // PLAYLIST · discovery pace
 rule(() => {
   if (!IS.journey) return null;
@@ -3253,11 +3295,29 @@ rule(() => {
   const fresh = firstAt.filter(t => t.n > cut), col = fresh.filter(t => splitArtistsAll(t.artist).length > 1);
   const best = [...CHI].sort((a, b) => b.arts - a.arts)[0], slow = fresh.length <= Math.max(2, total * .2);
   const colOwner = col.length ? (splitArtists(col[0].artist).map(p => IS.art.find(a => a.k.toLowerCase() === p)).find(Boolean) || {}).k : null;
-  const halfPct = Math.round(half.n / NN * 100);
+  const halfPct = +(half.n / NN * 100).toFixed(2);
+  const lastNew = firstAt[firstAt.length - 1];
+  const rate = Math.round(NN / total);
+  const q1count = firstAt.filter(t => t.n <= Math.round(NN / 4)).length;
+  const q1pct = Math.round(q1count / total * 100);
+  const earlyRate = (Math.ceil(total / 2)) / (half.n);
+  const lateRate = (total - Math.ceil(total / 2)) / (NN - half.n);
+  const linearity = Math.min(earlyRate, lateRate) / Math.max(earlyRate, lateRate);
+  const curveShape = linearity > 0.75 ? "linha quase reta" : linearity > 0.5 ? "curva suave" : "curva acentuada";
+  // % de artistas descobertos na primeira metade das faixas (complementar ao halfPct)
+  const midArtPctRaw = firstAt.filter(t => t.n <= Math.round(NN / 2)).length / total * 100;
+  const midArtPct = Math.round(midArtPctRaw);
+  const midArtPctStr = +midArtPctRaw.toFixed(2);
+  const curveInterpretShort = midArtPct >= 65
+    ? `Curva acima da linha — ${midArtPct}% dos artistas já descobertos na 1ª metade da playlist`
+    : midArtPct <= 40
+    ? `Curva abaixo da linha — só ${midArtPct}% dos artistas na 1ª metade; exploração maior no final`
+    : `Curva próxima da linha — ${midArtPct}% dos artistas na 1ª metade, ritmo equilibrado`;
+
   return {tech: true, kind: "pl", theme: 4, score: 66,
     title: slow ? "A descoberta desacelerou" : "A playlist segue descobrindo artistas",
-    body: `<p>Metade dos ${total} artistas apareceu nos primeiros ${halfPct}% da playlist (até a #${half.n}). O trecho ${chapPos(best.i, CHI.length)} foi o mais rico: ${best.arts} artistas em ${best.seg.length} faixas.</p>`,
-    viz: V.disc(), mvClass: "disc",
+    body: `<div class="dsc-keys"><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><path d="M0,5L28,5" fill="none" stroke="hsl(var(--h),55%,68%)" stroke-width="2"/></svg>artistas únicos acumulados</div><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><line x1="0" y1="5" x2="28" y2="5" stroke="hsla(var(--h),50%,80%,.5)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>ritmo ideal constante</div></div><p class="dsc-how">Cada ponto da curva mostra quantos artistas únicos já entraram até aquela faixa da playlist.</p><div class="dsc-stats"><div class="dsc-chip"><b>${rate}</b><span>faixas por artista novo</span></div><div class="dsc-chip"><b>${+(total / NN * 100).toFixed(2)}%</b><span>média de novidades por faixa</span></div><div class="dsc-chip"><b>${halfPct}%</b><span>da playlist até a metade dos artistas</span></div><div class="dsc-chip"><b>#${lastNew.n}</b><span>último artista novo</span></div><div class="dsc-chip" id="dsc-peak-chip"><b>—</b><span>pico de descoberta</span></div>${(() => { const [t] = curveInterpretShort.split(' — '); return `<div class="dsc-chip"><b>${midArtPctStr}%</b><span>dos artistas na 1ª metade · ${t.toLowerCase()}</span></div>`; })()}</div><div class="dsc-zones"></div>`,
+    wide: true, noSplit: true, viz: V.disc(), mvClass: "disc",
     kick: [nf(fresh.length), `artista${fresh.length === 1 ? "" : "s"} novo${fresh.length === 1 ? "" : "s"} nas últimas ${nf(NN - cut)} adições${col.length ? `, ${col.length} ${col.length > 1 ? "deles parcerias" : "deles parceria"}${colOwner ? ` de ${colOwner}` : ""}` : ""}`]};
 });
 
@@ -3357,23 +3417,27 @@ rule(() => {
 rule(() => {
   const favs = T.filter(isFavT);
   if (!favs.length) return null;
-  const artsFav = [...groupBy(favs, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const artsFavAll = [...groupBy(favs, "artist")].map(([k, rs]) => [k, rs.length]).sort((a, b) => b[1] - a[1]);
+  const artsFav = artsFavAll.slice(0, 3);
+  const nArtsFav = artsFavAll.length;
   const genFav = favs.flatMap(t => t.ge || []).reduce((m, g) => { m.set(g, (m.get(g) || 0) + 1); return m; }, new Map());
   const topG = [...genFav].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([g]) => g);
   const decFav = favs.filter(t => t.year !== NI).reduce((m, t) => { const d = Math.floor(t.year / 10) * 10; m.set(d, (m.get(d) || 0) + 1); return m; }, new Map());
   const topD = [...decFav].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([d]) => d + "s");
-  // donut arc
+  // donut arc — cor varia com o percentual: quanto mais favoritas, mais intensa
   const rr = 30, ccx = 40, ccy = 40;
   const circ = +(2 * Math.PI * rr).toFixed(1);
-  const filled = +(circ * favs.length / T.length).toFixed(1);
+  const pct = favs.length / T.length;
+  const filled = +(circ * pct).toFixed(1);
+  const favS = Math.round(40 + pct * 45), favL = Math.round(48 + pct * 22);
   const artMax = artsFav[0] ? artsFav[0][1] : 1;
-  const viz = `<div class="fav-viz">
+  const viz = `<div class="fav-viz" style="--fav-s:${favS}%;--fav-l:${favL}%">
     <svg class="fav-donut" viewBox="0 0 80 80" aria-hidden="true">
       <circle cx="${ccx}" cy="${ccy}" r="${rr}" fill="none" stroke="hsla(var(--h),60%,67%,.12)" stroke-width="8"/>
-      <circle class="fav-arc" cx="${ccx}" cy="${ccy}" r="${rr}" fill="none" stroke="hsl(350,70%,65%)" stroke-width="8"
+      <circle class="fav-arc" cx="${ccx}" cy="${ccy}" r="${rr}" fill="none" stroke-width="8"
         stroke-dasharray="0 ${circ}" data-arc="${filled} ${circ}"
         stroke-linecap="round" transform="rotate(-90 ${ccx} ${ccy})"/>
-      <text x="${ccx}" y="${ccy - 3}" text-anchor="middle" font-size="13" font-weight="700" fill="hsl(350,70%,65%)" font-family="inherit">${pc1(favs.length, T.length)}</text>
+      <text x="${ccx}" y="${ccy - 3}" text-anchor="middle" font-size="13" font-weight="700" class="fav-pct" font-family="inherit">${pc1(favs.length, T.length)}</text>
       <text x="${ccx}" y="${ccy + 10}" text-anchor="middle" font-size="7.5" fill="var(--ink-3)" font-family="inherit">favoritas</text>
     </svg>
     <div class="fav-arts">${artsFav.map(([a, n]) => `<div class="fav-art-row">
@@ -3387,7 +3451,7 @@ rule(() => {
     title: "Suas favoritas",
     body: `<div><p>${B(faixas(favs.length))} da playlist favoritadas.</p>${genChips}${decLine}</div>`,
     viz,
-    kick: [pc1(favs.length, T.length), "das faixas estão favoritadas"]};
+    kick: [`${nf(nArtsFav)} de ${nf([...groupBy(T, "artist")].length)}`, `artista${nArtsFav === 1 ? "" : "s"} são favoritados`]};
 });
 
 // EVOLUÇÃO · fases de dominância
@@ -3424,9 +3488,7 @@ rule(() => {
   const nBands = new Set(allPhases.map(ph => ph.key)).size;
   const topPhases = allPhases.slice(0, 5);
   const maxCount = topPhases[0].count;
-  const artRank = new Map(IS.art.map((a, i) => [a.k, i]));
-  const getCol = k => { const rank = artRank.get(k); return evoCol(rank != null ? rank : artIdx.size); };
-  const rows = topPhases.map(ph => { const col = getCol(ph.key); return `<div class="fav-art-row"><span class="fav-art-name" style="color:${col}">${esc(ph.key)}</span><div class="fav-art-bar"><i data-w="${Math.round(ph.count / maxCount * 100)}" style="width:0;background:${col}"></i></div><b class="fav-art-n" style="color:${col}">${ph.count}</b></div>`; }).join('');
+  const rows = topPhases.map(ph => `<div class="fav-art-row"><span class="fav-art-name">${esc(ph.key)}</span><div class="fav-art-bar"><i data-w="${Math.round(ph.count / maxCount * 100)}" style="width:0"></i></div><b class="fav-art-n">${ph.count} de ${ph.end - ph.start + 1}</b></div>`).join('');
   const topBand = allPhases[0], topPct = Math.round(topBand.density * 100);
   return {kind: "pl", theme: 1, score: 82, wide: true,
     title: nBands === 1 ? "Uma banda dominou a playlist" : `${nf(nBands)} bandas com fases de dominância`,
@@ -3445,6 +3507,14 @@ let techCount = 0;
 function buildCards(){
   let cards = RULES.map(fn => { try { return fn(); } catch (e) { console.warn("regra ignorada", e); return null; } }).filter(Boolean);
   techCount = cards.filter(c => c.tech).length;
+  // mapear panelCard antes do filtro tech para syncInsightBtns ter a visão completa
+  const _t2p = {0:"years",1:"ranking",2:"ranking",3:"albums",4:"ranking",5:"profile"};
+  cards.forEach(c => {
+    if (c.title === "Suas favoritas") return;
+    if (c.extra){ c.panelCard = c.theme === 4 ? "genres" : c.theme === 3 ? "albums" : c.theme === 5 ? "profile" : (c.theme === 0 && c.kind === "pl") ? "genres" : null; }
+    else { c.panelCard = _t2p[c.theme] || null; if (c.panelCard === "ranking" && (c.title.includes("fases de dominância") || c.title.includes("Uma banda dominou"))) c.panelCard = "evo"; }
+  });
+  _panelInsTopics = new Set(cards.filter(c => c.panelCard).map(c => c.panelCard));
   cards = cards.filter(c => !!c.tech === techOn);
   // os cards dos dados extras (gênero, explícita…) sempre entram, por cima dos 14 clássicos de maior nota
   cards.sort((a, b) => b.score - a.score);
@@ -3465,12 +3535,19 @@ function renderCards(){
   const tag = k => k === "cat" ? `<span class="tag">Catálogo</span>` : k === "pl" ? `<span class="tag pl">Playlist</span>` : `<span class="tag">Catálogo</span> <span class="tag pl">Playlist</span>`;
   $("#mix").innerHTML = cards.map((c, i) => {
     const wide = c.wide || c.full;
-    return `<article class="card ic${wide ? " wide" : ""}${c.full ? " full" : ""} rise" style="--d:${i + 3}">
+    return `<article class="card ic${wide ? " wide" : ""}${c.full ? " full" : ""} rise" style="--d:${i + 3}"${c.panelCard ? ` data-panel="${c.panelCard}"` : ""}>
       <div class="num">${String(i + 1).padStart(2, "0")} ${tag(c.kind)}</div><h3>${esc(c.title)}</h3>
-      ${wide ? `<div class="split"><div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>${c.body}</div>` : `${c.body}<div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>`}
+      ${c.noSplit ? `<div class="disc-row"><div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div><div class="disc-side">${c.body}</div></div>` : wide ? `<div class="split"><div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>${c.body}</div>` : `${c.body}<div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>`}
       <div class="kick"><b>${esc(c.kick[0])}</b><span>${esc(c.kick[1])}</span></div></article>`;
   }).join("");
+  syncInsightBtns();
   return cards;
+}
+
+function syncInsightBtns(){
+  document.querySelectorAll(".card-ins-btn").forEach(btn => {
+    btn.style.display = _panelInsTopics.has(btn.dataset.for) ? "inline-block" : "none";
+  });
 }
 
 /* ---------- hero ---------- */
@@ -3602,23 +3679,362 @@ function drawScatter(){
 function renderDisc(){
   const el = $("#disc"); if (!el) return;
   const seen = new Set(); const cum = BY_PLAYLIST.map(t => (seen.add(t.artist), seen.size));
-  const W = 300, H = 120, n = cum.length, mx = cum[n - 1];
-  const P = cum.map((c, i) => `${(i / Math.max(1, n - 1) * W).toFixed(1)},${(H - 4 - (c / mx) * (H - 8)).toFixed(1)}`).join("L");
+  const W = 300, H = 300, n = cum.length, mx = cum[n - 1];
+  // Curva começa em (0, H-4) = origem do gráfico (0 faixas → 0 artistas)
+  const P = `0,${(H - 4).toFixed(1)}L` + cum.map((c, i) => `${(i / Math.max(1, n - 1) * W).toFixed(1)},${(H - 4 - (c / mx) * (H - 8)).toFixed(1)}`).join("L");
   const half = cum.findIndex(c => c >= Math.ceil(mx / 2));
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;flex:1;min-height:${H}px;display:block;overflow:visible" aria-label="Artistas acumulados ao longo da playlist">
-    <defs><linearGradient id="dg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="hsla(var(--h),84%,40%,.35)"/><stop offset="1" stop-color="hsla(var(--h),84%,40%,0)"/></linearGradient></defs>
-    <path d="M0,${H}L${P}L${W},${H}Z" fill="url(#dg)"/><path d="M${P}" fill="none" stroke="hsl(var(--h),60%,64%)" stroke-width="2" vector-effect="non-scaling-stroke"/>
-    <line x1="${half / Math.max(1, n - 1) * W}" x2="${half / Math.max(1, n - 1) * W}" y1="0" y2="${H}" stroke="hsla(var(--h),80%,98%,.5)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/></svg>
-    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--ink-3);margin-top:6px"><span>artistas acumulados</span><span>metade em #${BY_PLAYLIST[half].n}</span><span>${mx} no total</span></div>`;
-  el.style.display = "flex"; el.style.flexDirection = "column"; el.style.flex = "1";
+  const halfX = (half / Math.max(1, n - 1) * W).toFixed(1);
+  const pad = 36;
+  const NSEG = 12;
+  const segRates = Array.from({length: NSEG}, (_, s) => {
+    const a = Math.floor(s * n / NSEG), b = Math.min(n - 1, Math.floor((s + 1) * n / NSEG) - 1);
+    return (cum[b] - (a > 0 ? cum[a - 1] : 0)) / Math.max(1, b - a + 1);
+  });
+  const rMax = Math.max(...segRates, 0.001);
+
+  // Busca exaustiva: todas as janelas contíguas de segmentos [s1..s2] (78 combinações)
+  // Para cada janela: taxa = artistas novos no trecho / faixas do trecho
+  // Pega as 2 janelas com maior taxa (Exploração) e as 2 com menor (Território Familiar),
+  // sem sobreposição, com mínimo de ~6% da playlist (mínimo 8 faixas)
+  const minZoneSpan = Math.max(8, Math.ceil(n * 0.06));
+  const tX = k => k / Math.max(1, n - 1) * W;
+  const tY = k => H - 4 - (cum[Math.min(k, n-1)] / mx) * (H - 8);
+  const abbr = (name, maxW) => { const cw = 4.8; if (name.length * cw <= maxW) return name; let r = ''; for (const ch of name) { if ((r+ch).length*cw <= maxW) r += ch; else break; } return r; };
+  // Mesmo algoritmo das fases de dominância do evo:
+  // itera sobre as posições de faixas do tipo (novas / repetidas),
+  // janela deslizante [l..r] sobre esse array, density = count / span,
+  // span mínimo igual ao evo (piso 6, decai com tamanho da playlist)
+  // Ordenação: maior % primeiro; desempate = maior intervalo (mais músicas)
+  const PHASE_MIN_SPAN = Math.max(10, Math.ceil(n * 0.125));
+  const isNew = cum.map((c, i) => i === 0 || c > cum[i - 1]);
+  const newPos = isNew.reduce((a, v, i) => { if (v)  a.push(i); return a; }, []);
+  const famPos = isNew.reduce((a, v, i) => { if (!v) a.push(i); return a; }, []);
+  // Coleta todos os candidatos iterando sobre âncoras novas E familiares,
+  // mas mede todos com a mesma métrica: % de artistas novos no intervalo.
+  // Pool unificado → top-2 maior % = Exploração, bottom-2 menor % = Território Familiar.
+  // Desempate de %: maior span (mais músicas) vence.
+  const collectCandidates = (p) => {
+    const m = p.length; if (m < 2) return [];
+    const out = [];
+    for (let l = 0; l < m; l++) {
+      let r = l + 1;
+      while (r < m && p[r] - p[l] + 1 < PHASE_MIN_SPAN) r++;
+      for (; r < m; r++) {
+        const tS = p[l], tE = p[r], span = tE - tS + 1;
+        const newInWin = cum[tE] - (tS > 0 ? cum[tS - 1] : 0);
+        out.push({tS, tE, span, density: newInWin / span});
+      }
+    }
+    return out;
+  };
+  const allCandidates = [...collectCandidates(newPos), ...collectCandidates(famPos)];
+  const pickBest = (sorted, count) => {
+    const picked = [];
+    for (const c of sorted) {
+      if (picked.some(q => q.tS <= c.tE && q.tE >= c.tS)) continue;
+      picked.push(c);
+      if (picked.length >= count) break;
+    }
+    return picked;
+  };
+  const discSorted = pickBest([...allCandidates].sort((a, b) => b.density - a.density || b.span - a.span), 2).map((z, ri) => ({...z, type: 'disc', label: 'Expansão', rank: ri + 1}));
+  const famSorted  = pickBest([...allCandidates].sort((a, b) => a.density - b.density || b.span - a.span), 2).map((z, ri) => ({...z, type: 'fam',  label: 'Familiar',  rank: ri + 1}));
+  const zones = [...discSorted, ...famSorted];
+  const dMax = discSorted[0]?.density || 1;
+  const fMax = 1 - (famSorted[0]?.density ?? 0); // "familiaridade" do 1º
+  const BASE   = 70;  // offset fixo de --h para cada tipo (Expansão: -BASE, Familiar: +BASE)
+  const SPREAD = 40;  // graus extras proporcionais, cria o gap visível entre 1º e 2º da mesma classe
+  const zoneCol = z => {
+    const deg = z.rank === 1 ? BASE + SPREAD : BASE;
+    return z.type === 'disc'
+      ? `hsl(calc(var(--h) + ${Math.round(deg / 1.5)}),45%,62%)`
+      : `hsl(calc(var(--h) - ${deg}),65%,62%)`;
+  };
+  let phaseDefs = '', phaseSvg = '', phaseGlow = '';
+  const phaseMusX = [], phaseArtY = [], phaseMusRanges = [], phaseArtRanges = []; // centros e ranges p/ colisão
+  zones.forEach((z, i) => {
+    const {tS, tE} = z;
+    const px1 = tX(tS), px2 = tX(tE);
+    const stripeW = Math.max(1, px2 - px1);
+    const col = zoneCol(z);
+    const fid = `df_${i}`, cid = `dc_${i}`, gcid = `dg_cl_${i}`, gfid = `dg_gf_${i}`;
+    phaseDefs += `<filter id="${fid}" x="-25%" y="-80%" width="150%" height="400%"><feGaussianBlur stdDeviation="4"/></filter>`;
+    phaseDefs += `<filter id="${gfid}" x="-10%" y="-150%" width="120%" height="400%"><feGaussianBlur stdDeviation="2"/></filter>`;
+    phaseDefs += `<clipPath id="${gcid}"><rect x="${px1.toFixed(1)}" y="0" width="${stripeW.toFixed(1)}" height="${H}"/></clipPath>`;
+
+    if (z.type === 'disc') {
+      // Exploração: efeito Território Familiar rotacionado 90°
+      // Faixa na LATERAL ESQUERDA (não no topo), brilho vai da faixa ATÉ A CURVA horizontalmente
+      // Tudo delimitado pelo intervalo vertical da curva na zona (tY(tE)..tY(tS))
+      const yTop = tY(tE), yBot = tY(tS), zoneH = yBot - yTop; // y range da curva
+      const sw = 10; // largura da faixa lateral (equivale ao stripH do Território Familiar)
+      // Curtain: da parede esquerda (x=0) até a curva — cor sólida, sem fade
+      let dc = `M0,${yBot.toFixed(1)}`;
+      for (let k = tS; k <= tE; k++) dc += ` L${tX(k).toFixed(1)},${tY(k).toFixed(1)}`;
+      dc += ` L0,${yTop.toFixed(1)} Z`;
+      phaseSvg += `<path d="${dc}" fill="${col}" opacity="0.18"/>`;
+      // Faixa lateral na parede esquerda do chart (x=0)
+      phaseSvg += `<rect x="${-sw}" y="${yTop.toFixed(1)}" width="${sw}" height="${zoneH.toFixed(1)}" fill="${col}" opacity="0.55" filter="url(#${fid})"/>`;
+      phaseSvg += `<rect x="${-sw}" y="${yTop.toFixed(1)}" width="${sw}" height="${zoneH.toFixed(1)}" fill="${col}" opacity="0.3"/>`;
+      const discCy = (yTop + yBot) / 2;
+      phaseArtY.push(discCy);
+      phaseArtRanges.push([yTop, yBot]);
+      const discLbl = abbr(z.label, zoneH - 8).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const dlx = (-sw / 2).toFixed(1), dly = discCy.toFixed(1);
+      if (discLbl) phaseSvg += `<text transform="rotate(-90,${dlx},${dly})" x="${dlx}" y="${dly}" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="var(--body)" font-weight="800" paint-order="stroke" stroke="rgba(0,0,0,0.78)" stroke-width="3" stroke-linejoin="round" fill="#fff">${discLbl}</text>`;
+    } else {
+      // Território Familiar: luz do topo para baixo até a curva (comportamento original)
+      const bottomY = Math.max(...Array.from({length: tE-tS+1}, (_,k) => tY(tS+k)));
+      const stripH = 10;
+      phaseDefs += `<linearGradient id="${cid}" x1="0" y1="0" x2="0" y2="${bottomY.toFixed(1)}" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="${col}" stop-opacity="0.28"/><stop offset="100%" stop-color="${col}" stop-opacity="0"/></linearGradient>`;
+      let dc = `M${px1.toFixed(1)},0 L${px2.toFixed(1)},0`;
+      for (let k = tE; k >= tS; k--) dc += ` L${tX(k).toFixed(1)},${tY(k).toFixed(1)}`;
+      dc += ' Z';
+      phaseSvg += `<path d="${dc}" fill="url(#${cid})"/>`;
+      phaseSvg += `<rect x="${px1.toFixed(1)}" y="${-stripH}" width="${stripeW.toFixed(1)}" height="${stripH}" fill="${col}" opacity="0.55" filter="url(#${fid})"/>`;
+      phaseSvg += `<rect x="${px1.toFixed(1)}" y="${-stripH}" width="${stripeW.toFixed(1)}" height="${stripH}" fill="${col}" opacity="0.3"/>`;
+      const famCx = (px1 + px2) / 2;
+      phaseMusX.push(famCx);
+      phaseMusRanges.push([px1, px2]);
+      const famLbl = abbr(z.label, stripeW - 4).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      if (famLbl) phaseSvg += `<text x="${famCx.toFixed(1)}" y="${(-stripH / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="var(--body)" font-weight="800" paint-order="stroke" stroke="rgba(0,0,0,0.78)" stroke-width="3" stroke-linejoin="round" fill="#fff">${famLbl}</text>`;
+    }
+
+    // Glow na curva — igual evo personalizado (clipado + stroke borrado), igual para ambos os tipos
+    let dLine = `M${tX(tS).toFixed(1)},${tY(tS).toFixed(1)}`;
+    for (let k = tS + 1; k <= tE; k++) dLine += ` L${tX(k).toFixed(1)},${tY(k).toFixed(1)}`;
+    phaseGlow += `<path d="${dLine}" fill="none" stroke="${col}" stroke-width="8" stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round" filter="url(#${gfid})" clip-path="url(#${gcid})" vector-effect="non-scaling-stroke"/>`;
+  });
+
+  const gradStops = segRates.map((r, i) => {
+    const t = r / rMax, pct = (i / NSEG * 100).toFixed(1);
+    return `<stop offset="${pct}%" stop-color="hsla(var(--h),${Math.round(25 + t * 60)}%,${Math.round(32 + t * 32)}%,${(0.06 + t * 0.44).toFixed(2)})"/>`;
+  }).join("") + (() => { const t = segRates[NSEG - 1] / rMax; return `<stop offset="100%" stop-color="hsla(var(--h),${Math.round(25 + t * 60)}%,${Math.round(32 + t * 32)}%,${(0.06 + t * 0.44).toFixed(2)})">`; })();
+  // Pico: faixa com maior distância euclidiana até a diagonal (0,H)→(W,4)
+  const diagA = 4 - H, diagB = -W, diagC = W * H;
+  const diagLen = Math.sqrt(diagA * diagA + diagB * diagB);
+  let peakK = 0, peakDist = -1;
+  for (let k = 0; k < n; k++) {
+    const d = Math.abs(diagA * tX(k) + diagB * tY(k) + diagC) / diagLen;
+    if (d > peakDist) { peakDist = d; peakK = k; }
+  }
+  const pkXv = tX(peakK), pkYv = tY(peakK);
+  const pkX = pkXv.toFixed(1), pkY = pkYv.toFixed(1);
+  const PEAK_COL = `hsl(calc(var(--h) + 180),55%,68%)`;
+  // Pico: coordenadas fixas no ponto natural
+  const pkLblY = pkYv + 3.5;
+  const pkLblX = pkXv;
+  const pkAnchorX = pkXv < 20 ? 'start' : pkXv > W - 20 ? 'end' : 'middle';
+
+  // Sobe #xpico enquanto colidir horizontalmente com retângulo de Território Familiar acima do chart
+  const PH_STRIP_H = 10;
+  let pkTopY = -8;
+  const PH_STRIP_GAP = 5; // folga após sair do retângulo
+  const xpicoHitsStrip = y => phaseMusRanges.some(([r1, r2]) =>
+    pkLblX > r1 - 15 && pkLblX < r2 + 15 && y > -(PH_STRIP_H + PH_STRIP_GAP)
+  );
+  while (xpicoHitsStrip(pkTopY) && pkTopY > -120) pkTopY--;
+
+  // Move ypico para a esquerda só se colidir com retângulo de Exploração; sem colisão = mesma coluna
+  const PH_SW = 10, PH_SW_GAP = 5;
+  let pkLeftX = -3;
+  const ypicoHitsStrip = x => phaseArtRanges.some(([yt, yb]) =>
+    pkLblY >= yt - 5 && pkLblY <= yb + 5 && x > -(PH_SW + PH_SW_GAP)
+  );
+  while (ypicoHitsStrip(pkLeftX) && pkLeftX > -120) pkLeftX--;
+
+  // "artistas →" rotacionado: ~77px de comprimento → raio visual ~40px
+  // pico y-label: ~20px → raio ~10px → gap mínimo real = 50px
+  const ART_GAP = 50;
+  const ART_AVOID = [pkLblY, 10, H, ...phaseArtY];
+  const collidesY = y => ART_AVOID.some(ay => Math.abs(y - ay) < ART_GAP);
+  let artLblY = H / 3;
+  if (collidesY(artLblY)) {
+    let t = artLblY;
+    while (collidesY(t) && t <= H - ART_GAP) t++;
+    if (!collidesY(t)) { artLblY = t; }
+    else {
+      t = artLblY;
+      while (collidesY(t) && t >= ART_GAP) t--;
+      if (!collidesY(t)) artLblY = t;
+    }
+  }
+
+  // "músicas →": ~80px → raio ~40px; pico x-label ~25px → raio ~12px → gap = 55px
+  const MUS_GAP = 55;
+  const MUS_AVOID = [pkLblX, 0, W, ...phaseMusX];
+  const collidesX = x => MUS_AVOID.some(ax => Math.abs(x - ax) < MUS_GAP);
+  let musLblX = W / 2;
+  if (collidesX(musLblX)) {
+    let t = musLblX;
+    while (collidesX(t) && t >= MUS_GAP) t--;
+    if (!collidesX(t)) { musLblX = t; }
+    else {
+      t = musLblX;
+      while (collidesX(t) && t <= W - MUS_GAP) t++;
+      if (!collidesX(t)) musLblX = t;
+    }
+  }
+
+  // Eixos e marcações — step "redondo" que dá 3–7 divisões
+  const niceStep = max => { for (const s of [100,50,25,20,10,5,2,1]) if (max/s>=3 && max/s<=7) return s; return 1; };
+  const xStep = niceStep(n), yStep = niceStep(mx);
+  const aS = `hsla(var(--h),40%,70%,`; // prefixo de cor dos eixos
+  let gridSvg = '', xLblSvg = '', yLblSvg = '';
+  // Linhas dos eixos (x em baixo, y na esquerda)
+  gridSvg += `<line x1="0" y1="${H-4}" x2="${W}" y2="${H-4}" stroke="${aS}.22)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+  gridSvg += `<line x1="0" y1="4" x2="0" y2="${H-4}" stroke="${aS}.22)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+  // Meios dos eixos — calculados antes de desenhar para usar posições finais dos labels
+  const midCurveCol = `hsl(var(--h),55%,68%)`;
+  const midX = (W/2).toFixed(1), midY = ((H-4+4)/2).toFixed(1);
+  const midKx = Math.min(Math.round((n-1)/2), cum.length-1);
+  const midCurveArt = cum[midKx];
+  const midCurveTrack = BY_PLAYLIST[half] ? BY_PLAYLIST[half].n : half + 1;
+  // Posição dos labels — desviam de fases e do pico
+  let midArtTopY = 2;
+  const midArtCollides = y =>
+    (Math.abs(W/2 - pkLblX) < 25 && Math.abs(y - pkTopY) < 11) ||
+    phaseMusRanges.some(([r1, r2]) => W/2 > r1 - 15 && W/2 < r2 + 15 && y > -(PH_STRIP_H + PH_STRIP_GAP));
+  while (midArtCollides(midArtTopY) && midArtTopY > -120) midArtTopY--;
+  let midTrackLeftX = -5;
+  const midTrackCollides = x =>
+    (Math.abs(parseFloat(midY) - pkLblY) < 11 && Math.abs(x - pkLeftX) < 25) ||
+    phaseArtRanges.some(([yt, yb]) => parseFloat(midY) >= yt - 5 && parseFloat(midY) <= yb + 5 && x > -(PH_SW + PH_SW_GAP));
+  while (midTrackCollides(midTrackLeftX) && midTrackLeftX > -120) midTrackLeftX--;
+  const midCurveArtPct = Math.round(midCurveArt / mx * 100);
+  const midCurveTrackPct = Math.round(half / Math.max(1, n - 1) * 100);
+  // Linhas tracejadas estendem até o label deslocado
+  gridSvg += `<line x1="${midX}" y1="${midArtTopY}" x2="${midX}" y2="${H-4}" stroke="${midCurveCol}" stroke-width="1" stroke-dasharray="4 4" opacity=".35" vector-effect="non-scaling-stroke"/>`;
+  gridSvg += `<line x1="${midTrackLeftX}" y1="${midY}" x2="${W}" y2="${midY}" stroke="${midCurveCol}" stroke-width="1" stroke-dasharray="4 4" opacity=".35" vector-effect="non-scaling-stroke"/>`;
+  gridSvg += `<text font-size="8" fill="${midCurveCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="auto" x="${midX}" y="${midArtTopY}">${midCurveArtPct}%</text>`;
+  gridSvg += `<text font-size="8" fill="${midCurveCol}" font-family="var(--body)" text-anchor="end" dominant-baseline="middle" x="${midTrackLeftX}" y="${midY}">#${midCurveTrackPct}%</text>`;
+  // Marcações do eixo X
+  for (let v = xStep; v < n; v += xStep) {
+    const tx = (v / (n-1) * W).toFixed(1);
+    gridSvg += `<line x1="${tx}" x2="${tx}" y1="4" y2="${H-4}" stroke="${aS}.05)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    gridSvg += `<line x1="${tx}" x2="${tx}" y1="${H-4}" y2="${H-1}" stroke="${aS}.35)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    if (Math.abs(+tx) >= 20 && Math.abs(+tx - W) >= 20 && Math.abs(+tx - W/2) >= 20)
+      xLblSvg += `<text font-size="8" fill="${aS}.4)" font-family="var(--body)" text-anchor="middle" x="${(pad + +tx).toFixed(1)}" y="${H+11}">#${v}</text>`;
+  }
+  // Marcações do eixo Y
+  for (let v = yStep; v < mx; v += yStep) {
+    const ty = (H - 4 - (v/mx)*(H-8)).toFixed(1);
+    gridSvg += `<line x1="0" x2="${W}" y1="${ty}" y2="${ty}" stroke="${aS}.05)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    gridSvg += `<line x1="-3" x2="0" y1="${ty}" y2="${ty}" stroke="${aS}.35)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    if (Math.abs(+ty - 10) >= 12 && Math.abs(+ty - (H - 4)) >= 12)
+      yLblSvg += `<text font-size="8" fill="${aS}.4)" font-family="var(--body)" text-anchor="start" dominant-baseline="middle" x="${pad+W+6}" y="${ty}">${v}</text>`;
+  }
+  // Labels do ponto médio — desviam se colidirem com outros labels
+  // Ticks próximos de W/2 omitidos; label do pico fica acima do gráfico — sem colisão possível
+  const xMidCollides = false;
+  xLblSvg += `<text font-size="8" fill="hsl(var(--h),55%,68%)" font-family="var(--body)" text-anchor="middle" x="${(pad + W/2).toFixed(1)}" y="${xMidCollides ? H+21 : H+11}">#${Math.round(n/2)}</text>`;
+  const yMidTy = (H-4+4)/2;
+  const yMidCollides = (() => {
+    if (Math.abs(yMidTy - pkLblY) < 12) return true;
+    for (let v = yStep; v < mx; v += yStep) { if (Math.abs(yMidTy - (H-4-(v/mx)*(H-8))) < 12) return true; }
+    return false;
+  })();
+  yLblSvg += `<text font-size="8" fill="hsl(var(--h),55%,68%)" font-family="var(--body)" text-anchor="start" dominant-baseline="middle" x="${yMidCollides ? pad+W+16 : pad+W+6}" y="${yMidTy.toFixed(1)}">${Math.round(mx/2)}</text>`;
+
+  // Setas dos eixos — ficam acima das fases e dos labels do pico
+  // Setas ficam além de TODOS os labels relevantes de cada eixo
+  // Baixo (músicas): coleta todos os y de labels abaixo do gráfico
+  const belowLabelsY = [H + 11]; // tick labels, #0, #n (sempre em H+11)
+  if (xMidCollides) belowLabelsY.push(H + 21); // mid x-label deslocado para H+21
+  const arrowBotY = Math.max(...belowLabelsY) + 11;
+  // Direita (artistas): coleta todos os x-extent de labels à direita do gráfico
+  const yNumW = Math.ceil(Math.max(String(mx).length, String(Math.round(mx/2)).length) * 5.5) + 2;
+  const rightLabelsX = [W + 6 + yNumW]; // tick labels, mx, 0 (text-anchor="start" a partir de W+6)
+  if (yMidCollides) rightLabelsX.push(W + 16 + yNumW); // mid y-label deslocado para W+16
+  const arrowRightX = Math.max(...rightLabelsX) + 8;
+  const axCol = `hsla(var(--h),40%,70%,.7)`;
+  const arrowMidY = ((H - 4 + 4) / 2).toFixed(1);
+  let axisArrowsSvg = '';
+  // Seta horizontal → (eixo músicas) — abaixo dos labels do eixo X
+  axisArrowsSvg += `<line x1="0" y1="${arrowBotY}" x2="${W - 10}" y2="${arrowBotY}" stroke="${axCol}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+  axisArrowsSvg += `<path d="M${W-12},${arrowBotY-4} L${W},${arrowBotY} L${W-12},${arrowBotY+4}" fill="none" stroke="${axCol}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+  axisArrowsSvg += `<text font-size="10" fill="${axCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="hanging" x="${(W/2).toFixed(1)}" y="${arrowBotY + 4}">músicas</text>`;
+  // Seta vertical ↑ (eixo artistas) — à direita dos labels do eixo Y
+  axisArrowsSvg += `<line x1="${arrowRightX}" y1="${H-4}" x2="${arrowRightX}" y2="12" stroke="${axCol}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+  axisArrowsSvg += `<path d="M${arrowRightX-4},12 L${arrowRightX},4 L${arrowRightX+4},12" fill="none" stroke="${axCol}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+  axisArrowsSvg += `<text font-size="10" fill="${axCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="middle" transform="rotate(90,${arrowRightX+5},${arrowMidY})" x="${arrowRightX+5}" y="${arrowMidY}">artistas</text>`;
+
+  // Oculta o círculo do pico se ele coincidir com a interseção dos tracejados do meio
+  const hidePeakCircle = Math.abs(pkXv - W/2) < 12 && Math.abs(pkYv - H/2) < 12;
+
+  el.innerHTML = `<svg viewBox="0 0 ${W + pad * 2} ${H + pad}" style="width:100%;height:100%;display:block;overflow:visible" aria-label="Artistas acumulados ao longo da playlist">
+    <defs>
+      <linearGradient id="dg" x1="0" x2="1" y1="0" y2="0" gradientUnits="objectBoundingBox">${gradStops}</linearGradient>
+      <clipPath id="cl-above"><polygon points="0,${H} ${W},4 ${W},-10 0,-10"/></clipPath>
+      <clipPath id="cl-below"><polygon points="0,${H} ${W},4 ${W},${H + 5} 0,${H + 5}"/></clipPath>
+      <filter id="pk-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
+      ${phaseDefs}
+    </defs>
+    <g transform="translate(${pad},0)">
+      ${gridSvg}
+      <line x1="0" y1="${H}" x2="${W}" y2="4" stroke="hsla(var(--h),50%,80%,.22)" stroke-width="1" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+      ${phaseSvg}
+      <path d="M${P}" fill="none" stroke="hsl(var(--h),55%,68%)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+      ${phaseGlow}
+      <line x1="${pkX}" x2="${pkX}" y1="${pkTopY}" y2="${H}" stroke="${PEAK_COL}" stroke-opacity=".45" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+      <line x1="${pkLeftX}" y1="${pkY}" x2="${W}" y2="${pkY}" stroke="${PEAK_COL}" stroke-opacity=".45" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+      ${hidePeakCircle ? '' : `<circle cx="${pkX}" cy="${pkY}" r="4" fill="none" stroke="${PEAK_COL}" stroke-width="1.5" opacity=".9" filter="url(#pk-glow)" vector-effect="non-scaling-stroke"/>
+      <circle cx="${pkX}" cy="${pkY}" r="4" fill="none" stroke="${PEAK_COL}" stroke-width="1.5" opacity=".9" vector-effect="non-scaling-stroke"/>`}
+      <text font-size="9" fill="${PEAK_COL}" font-family="var(--body)" text-anchor="${pkAnchorX}" x="${pkLblX.toFixed(1)}" y="${pkTopY}" dominant-baseline="auto" font-weight="700">#${BY_PLAYLIST[peakK] ? BY_PLAYLIST[peakK].n : peakK + 1}</text>
+      <text font-size="9" fill="${PEAK_COL}" font-family="var(--body)" text-anchor="end" x="${pkLeftX}" y="${pkLblY.toFixed(1)}" font-weight="700">${cum[peakK]}</text>
+      ${axisArrowsSvg}
+    </g>
+    <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="middle" x="${pad}"      y="${H + 11}">#0</text>
+    <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="end"    x="${pad + W}" y="${H + 11}">#${n}</text>
+    <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="start"   x="${pad+W+6}"  y="10">${mx}</text>
+    <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="start"   x="${pad+W+6}"  y="${H}"  dominant-baseline="middle">0</text>
+    ${xLblSvg}${yLblSvg}
+  </svg>`;
+  el.style.display = "flex"; el.style.flexDirection = "column";
+  const peakChip = document.getElementById('dsc-peak-chip');
+  if (peakChip) {
+    const pTrack = BY_PLAYLIST[peakK];
+    const peakCovPct = +(cum[peakK] / mx * 100).toFixed(2);
+    const xn = peakK / Math.max(1, n - 1), yn = cum[peakK] / mx;
+    const triRatio = xn > 0 ? Math.round((yn - xn) ** 2 / (xn * yn) * 100) : 0;
+    peakChip.innerHTML = `<b>#${pTrack ? pTrack.n : peakK + 1}</b><span>${cum[peakK]} artistas · ${peakCovPct}% do total descoberto</span>`;
+  }
+
+  const zonesEl = el.closest('.disc-row')?.querySelector('.dsc-zones');
+  if (zonesEl) {
+    const tn = k => BY_PLAYLIST[k] ? `#${BY_PLAYLIST[k].n}` : `#${k+1}`;
+    const pct = z => `${+(z.density * 100).toFixed(2)}%`;
+    const row = z => { const c = zoneCol(z); return `<div class="dsc-zrow" style="color:${c}"><span class="dsc-zrank">${z.rank}ª</span><span class="dsc-zrange">${tn(z.tS)}–${tn(z.tE)}</span><span class="dsc-zpct">${pct(z)} novas</span></div>`; };
+    const disc = zones.filter(z => z.type === 'disc');
+    const fam  = zones.filter(z => z.type === 'fam');
+    const avgDensity = cum[n - 1] / n;
+    const peakTrackStr = BY_PLAYLIST[peakK] ? `#${BY_PLAYLIST[peakK].n}` : `#${peakK+1}`;
+    const peakDensityNum = cum[peakK] / (BY_PLAYLIST[peakK] ? BY_PLAYLIST[peakK].n : peakK + 1);
+    const five = [
+      {z: fam[0],  label: 'Familiar 1ª', numVal: fam[0]?.density ?? 0},
+      {z: fam[1],  label: 'Familiar 2ª', numVal: fam[1]?.density ?? 0},
+      {z: null,    label: 'Média',        density: avgDensity, numVal: avgDensity, col: 'hsl(var(--h),55%,68%)'},
+      {z: disc[1], label: 'Expansão 2ª', numVal: disc[1]?.density ?? 0},
+      {z: disc[0], label: 'Expansão 1ª', numVal: disc[0]?.density ?? 0},
+      {z: null,    label: 'Pico',         val: `${+(peakDensityNum * 100).toFixed(2)}%`, numVal: peakDensityNum, col: `hsl(calc(var(--h) + 180),55%,68%)`, rangeStr: peakTrackStr},
+    ].filter(p => p.z !== undefined).sort((a, b) => b.numVal - a.numVal);
+    const fiveHtml = five.map(p => {
+      const c = p.z ? zoneCol(p.z) : p.col;
+      const valStr = p.val ?? `${+((p.z ? p.z.density : p.density) * 100).toFixed(2)}%`;
+      const rangeStr = p.z ? `${tn(p.z.tS)}–${tn(p.z.tE)}` : (p.rangeStr ?? '');
+      return `<div class="dsc-five-item" style="color:${c}"><span class="dsc-five-pct">${valStr}</span><span class="dsc-five-lbl">${p.label}</span>${rangeStr ? `<span class="dsc-five-range">${rangeStr}</span>` : ''}</div>`;
+    }).join('');
+    zonesEl.innerHTML = `<div class="dsc-five">${fiveHtml}</div>`;
+  }
 }
 function renderNote(){
   const nc = chapCount(NN); $("#ins-note").textContent = `${IS.journey ? `Ordem de entrada = coluna "número" da lista (#1 é a mais antiga na playlist). Partes = ${nc} blocos de ~${Math.round(NN / nc)} adições. ` : ""}Cada faixa conta uma vez para o artista exatamente como está escrito na lista. Índice de concentração = soma dos quadrados das participações (HHI). Os textos desta aba são gerados por regras a partir dos dados atuais e mudam quando a lista muda.`;
 }
 function renderTechBar(){
-  const b = $("#tech-toggle");
+  const b = $("#tech-toggle"), bc = $("#ins-tech-cta-btn");
   b.setAttribute("aria-pressed", techOn);
   b.textContent = techOn ? "Ver insights simples" : "Ver insights técnicos";
+  if (bc){ bc.setAttribute("aria-pressed", techOn); bc.textContent = techOn ? "Insights simples" : "Insights técnicos"; }
   $("#insights").dataset.view = techOn ? "tech" : "simple";
   $("#tech-hint").textContent = techOn ? "Mostrando só a análise técnica: jornada da playlist, cards avançados e metodologia." : "Mostrando a leitura simples: resumo e cards principais.";
 }
@@ -5798,6 +6214,30 @@ function boot(){
     else if (verify) setTimeout(askVerifyOrder, 1400);
   }
   if (location.hash === "#insights") showTab("insights");
+  // botões "Ver insight" nos cards do painel
+  [["card-years","years"],["card-part","ranking"],["card-albums","albums"],["card-ranking","ranking"],["card-profile","profile"],["card-genres","genres"],["evo-card","evo"]].forEach(([id, topic]) => {
+    const article = document.getElementById(id); if (!article) return;
+    const isEvo = id === "evo-card";
+    const target = isEvo ? article.querySelector(".evo-right-tools") : article.querySelector("header");
+    if (!target) return;
+    target.insertAdjacentHTML(isEvo ? "afterbegin" : "beforeend", `<button class="card-ins-btn" type="button" data-for="${topic}">Ver insight →</button>`);
+  });
+  syncInsightBtns();
+  document.addEventListener("click", e => {
+    const btn = e.target.closest(".card-ins-btn"); if (!btn) return;
+    showTab("insights");
+    setTimeout(() => {
+      const target = document.querySelector(`#mix [data-panel="${btn.dataset.for}"]`);
+      if (target){
+        let el = target, docTop = 0; while (el){ docTop += el.offsetTop; el = el.offsetParent; }
+        window.scrollTo({top: Math.max(0, docTop - 80), behavior: "smooth"});
+        setTimeout(() => { target.classList.add("ins-pulse"); target.addEventListener("animationend", () => target.classList.remove("ins-pulse"), {once: true}); }, 700);
+      } else scrollTo({top: 0, behavior: "smooth"});
+    }, 80);
+  });
+  $("#ins-cta-btn").addEventListener("click", () => { showTab("insights"); scrollTo({top: 0, behavior: "smooth"}); });
+  $("#ins-tech-cta-btn").addEventListener("click", () => { techOn = !techOn; try { localStorage.setItem(TECH_KEY, techOn ? "1" : "0"); } catch(e){} renderCards(); renderDisc(); renderTechBar(); animateInsights(); dispatchEvent(new Event("fx:refresh")); scrollTo({top: 0, behavior: "smooth"}); });
+  $("#ins-painel-cta-btn").addEventListener("click", () => { _panelScrollY = 0; showTab("painel"); });
   const untouched = !STORE && !touchedExample();   // exemplo do site sem nenhuma alteração
   const params = new URLSearchParams(location.search);
   if (params.get("import") === "nova-playlist"){
