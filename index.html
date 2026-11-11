@@ -133,41 +133,35 @@
       </div>
 
       <div class="grid">
-        <article class="card chart rise" style="--d:7">
+        <article class="card chart rise" id="card-years" style="--d:7">
           <header><div><div class="eyebrow">01 · Linha do tempo</div><h2>Músicas por ano de lançamento</h2></div><div class="hint" id="years-hint">Passe o mouse para ver os álbuns de cada ano · clique para filtrar</div><div class="card-tools"><span class="seg" id="years-tab" role="group" aria-label="Visualização"><button type="button" data-m="anos" aria-pressed="true">Por ano</button><button type="button" data-m="decadas" aria-pressed="false">Por década</button></span></div></header>
           <div class="body"><div class="years" id="years"></div><div class="prof" id="years-decades" style="display:none"></div></div>
         </article>
-        <article class="card chart rise" style="--d:8">
+        <article class="card chart rise" id="card-part" style="--d:8">
           <header><div><div class="eyebrow">02 · Participação</div><h2 id="tree-title">Músicas por banda/artista</h2></div><button class="gbtn tree-exp" id="tree-expand" type="button" title="Ver o gráfico em tela cheia"><svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>Tela cheia</button><div class="hint hint-btn"><span class="tree-tools"><span class="seg alb-mode" id="tree-mode" role="group" aria-label="O que o gráfico mostra"><button type="button" data-m="bandas" aria-pressed="true">Bandas</button><button type="button" data-m="albuns" aria-pressed="false">Álbuns</button></span><span id="tree-style-slot"></span></span></div></header>
           <div class="body"><div class="tree" id="tree"></div></div>
         </article>
-        <article class="card chart rise" style="--d:9">
+        <article class="card chart rise" id="card-albums" style="--d:9">
           <header><div><div class="eyebrow">03 · Repertório</div><h2 id="alb-title">Músicas por álbum</h2></div><div class="hint" id="alb-hint"></div><div class="card-tools"><span class="seg alb-mode" id="alb-mode" role="group" aria-label="Ordenar os álbuns por"><button type="button" data-m="faixas" aria-pressed="true">Faixas</button><button type="button" data-m="duracao" aria-pressed="false">Duração</button></span></div></header>
           <div class="body"><div class="list albums" id="albums"></div></div>
         </article>
-        <article class="card chart rise" style="--d:10">
+        <article class="card chart rise" id="card-ranking" style="--d:10">
           <header><div><div class="eyebrow">04 · Ranking</div><h2>Bandas/artistas do maior para o menor</h2></div><div class="hint">Com participação e acumulado</div></header>
           <div class="body"><div class="list rank" id="rank"></div></div>
         </article>
-        <article class="card chart rise prof-card" style="--d:11">
+        <article class="card chart rise prof-card" id="card-profile" style="--d:11">
           <header><div><div class="eyebrow">05 · Perfil</div><h2>Como são as faixas</h2></div><div class="hint" id="prof-hint"></div></header>
           <div class="body"><div class="prof" id="profile"></div></div>
         </article>
-        <article class="card chart rise genre-wide" style="--d:12">
+        <article class="card chart rise genre-wide" id="card-genres" style="--d:12">
           <header><div><div class="eyebrow">06 · Estilo</div><h2>Músicas por gênero</h2></div><div class="hint" id="gen-hint"></div></header>
           <div class="body"><div class="list rank genres" id="genres"></div></div>
         </article>
       </div>
 
       <article class="card chart rise" id="evo-card" style="--d:13">
-        <header><div><div class="eyebrow">07 · Evolução</div><h2>Como cada <span id="evo-what">banda</span> cresceu na playlist</h2></div><div class="hint" id="evo-hint"></div></header>
+        <header><div><div class="eyebrow">07 · Evolução</div><h2>Como cada <span id="evo-what">banda</span> cresceu na playlist</h2></div><div class="hint" id="evo-hint"></div><div class="card-tools evo-card-tools"><span class="seg" id="evo-mode" role="group" aria-label="Agrupar por"><button type="button" data-m="band" aria-pressed="true">Bandas</button><button type="button" data-m="genre" aria-pressed="false">Gêneros</button></span><button class="gbtn evo-phases-btn" type="button" id="evo-phases" aria-pressed="false">Fases de dominância</button><div class="evo-right-tools"><div class="dtool-grp evo-tops-grp"><button class="gbtn dtool-trg" id="evo-tops-trg" type="button" aria-haspopup="true" aria-expanded="false">Exibir<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="dtool-drop evo-tops-drop" hidden><span class="seg" id="evo-tops" role="group" aria-label="Mostrar os maiores"></span></div></div><button class="gbtn" type="button" id="evo-none">Limpar linhas</button></div></div></header>
         <div class="body">
-          <div class="evo-tools">
-            <span class="seg" id="evo-mode" role="group" aria-label="Agrupar por"><button type="button" data-m="band" aria-pressed="true">Bandas</button><button type="button" data-m="genre" aria-pressed="false">Gêneros</button></span>
-            <span class="seg" id="evo-tops" role="group" aria-label="Mostrar os maiores"></span>
-            <button class="gbtn" type="button" id="evo-none">Limpar linhas</button>
-            <button class="gbtn" type="button" id="evo-phases" aria-pressed="false">Fases</button>
-          </div>
           <div class="evo-pick"><input type="search" id="evo-q" placeholder="Buscar para adicionar uma linha…" aria-label="Buscar para adicionar uma linha"><div class="evo-opts" id="evo-opts"></div><div class="evo-singles-row" id="evo-singles-row" style="display:none"><button class="lnk" type="button" id="evo-singles" style="padding:0"></button><button class="evo-x" type="button" id="evo-singles-x" title="Tirar do gráfico as linhas de 1 faixa" aria-label="Tirar do gráfico as linhas de 1 faixa">×</button></div></div>
           <div class="evo" id="evo"></div>
         </div>
@@ -187,6 +181,10 @@
       <h3>Nenhuma faixa combina com estes filtros</h3>
       <p>As bandas e os álbuns escolhidos não têm músicas em comum no catálogo. Limpe os filtros para voltar à visão completa.</p>
       <button class="btn" id="empty-clear">Limpar filtros</button>
+    </div>
+
+    <div class="ins-cta rise" id="ins-cta" style="--d:1">
+      <button class="btn ins-cta-btn" id="ins-cta-btn" type="button">Ver Insights</button>
     </div>
   </section>
 
@@ -214,6 +212,11 @@
     <div class="mix" id="mix"></div>
 
     <p class="note" id="ins-note" data-ins="tech"></p>
+
+    <div class="ins-cta rise" id="ins-cta-bot" style="--d:1">
+      <button class="btn ins-cta-btn" id="ins-tech-cta-btn" type="button"></button>
+      <button class="btn ins-cta-btn ins-cta-painel" id="ins-painel-cta-btn" type="button">Voltar para o Painel</button>
+    </div>
   </section>
 
   <footer><span id="foot-src"></span><span>Dashbeat · Sinta a batida. Revele o impacto.</span><span>Outros projetos: <a href="https://lui13h.github.io/Otimizador/" target="_blank" rel="noopener">Otimizador</a> · <a href="https://central-pro-clubs-2j9o.vercel.app/clips.html" target="_blank" rel="noopener">Central de Estatísticas</a></span><span>Atalho: tecla <b>Esc</b> fecha filtros</span></footer>

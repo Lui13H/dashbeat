@@ -1,3 +1,22 @@
+/* Scroll fantasma: containers com overflow mas sem conteúdo suficiente bloqueiam
+   o scroll da página. Intercepta wheel events e passa para window quando o container
+   não tem conteúdo para rolar ou chegou ao seu limite. */
+(function(){
+  const SELS = '.opts,.list,.mb,.prof,.tbscroll,.cd-side,.cd-wrap,.warns ul,.ptab';
+  document.addEventListener('wheel', function(e){
+    const el = e.target.closest(SELS);
+    if (!el) return;
+    const canScroll = el.scrollHeight > el.clientHeight;
+    if (canScroll) {
+      const atTop    = el.scrollTop <= 0 && e.deltaY < 0;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && e.deltaY > 0;
+      if (!atTop && !atBottom) return;
+    }
+    e.preventDefault();
+    window.scrollBy(0, e.deltaY);
+  }, { passive: false });
+})();
+
 /* Efeitos de scroll, só onde fazem sentido:
    - revelar ao rolar: cards abaixo da dobra entram quando aparecem na tela (as duas páginas)
    - barra fixa: a toolbar do painel gruda no topo e ganha vidro (dashboard)
@@ -60,6 +79,69 @@
   orbs.innerHTML = "<i></i><i></i><i></i>";
   document.body.prepend(orbs);
   const orbEls = [...orbs.children], orbSpeed = [-0.12, -0.22, -0.34];
+
+  // equalizador espectral no rodapé
+  const cv = document.createElement("canvas");
+  cv.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:0;";
+  cv.setAttribute("aria-hidden","true");
+  document.body.prepend(cv);
+  const cx = cv.getContext("2d");
+  const getH = () => +getComputedStyle(root).getPropertyValue("--h") || 153;
+  let cvH = getH();
+  setInterval(() => { cvH = getH(); }, 3000);
+  const BARS = 120;
+  const bh = Array.from({length:BARS}, () => Math.random());
+  const bt = Array.from({length:BARS}, () => Math.random());
+  const bs = Array.from({length:BARS}, () => 0.012 + Math.random() * 0.028);
+  const resizeCv = () => { cv.width = innerWidth; cv.height = innerHeight; };
+  resizeCv();
+  addEventListener("resize", resizeCv);
+  (function tick(){
+    requestAnimationFrame(tick);
+    cx.clearRect(0, 0, cv.width, cv.height);
+    const W = cv.width, H = cv.height;
+    const bw = W / BARS;
+    const footerEl = document.querySelector(".wrap>footer");
+    const maxH = (footerEl ? footerEl.offsetHeight : H * 0.1) * 4;
+    cx.save();
+    const maxScroll = Math.max(1, document.body.scrollHeight - innerHeight);
+    const barMaxH = maxH;
+    const parallaxOffset = Math.max(0, (barMaxH - 4) * (1 - scrollY / maxScroll));
+    cx.translate(0, parallaxOffset);
+    // luz estática no rodapé — não muda com as barras
+    const staticGlow = cx.createLinearGradient(0, H * 0.72, 0, H);
+    staticGlow.addColorStop(0,   `hsla(${cvH},100%,62%,0)`);
+    staticGlow.addColorStop(0.7, `hsla(${cvH},100%,62%,.06)`);
+    staticGlow.addColorStop(1,   `hsla(${cvH},100%,62%,.16)`);
+    cx.fillStyle = staticGlow;
+    cx.fillRect(0, H * 0.72, W, H * 0.28);
+    // atualizar alturas
+    for (let i = 0; i < BARS; i++){
+      if (Math.abs(bh[i] - bt[i]) < 0.015) bt[i] = 0.02 + Math.random() * 0.98 * (0.3 + 0.7 * Math.sin(i / BARS * Math.PI));
+      bh[i] += (bt[i] - bh[i]) * bs[i];
+    }
+    // corpos de vidro
+    cx.fillStyle = `hsl(${cvH},80%,65%)`;
+    for (let i = 0; i < BARS; i++){
+      cx.globalAlpha = 0.06;
+      cx.fillRect(i * bw, H - bh[i] * maxH, bw, bh[i] * maxH);
+    }
+    cx.globalAlpha = 1;
+    // contorno neon — só arestas expostas
+    const neon = `hsl(${cvH},100%,62%)`;
+    cx.fillStyle = neon;
+    cx.shadowBlur = 1; cx.shadowColor = neon; cx.globalAlpha = 0.55;
+    for (let i = 0; i < BARS; i++){
+      const top = H - bh[i] * maxH, x = i * bw;
+      cx.fillRect(x, top, bw, 0.5);                                              // topo sempre
+      const lTop = i > 0        ? H - bh[i-1] * maxH : H;
+      if (top < lTop) cx.fillRect(x,            top, 0.5, lTop - top);           // esquerda exposta
+      const rTop = i < BARS - 1 ? H - bh[i+1] * maxH : H;
+      if (top < rTop) cx.fillRect(x + bw - 0.5, top, 0.5, rTop - top);          // direita exposta
+    }
+    cx.shadowBlur = 0; cx.globalAlpha = 1;
+    cx.restore();
+  })();
 
   // altura da toolbar
   const setTb = () => { if (toolbar) root.style.setProperty("--fx-tb", Math.round(toolbar.offsetHeight) + "px"); };
