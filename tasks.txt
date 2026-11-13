@@ -264,3 +264,39 @@ diminui o tamanho desse card tirando uma das bandas dele, tá muito comprido
 ------------------------------------------------------------------
 
 comente caso haja (caso tenha acontecido no grafico) o quão raro é fases de expansão depois da metade da playlist e/ou fases de familiaridade antes da metade da playlist
+
+------------------------------------------------------
+IDEIAS GENIAIS PARA PRÓXIMAS VERSÕES
+------------------------------------------------------
+
+IDEIA A — "DNA Musical" (radar/teia)
+Gráfico de teia (spider chart) com 6 dimensões simultâneas: concentração por artista,
+diversidade de décadas, % explícitas, proporção álbuns vs singles, faixas longas, ritmo
+de adição. Uma foto instantânea do "genoma" da playlist — cada um tem um formato único.
+Compartilhável como assinatura musical.
+
+IDEIA B — Detector de anomalias ("faixas fora de lugar")
+Calcula o "desvio" de cada faixa em relação ao perfil médio (década, duração, gênero).
+As 5 mais discrepantes ganham destaque no insight: "estas faixas parecem vir de outra
+playlist". Genuinamente surpreendente — o algoritmo encontra coisas que o dono não
+perceberia. Dados necessários: year, sec, genre.
+
+IDEIA C — "Lealdade do artista" ao longo do tempo
+Para os top 10 artistas, mostra se foram adicionados em burst (tudo de uma vez, febre
+passageira) ou distribuídos ao longo de toda a história (amor duradouro). Uma linha do
+tempo sparkline por artista. Usa CHI + a.rs para calcular distribuição de adições.
+
+IDEIA D — "Mapa de influência" entre décadas
+Se você tem Iron Maiden (80s) + Pantera (90s) + Gojira (2000s), o insight detecta a
+cadeia de influência e narra: "a playlist traça uma linha direta do heavy metal dos 80s
+ao metal progressivo dos 2000s". Conta a história por trás das escolhas via IS.dec + IS.art.
+
+IDEIA E — Score de coesão da playlist (0–100)
+Número calculado a partir da dispersão de décadas, gêneros e durações. Breakdown visual:
+"Coesão de era: 94 · Coesão de gênero: 71 · Diversidade de artistas: 45". Simples,
+comparável, compartilhável. Aparece no hero ou como insight próprio.
+
+IDEIA F — "Completude por década"
+Para cada década presente, mostra quantos dos ~200 álbuns canônicos daquela era estão
+na playlist (lista embutida no JS, sem API). Ex: "Anos 90: 7 de 15 clássicos — faltam
+Rust in Peace, Scenes from a Memory...". Exige curadoria manual da lista de referência.

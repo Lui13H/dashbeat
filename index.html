@@ -157,10 +157,14 @@
           <header><div><div class="eyebrow">06 · Estilo</div><h2>Músicas por gênero</h2></div><div class="hint" id="gen-hint"></div></header>
           <div class="body"><div class="list rank genres" id="genres"></div></div>
         </article>
+        <article class="card chart rise" id="card-decades" style="--d:12">
+          <header><div><div class="eyebrow">07 · Épocas</div><h2>Artistas por década</h2></div><div class="card-tools"><span class="seg" id="dec-mode" role="group" aria-label="Visualização por décadas ou partes"><button type="button" data-m="decades" aria-pressed="true">Décadas</button><button type="button" data-m="parts" aria-pressed="false">Partes</button></span></div></header>
+          <div class="body"><div class="dec-wrap" id="decades"></div></div>
+        </article>
       </div>
 
       <article class="card chart rise" id="evo-card" style="--d:13">
-        <header><div><div class="eyebrow">07 · Evolução</div><h2>Como cada <span id="evo-what">banda</span> cresceu na playlist</h2></div><div class="hint" id="evo-hint"></div><div class="card-tools evo-card-tools"><span class="seg" id="evo-mode" role="group" aria-label="Agrupar por"><button type="button" data-m="band" aria-pressed="true">Bandas</button><button type="button" data-m="genre" aria-pressed="false">Gêneros</button></span><button class="gbtn evo-phases-btn" type="button" id="evo-phases" aria-pressed="false">Fases de dominância</button><div class="evo-right-tools"><div class="dtool-grp evo-tops-grp"><button class="gbtn dtool-trg" id="evo-tops-trg" type="button" aria-haspopup="true" aria-expanded="false">Exibir<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="dtool-drop evo-tops-drop" hidden><span class="seg" id="evo-tops" role="group" aria-label="Mostrar os maiores"></span></div></div><button class="gbtn" type="button" id="evo-none">Limpar linhas</button></div></div></header>
+        <header><div><div class="eyebrow">08 · Evolução</div><h2>Como cada <span id="evo-what">banda</span> cresceu na playlist</h2></div><div class="hint" id="evo-hint"></div><div class="card-tools evo-card-tools"><span class="seg" id="evo-mode" role="group" aria-label="Agrupar por"><button type="button" data-m="band" aria-pressed="true">Bandas</button><button type="button" data-m="genre" aria-pressed="false">Gêneros</button></span><button class="gbtn evo-phases-btn" type="button" id="evo-phases" aria-pressed="false">Fases de dominância</button><div class="evo-right-tools"><div class="dtool-grp evo-tops-grp"><button class="gbtn dtool-trg" id="evo-tops-trg" type="button" aria-haspopup="true" aria-expanded="false">Exibir<svg class="chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="dtool-drop evo-tops-drop" hidden><span class="seg" id="evo-tops" role="group" aria-label="Mostrar os maiores"></span></div></div><button class="gbtn" type="button" id="evo-none">Limpar linhas</button></div></div></header>
         <div class="body">
           <div class="evo-pick"><input type="search" id="evo-q" placeholder="Buscar para adicionar uma linha…" aria-label="Buscar para adicionar uma linha"><div class="evo-opts" id="evo-opts"></div><div class="evo-singles-row" id="evo-singles-row" style="display:none"><button class="lnk" type="button" id="evo-singles" style="padding:0"></button><button class="evo-x" type="button" id="evo-singles-x" title="Tirar do gráfico as linhas de 1 faixa" aria-label="Tirar do gráfico as linhas de 1 faixa">×</button></div></div>
           <div class="evo" id="evo"></div>
@@ -168,7 +172,7 @@
       </article>
 
       <article class="card chart rise" id="filtered-list-card" style="--d:14;display:none">
-        <header><div><div class="eyebrow">08 · Seleção</div><h2>Músicas no filtro atual</h2></div><div class="hint" id="filtered-list-hint"></div></header>
+        <header><div><div class="eyebrow">09 · Seleção</div><h2>Músicas no filtro atual</h2></div><div class="hint" id="filtered-list-hint"></div><div class="card-tools"><button class="gbtn" type="button" id="fl-detail-toggle">Mostrar mais</button></div></header>
         <div class="body"><div class="tbscroll inline"><table class="tb">
           <thead><tr></tr></thead>
           <tbody id="filtered-list-body"></tbody>
