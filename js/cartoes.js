@@ -26,6 +26,15 @@ function buildThemes(h){
 }
 const THEMES = buildThemes(153);
 const FORMATS = {retrato: {label: "Vertical", sub: "1080×1350", w: 1080, h: 1350}, paisagem: {label: "Horizontal", sub: "1920×1080", w: 1920, h: 1080}};
+const KEY_TMFMT = "catalogo-musical:cards-tmfmt";
+const TREEMAP_FMTS = {
+  quadrado:  {label: "Quadrado",   sub: "1080×1080", w: 1080, h: 1080},
+  retrato:   {label: "Retrato",    sub: "1080×1350", w: 1080, h: 1350},
+  story:     {label: "Story",      sub: "1080×1920", w: 1080, h: 1920},
+  desktop:   {label: "Desktop",    sub: "1920×1080", w: 1920, h: 1080},
+  banner:    {label: "Banner",     sub: "1500×500",  w: 1500, h: 500},
+  wallpaper: {label: "Wallpaper",  sub: "2560×1440", w: 2560, h: 1440},
+};
 /* opções de estilo do mapa de bandas: as mesmas do gráfico do painel (caixa marcada = ligado). Começam iguais às do painel e depois ficam salvas à parte */
 const TOPTS = [["nomes", "Mostrar nomes", "nolabels"], ["numeros", "Mostrar números", "nonums"], ["bordas", "Bordas redondas", "flush"]];
 function loadTreeOpts(){
@@ -309,7 +318,7 @@ function filterText(){
   const parts = [part(state.bands), part(state.albums), part(state.genres), part(state.years)].filter(Boolean);
   return parts.length ? parts.join(" · ") : "filtros atuais";
 }
-function dataset(scope){
+function dataset(scope, opts = {}){
   const R = (scope === "recorte" ? rows(true, true, true, false) : T).slice().sort((a, b) => a.n - b.n), N = R.length;
   const d = {N, scope, scopeText: scope === "recorte" ? `Recorte: ${filterText()} · ${faixas(N)}` : `Playlist inteira · ${faixas(N)}`};
   d.sec = sum(R, r => r.sec || 0);
@@ -319,7 +328,7 @@ function dataset(scope){
   d.albums = new Set(R.map(r => r.album).filter(a => a !== NI)).size;
   const top3 = new Set(d.bands.slice(0, 3).map(x => x[0].toLowerCase()));
   d.top3Tracks = R.filter(r => bandsOfRow(r).some(b => top3.has(b.toLowerCase()))).length;
-  const rowsOf = new Map(gb), MAXT = 28;
+  const rowsOf = new Map(gb), MAXT = opts.allBands ? d.bands.length : 28;
   d.tiles = d.bands.slice(0, MAXT).map(([b, c]) => {
     const alb = topAlbumOf(rowsOf.get(b)), key = alb ? `${b}|${alb}` : "";
     return {k: b, value: c, url: key ? coverOf(key) : null};
@@ -376,14 +385,138 @@ async function paint(canvas, id, themeKey, fmt, d, name, tree){
   await DRAW[id](ctx, t, d, {name, tree}, L);
   footer(ctx, t, d, L);
 }
+async function paintTreemapExport(canvas, fmtKey, d, tree, themeKey){
+  await fontsReady();
+  const f = TREEMAP_FMTS[fmtKey] || TREEMAP_FMTS.quadrado;
+  canvas.width = f.w; canvas.height = f.h;
+  const W = f.w, H = f.h;
+  const hue = +(getComputedStyle(document.documentElement).getPropertyValue('--h').trim()) || 153;
+  const t = buildThemes(hue)[themeKey] || buildThemes(hue).escuro;
+  const ctx = canvas.getContext("2d");
+  const pad = Math.round(Math.min(W, H) * .018);
+  const bgG = ctx.createLinearGradient(0, 0, 0, H); bgG.addColorStop(0, t.bg0); bgG.addColorStop(1, t.bg1); ctx.fillStyle = bgG; ctx.fillRect(0, 0, W, H);
+  let gw = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.min(W,H)*.9); gw.addColorStop(0, t.glow); gw.addColorStop(1, "transparent"); ctx.fillStyle = gw; ctx.fillRect(0, 0, W, H);
+  gw = ctx.createRadialGradient(W, H, 0, W, H, Math.min(W,H)); gw.addColorStop(0, t.glow2); gw.addColorStop(1, "transparent"); ctx.fillStyle = gw; ctx.fillRect(0, 0, W, H);
+  const ax = pad, ay = pad, aw = W-2*pad, ah = H-2*pad;
+  const items = d.tiles.map(x => ({k: x.k, value: x.value}));
+  const laid = squarify(items, aw, ah), by = new Map(d.tiles.map(x => [x.k, x]));
+  const imgs = new Map(await Promise.all(d.tiles.map(async x => [x.k, x.url ? await loadImg(x.url) : null])));
+  const max = d.tiles[0].value, to = tree || {nomes: true, numeros: true, bordas: true}, G = to.bordas ? 3 : 0;
+  for (const tl of laid){
+    const x = ax+tl.x+G/2, y = ay+tl.y+G/2, w = tl.w-G, h = tl.h-G, info = by.get(tl.k), im = imgs.get(tl.k);
+    if (w < 2 || h < 2) continue;
+    const rad = to.bordas ? Math.max(3, Math.min(14, w/5, h/5)) : 0;
+    ctx.save(); rr(ctx, x, y, w, h, rad); ctx.clip();
+    const k = Math.sqrt(tl.value/max), tg = ctx.createLinearGradient(x, y, x+w, y+h);
+    if (info.other){ tg.addColorStop(0, t.light ? `hsl(${hue},60%,86%)` : `hsl(${hue},36%,9%)`); tg.addColorStop(1, t.light ? `hsl(${hue},50%,80%)` : `hsl(${hue},42%,6%)`); }
+    else { tg.addColorStop(0, `hsl(${hue},62%,${16+26*k}%)`); tg.addColorStop(1, `hsl(${hue},70%,${10+18*k}%)`); }
+    ctx.fillStyle = tg; ctx.fillRect(x, y, w, h);
+    if (im) drawCover(ctx, im, x, y, w, h);
+    ctx.restore();
+    if (info.other){ ctx.strokeStyle = t.line; ctx.lineWidth = 2; rr(ctx, x+1, y+1, w-2, h-2, rad); ctx.stroke(); }
+    const pp = Math.max(5, Math.min(16, Math.min(w,h)/9)), cs = Math.max(11, Math.min(30, Math.sqrt(w*h)/9)), inW = w-2*pp;
+    ctx.save(); ctx.textBaseline = "alphabetic";
+    ctx.strokeStyle = (info.other && t.light) ? "rgba(255,255,255,.9)" : "rgba(0,0,0,.85)"; ctx.lineJoin = "round";
+    const put2 = (txt, tx, ty) => { ctx.lineWidth = Math.max(2, ctx.measureText(" ").width/3); ctx.strokeText(txt, tx, ty); ctx.fillText(txt, tx, ty); };
+    if (info.other){
+      const lbl = to.nomes ? `+${info.n} bandas` : "";
+      if (!to.nomes && to.numeros){ ctx.font = font(700, cs, FD); setLS(ctx, 0); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic"; if (inW >= ctx.measureText(`+${info.n}`).width && h >= cs+pp*1.6){ ctx.fillStyle = t.ink; ctx.globalAlpha = .85; put2(`+${info.n}`, x+pp, y+h-pp); } }
+      else if (lbl){ let s = Math.min(44, Math.max(12, Math.sqrt(w*h)/4)); ctx.textAlign = "center"; ctx.textBaseline = "middle"; for (; s >= 11; s -= 1){ ctx.font = font(700, s, FD); setLS(ctx, -.2); if (ctx.measureText(lbl).width <= inW && s*1.2 <= h-2*pp) break; } if (s >= 11){ ctx.fillStyle = t.ink; put2(lbl, x+w/2, y+h/2); } }
+      ctx.restore(); continue;
+    }
+    let nameSize = 0;
+    if (to.nomes) for (let s = Math.min(34, Math.max(12, Math.sqrt(w*h)/6.5)); s >= 12; s -= 1){ ctx.font = font(600, s, FD); setLS(ctx, -.2); if (ctx.measureText(info.k).width <= inW && h-2*pp >= s*1.1+cs*1.2){ nameSize = s; break; } }
+    ctx.fillStyle = t.ink; ctx.textAlign = "left";
+    if (nameSize){ ctx.font = font(600, nameSize, FD); setLS(ctx, -.2); put2(info.k, x+pp, y+pp+nameSize*.9); }
+    ctx.font = font(700, cs, FD); setLS(ctx, 0);
+    if (to.numeros && inW >= ctx.measureText(String(tl.value)).width && h >= cs+pp*1.6){ ctx.globalAlpha = .85; put2(String(tl.value), x+pp, y+h-pp); }
+    ctx.restore();
+  }
+  const ws = Math.max(16, Math.round(Math.min(W,H)*.018));
+  ctx.save(); ctx.font = font(700, ws, FD); ctx.fillStyle = t.ink; ctx.globalAlpha = .28;
+  ctx.textAlign = "right"; ctx.textBaseline = "alphabetic"; setLS(ctx, -.3);
+  ctx.fillText("Dashbeat", W-pad-4, H-pad-4);
+  ctx.restore(); setLS(ctx, 0);
+}
 const toBlob = canvas => new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error("toBlob")), "image/png"));
 const dateTag = () => { const x = new Date(); return `${pad2(x.getDate())}-${pad2(x.getMonth() + 1)}-${pad2(x.getFullYear() % 100)}`; };
 
+/* ---------- pôster de bandas ---------- */
+function openPoster(){
+  const d = dataset("all", {allBands: true});
+  if (!d.tiles || d.tiles.length < 2){ toast("Poucas bandas para gerar o pôster."); return; }
+  const st = {theme: lsGet(KEY_THEME) === "claro" ? "claro" : "escuro", tmFmt: lsGet(KEY_TMFMT) in TREEMAP_FMTS ? lsGet(KEY_TMFMT) : "quadrado", tree: loadTreeOpts()};
+  const _fmtBtns = Object.entries(TREEMAP_FMTS).map(([k, v]) => {
+    const sc = Math.min(26/v.w, 20/v.h), iw = Math.round(v.w*sc), ih = Math.round(v.h*sc);
+    return `<button type="button" class="pt-fmt" data-tf="${k}"><span class="pt-fmt-shape"><span class="tmfmt-icon" style="--iw:${iw}px;--ih:${ih}px"></span></span><span class="pt-fmt-info"><span class="pt-fname">${v.label}</span><span class="tmfmt-sub">${v.sub}</span></span></button>`;
+  }).join("");
+  const body = document.createElement("div"); body.className = "pt-wrap";
+  body.innerHTML = `
+    <div class="pt-side">
+      <span class="cd-lbl">Exportar mapa como</span>
+      <div class="pt-fmts">${_fmtBtns}</div>
+    </div>
+    <div class="pt-preview">
+      <canvas class="pt-canvas" role="img" aria-label="Pré-visualização do pôster"></canvas>
+    </div>`;
+  const foot = document.createElement("div"); foot.className = "mfrow";
+  const canCopy = !!(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write);
+  foot.innerHTML = `${canCopy ? `<button class="gbtn" type="button" data-a="copy">Copiar imagem</button>` : ""}<span class="sp"></span><button class="pbtn" type="button" data-a="png" autofocus>Baixar PNG</button>`;
+  openModal({title: "Pôster de bandas", sub: "Mapa visual das bandas da sua playlist", body, foot, size: "md"});
+  const canvas = body.querySelector(".pt-canvas");
+  let token = 0;
+  const shotPoster = async () => { const c = document.createElement("canvas"); await paintTreemapExport(c, st.tmFmt, d, st.tree, st.theme); return toBlob(c); };
+  async function render(){
+    const my = ++token;
+    try { await paintTreemapExport(canvas, st.tmFmt, d, st.tree, st.theme); }
+    catch(e){ if (my === token) toast("Não foi possível desenhar o pôster."); }
+  }
+  function ui(){ body.querySelectorAll(".pt-fmt").forEach(b => b.setAttribute("aria-pressed", String(st.tmFmt === b.dataset.tf))); }
+  body.addEventListener("click", e => {
+    const tb = e.target.closest(".pt-fmt"); if (!tb) return;
+    st.tmFmt = tb.dataset.tf; lsSet(KEY_TMFMT, st.tmFmt); ui(); render();
+  });
+  foot.addEventListener("click", async e => {
+    const b = e.target.closest("button[data-a]"); if (!b || b.disabled) return;
+    const a = b.dataset.a; b.disabled = true;
+    try {
+      if (a === "png"){ const fLabel = (TREEMAP_FMTS[st.tmFmt]?.label || "mapa").toLowerCase(); download(`dashbeat_mapa_${fLabel}_${dateTag()}.png`, await shotPoster()); toast("Pôster baixado."); }
+      else if (a === "copy"){ await navigator.clipboard.write([new ClipboardItem({"image/png": shotPoster()})]); toast("Imagem copiada."); }
+    } catch(err){ toast(a === "copy" ? "O navegador não deixou copiar a imagem." : "Não foi possível gerar o pôster."); }
+    b.disabled = false;
+  });
+  ui(); render();
+}
+
+/* ---------- picker de entrada ---------- */
+function openCardsPicker(){
+  const body = document.createElement("div"); body.className = "cpk-wrap";
+  body.innerHTML = `
+    <button type="button" class="cpk-opt" data-pick="cards">
+      <div class="cpk-icon"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="4" y="2.5" width="20" height="23" rx="4" stroke="currentColor" stroke-width="1.5"/><path d="M8 10h12M8 14h12M8 18h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+      <span class="cpk-title">Cartões</span>
+      <span class="cpk-desc">Resumo visual da playlist em várias categorias para compartilhar</span>
+    </button>
+    <button type="button" class="cpk-opt" data-pick="treemap">
+      <div class="cpk-icon"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="12" height="13" rx="2.5" stroke="currentColor" stroke-width="1.5"/><rect x="16.5" y="2.5" width="9" height="7" rx="2.5" stroke="currentColor" stroke-width="1.5"/><rect x="16.5" y="11.5" width="9" height="4.5" rx="2.5" stroke="currentColor" stroke-width="1.5"/><rect x="2.5" y="17.5" width="7" height="8" rx="2.5" stroke="currentColor" stroke-width="1.5"/><rect x="11.5" y="17.5" width="14" height="8" rx="2.5" stroke="currentColor" stroke-width="1.5"/></svg></div>
+      <span class="cpk-title">Pôster de bandas</span>
+      <span class="cpk-desc">Imagem com as fotos das bandas no tamanho de cada uma</span>
+    </button>`;
+  const md = openModal({title: "Criar imagem", sub: "Escolha o que você quer gerar", body, size: "sm"});
+  body.addEventListener("click", e => {
+    const opt = e.target.closest(".cpk-opt"); if (!opt) return;
+    md.close();
+    if (opt.dataset.pick === "treemap") openPoster();
+    else openCards();
+  });
+}
+
 /* ---------- modal ---------- */
-function openCards(){
+function openCards(opts = {}){
   const filtered = rows(true, true, true, false).length < NN;
-  const st = {scope: "all", theme: lsGet(KEY_THEME) === "claro" ? "claro" : "escuro", fmt: lsGet(KEY_FMT) === "paisagem" ? "paisagem" : "retrato", tree: loadTreeOpts(), name: (lsGet(KEY_NAME) || "").slice(0, 40), id: "cover"};
+  const st = {scope: "all", theme: lsGet(KEY_THEME) === "claro" ? "claro" : "escuro", fmt: lsGet(KEY_FMT) === "paisagem" ? "paisagem" : "retrato", tree: loadTreeOpts(), name: (lsGet(KEY_NAME) || "").slice(0, 40), id: opts.startAt in LABEL ? opts.startAt : "cover", tmFmt: lsGet(KEY_TMFMT) in TREEMAP_FMTS ? lsGet(KEY_TMFMT) : "quadrado"};
   let d = dataset(st.scope), token = 0;
+  const _tmBtns = Object.entries(TREEMAP_FMTS).map(([k, v]) => { const sc = Math.min(26/v.w, 20/v.h), iw = Math.round(v.w*sc), ih = Math.round(v.h*sc); return `<button type="button" class="tmfmt-btn" data-tf="${k}" title="${v.sub}"><span class="tmfmt-icon" style="--iw:${iw}px;--ih:${ih}px"></span><span>${v.label}</span><span class="tmfmt-sub">${v.sub}</span></button>`; }).join("");
   const body = document.createElement("div"); body.className = "cd-wrap";
   body.innerHTML = `
     <aside class="cd-side">
@@ -392,6 +525,7 @@ function openCards(){
       <div class="cd-field"><span class="cd-lbl">Tema</span><div class="seg cd-seg" data-k="theme">${Object.entries(THEMES).map(([k, v]) => `<button type="button" data-v="${k}">${v.label}</button>`).join("")}</div></div>
       <div class="cd-field"><label class="cd-lbl" for="cd-name">Seu nome (opcional)</label><input id="cd-name" class="cd-in" type="text" maxlength="40" placeholder="Ex.: Luis" autocomplete="off" value="${esc(st.name)}"></div>
       <div class="cd-field"><span class="cd-lbl">Cartões</span><div class="cd-list" role="tablist" aria-label="Cartões"></div></div>
+      <div class="cd-field cd-tmfmt-wrap" hidden><span class="cd-lbl">Exportar mapa como</span><div class="cd-tmfmt">${_tmBtns}</div></div>
       <p class="cd-note"></p>
     </aside>
     <div class="cd-stage">
@@ -423,6 +557,8 @@ function openCards(){
     note.textContent = msgs.join(" ");
     body.querySelector(".cd-sty").hidden = st.id !== "treemap";
     body.querySelectorAll(".cd-opt").forEach(cb => { cb.checked = !!st.tree[cb.dataset.opt]; });
+    body.querySelector(".cd-tmfmt-wrap").hidden = st.id !== "treemap";
+    body.querySelectorAll(".tmfmt-btn").forEach(b => b.setAttribute("aria-pressed", String(st.tmFmt === b.dataset.tf)));
   }
   async function render(){
     const my = ++token;
@@ -437,6 +573,7 @@ function openCards(){
       ui(); render(); return;
     }
     const lb = e.target.closest(".cd-list button"); if (lb){ st.id = lb.dataset.id; ui(); render(); return; }
+    const tb = e.target.closest(".tmfmt-btn"); if (tb){ st.tmFmt = tb.dataset.tf; lsSet(KEY_TMFMT, st.tmFmt); ui(); return; }
     if (e.target.closest(".cd-prev")) step(-1); else if (e.target.closest(".cd-next")) step(1);
   });
   body.addEventListener("change", e => {
@@ -452,7 +589,10 @@ function openCards(){
     const b = e.target.closest("button[data-a]"); if (!b || b.disabled) return;
     const a = b.dataset.a; b.disabled = true;
     try {
-      if (a === "png"){ download(`dashbeat_${SLUG[st.id]}${suffix()}_${dateTag()}.png`, await shot(st.id)); toast("Cartão baixado."); }
+      if (a === "png"){
+        if (st.id === "treemap"){ const c = document.createElement("canvas"); await paintTreemapExport(c, st.tmFmt, d, st.tree, st.theme); const fLabel = (TREEMAP_FMTS[st.tmFmt]?.label || "mapa").toLowerCase(); download(`dashbeat_mapa_${fLabel}_${dateTag()}.png`, await toBlob(c)); toast("Mapa baixado."); }
+        else { download(`dashbeat_${SLUG[st.id]}${suffix()}_${dateTag()}.png`, await shot(st.id)); toast("Cartão baixado."); }
+      }
       else if (a === "zip"){
         const files = []; let i = 1;
         for (const id of d.cards){ files.push({name: `dashbeat_${pad2(i++)}-${SLUG[id]}${suffix()}.png`, data: new Uint8Array(await (await shot(id)).arrayBuffer())}); }
@@ -470,6 +610,6 @@ function openCards(){
 const btn = $("#dt-cards");
 if (btn){
   btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="1.5" width="10" height="13" rx="2.2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5.6 10.5V8.2M8 10.5V5.6M10.4 10.5V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Cartões</span>`;
-  btn.addEventListener("click", openCards);
+  btn.addEventListener("click", openCardsPicker);
 }
 })();
