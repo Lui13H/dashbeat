@@ -429,7 +429,7 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 .dsc-zrank{font-weight:700;font-size:11px;min-width:16px}
 .dsc-zrange{font-variant-numeric:tabular-nums;opacity:.8}
 .dsc-zpct{margin-left:auto;font-weight:600;font-size:11px}
-.ic .kick{margin-top:auto;padding-top:16px;border-top:1px solid var(--line);display:flex;align-items:baseline;gap:12px;min-width:0}
+.ic .kick{margin-top:auto;padding-top:16px;border-top:1px solid var(--line);display:flex;align-items:center;gap:12px;min-width:0}
 .ic .mv + .kick,.ic .split + .kick{margin-top:20px}
 .ic .kick b{flex:none;font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:-.03em;line-height:1;white-space:nowrap;
   background:linear-gradient(180deg,hsl(var(--h),80%,98%),var(--mint));-webkit-background-clip:text;background-clip:text;color:transparent}

@@ -3176,9 +3176,12 @@ const V = {
     const pm = Math.max(1, ...vals);
     return `<div class="mbars">${vals.map((v, i) => `<div><b>${v}</b><i style="height:${Math.max(3, v / pm * 56)}px"></i><span>${labels[i]}</span></div>`).join("")}</div><div class="cap2">${cap}</div>`;
   },
-  runs(list, cap){
-    const rm = list[0].length;
-    return list.map(r => `<div class="hrow"><div class="hl"><span>${esc(r[0].artist)} <em>#${r[0].n}–${r[r.length - 1].n}</em></span><b>${r.length}</b></div><div class="ht"><i style="width:${r.length / rm * 100}%"></i></div></div>`).join("") + `<div class="cap2">${cap}</div>`;
+  runs(list, cap, vals){
+    const display = vals || list.map(r => r.length);
+    const rm = Math.max(...display);
+    const fmt = vals ? (v => pc0(v * 100, 100)) : (v => v);
+    const hdr = vals ? "% das faixas do artista" : "Faixas seguidas";
+    return `<div class="pf-h"><span>Artista · posições na playlist</span><b>${hdr}</b></div>` + list.map((r, i) => `<div class="hrow"><div class="hl"><span>${esc(r[0].artist)} <em>#${r[0].n}–${r[r.length - 1].n}</em></span><b>${fmt(display[i])}</b></div><div class="ht"><i style="width:${display[i] / rm * 100}%"></i></div></div>`).join("") + `<div class="cap2">${cap}</div>`;
   },
   dur(rows, max){
     return rows.map(([label, sub, v]) => `<div class="hrow"><div class="hl"><span>${esc(label)} <em>${esc(sub)}</em></span><b>${fmtDur(v)}</b></div><div class="ht"><i style="width:${Math.max(2, v / max * 100)}%"></i></div></div>`).join("");
@@ -3316,7 +3319,7 @@ rule(() => {
   const xs = withDur.map(t => t.n), ys = withDur.map(t => t.sec), mx = sum(xs, x => x) / xs.length, my = avg;
   const r = sum(xs.map((x, i) => (x - mx) * (ys[i] - my)), v => v) / Math.sqrt(sum(xs, x => (x - mx) ** 2) * sum(ys, y => (y - my) ** 2) || 1);
   const ratio = hi.sec / lo.sec, rs = r.toLocaleString("pt-BR", {maximumFractionDigits: 2, minimumFractionDigits: 2});
-  return {tech: true, kind: "both", theme: 5, score: 50,
+  return {tech: true, kind: "both", theme: 3, score: 50,
     title: Math.abs(r) < .1 ? "O gosto mudou de banda, não de formato" : r > 0 ? "As faixas ficaram mais longas com o tempo" : "As faixas ficaram mais curtas com o tempo",
     body: `<p>${Math.abs(r) < .1 ? `Os extremos são distantes, mas a duração média não acompanha a ordem de entrada (correlação de ${rs}).` : `A duração acompanha a ordem de entrada (correlação de ${rs}): as adições ${r > 0 ? "recentes são mais longas" : "recentes são mais curtas"}.`}</p>`,
     viz: V.dur([[cleanTitle(hi.title), hi.artist, hi.sec], ["Média do catálogo", faixas(withDur.length), avg], [cleanTitle(lo.title), lo.artist, lo.sec]], hi.sec),
@@ -3439,13 +3442,58 @@ rule(() => {
 rule(() => {
   if (!IS.journey) return null;
   const big = IS.runs.filter(r => r.length >= 5), inBig = sum(big, r => r.length), f = inBig / NN;
-  const ar = [...IS.albRuns].filter(r => r.length >= 5).sort((a, b) => b.length - a.length).slice(0, 4);
+  const ar = [...IS.albRuns].filter(r => r.length >= 5).sort((a, b) => b.length - a.length).slice(0, 7);
   const albTxt = ar.length ? (() => { const g = []; for (const r of ar){ const last = g[g.length - 1]; if (last && last.n === r.length) last.names.push(r[0].album); else g.push({n: r.length, names: [r[0].album]}); } return g.map(x => `${listPt(x.names.map(esc))} (${x.n}${x.names.length > 1 ? " cada" : " seguidas"})`).join(", "); })() : "";
-  const top = IS.runsSorted.slice(0, 5); if (!top.length || top[0].length < 3) return null;
-  return {tech: true, kind: "pl", theme: 3, score: f >= .25 ? 68 : 48,
+  const top = IS.runsSorted; if (!top.length || top[0].length < 3) return null;
+  const artTotals = new Map(); MT.forEach(t => artTotals.set(t.artist, (artTotals.get(t.artist) || 0) + 1));
+  const byArt = new Map();
+  for (const r of top) { const k = r[0].artist; if (!byArt.has(k)) byArt.set(k, []); byArt.get(k).push(r); }
+  const grouped = [...byArt.entries()].map(([artist, runs]) => {
+    const at = artTotals.get(artist) || runs.reduce((s, r) => s + r.length, 0);
+    const blockRuns = runs.filter(r => r.length >= 2);
+    const tc = blockRuns.reduce((s, r) => s + r.length, 0);
+    if (!tc) return { artist, runs: blockRuns, tc, at, score: 0 };
+    const sizePenalty = tc / at;
+    const allTracks = runs.flatMap(r => r);
+    const mu = allTracks.reduce((s, t) => s + t.n, 0) / allTracks.length;
+    let totalDist = 0;
+    for (const run of runs) {
+      const first = run[0].n, last = run[run.length - 1].n;
+      if (mu < first || mu > last) totalDist += Math.min(Math.abs(first - mu), Math.abs(last - mu));
+    }
+    let albumSubTc = 0;
+    for (const run of blockRuns) {
+      let s = 0;
+      for (let i = 1; i <= run.length; i++) {
+        if (i === run.length || !run[i].album || run[i].album === NI || run[i].album !== run[s].album) {
+          if (run[s].album && run[s].album !== NI && i - s >= 2) albumSubTc += i - s;
+          s = i;
+        }
+      }
+    }
+    const albumBonus = tc > 0 ? albumSubTc / tc : 0;
+    const presenceFactor = at / NN;
+    return { artist, runs: blockRuns, allRunsCount: runs.length, tc, at,
+      f1: tc / at,
+      f2: totalDist,
+      f3: tc > 0 ? albumSubTc / tc : 0,
+      f4: presenceFactor };
+  }).filter(x => x.f1 > 0);
+  if (!grouped.length) return null;
+  const mx = [0,1,2,3].map(i => Math.max(...grouped.map(x => [x.f1,x.f2,x.f3,x.f4][i]), 1e-9));
+  grouped.forEach(x => { x.score = (x.f1/mx[0] * 32 + (1 - x.f2/mx[1]) * 29 + x.f3/mx[2] * 21 + x.f4/mx[3] * 18) / 100; });
+  grouped.sort((a, b) => b.score - a.score);
+  const top8 = grouped.slice(0, 8);
+  const groupedViz = `<div class="pf-h"><span>Artista · blocos</span><b>Densidade do artista</b></div>` +
+    top8.map(x => {
+      const sub = `${x.at} faixas · ${x.allRunsCount} bloco${x.allRunsCount !== 1 ? 's' : ''}`;
+      const pct = Math.round(x.score * 100) + "%";
+      return `<div class="hrow"><div class="hl"><span>${esc(x.artist)} <em>${sub}</em></span><b>${pct}</b></div><div class="ht"><i style="width:${x.score * 100}%"></i></div></div>`;
+    }).join("") + `<div class="cap2">quanto mais concentrada e volumosa a entrada do artista, maior a densidade</div>`;
+  return {tech: true, kind: "pl", theme: 5, score: f >= .25 ? 68 : 48,
     title: f >= .3 ? "Você adiciona em blocos, não em singles" : f >= .15 ? "Maratonas pontuais no meio de faixas soltas" : "Você monta a playlist música a música",
     body: `<p>${ar.length ? `Álbuns entram quase inteiros de uma vez: ${albTxt}.` : `As maiores sequências seguidas são curtas: ${top[0].length} faixas no máximo.`}</p>`,
-    viz: V.runs(top, "maiores sequências seguidas do mesmo artista"), kick: [pc0(inBig, NN), `das faixas entraram em sequências de 5+ do mesmo artista`]};
+    viz: groupedViz, kick: [pc0(inBig, NN), `das faixas entraram em blocos densos do mesmo artista`]};
 });
 
 // PLAYLIST · richest discovery segment
