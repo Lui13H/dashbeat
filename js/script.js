@@ -3292,11 +3292,22 @@ rule(() => {
   const t5 = top(5), singles = IS.art.filter(a => a.c === 1).length, hhi = sum(c, x => (x / NN) ** 2);
   const seg = [[c[0], "hsl(var(--h),80%,98%)", "Líder"], [t5 - c[0], "hsl(var(--h),65%,52%)", "2º ao 5º"], [top(10) - t5, "hsl(var(--h),93%,24%)", "6º ao 10º"], [NN - top(10), "hsla(var(--h),60%,67%,.16)", `Demais ${Math.max(0, IS.art.length - 10)}`]];
   const f5 = t5 / NN;
-  return {tech: true, kind: "cat", theme: 4, score: 70, wide: true,
+  const capTxt = `${singles ? `${singles} dos ${IS.art.length} artistas têm uma faixa só. Peso equivale a ${Math.round(1 / hhi)} artistas de mesmo tamanho (HHI ${Math.round(hhi * 10000)}).` : ""}`;
+  const blockSeg = [
+    [c[0],         "hsl(var(--h),62%,72%)", "hsl(var(--h),40%,15%)", "Líder"],
+    [t5 - c[0],    "hsl(var(--h),65%,52%)", "hsl(var(--h),80%,95%)", "2º ao 5º"],
+    [top(10) - t5, "hsl(var(--h),80%,30%)", "hsl(var(--h),70%,90%)", "6º ao 10º"],
+    [NN - top(10), "hsla(var(--h),35%,55%,.18)", "var(--ink-2)", `Demais ${Math.max(0, IS.art.length - 10)}`]
+  ];
+  const segBlocks = `<div class="seg-fill">` +
+    blockSeg.map(([cnt, bg, fg, lbl]) =>
+      `<div style="flex:${cnt};background:${bg};color:${fg}"><b>${esc(lbl)}</b><span>${nf(cnt)} · ${pc1(cnt, NN)}</span></div>`
+    ).join('') + `</div>`;
+  return {tech: true, kind: "cat", theme: 4, score: 70, pairWith: "cat-conc",
     title: f5 >= .5 ? "Metade do catálogo está em cinco artistas" : f5 >= .35 ? "Cinco artistas respondem por mais de um terço do catálogo" : "Um catálogo pulverizado entre muitos artistas",
-    body: `<ul><li>${B(`Top 1 = ${pc1(top(1), NN)} · Top 3 = ${pc1(top(3), NN)}${IS.art.length >= 10 ? ` · Top 10 = ${pc1(top(10), NN)}` : ""}`)} das faixas.</li>
-      ${singles ? `<li>${B(`${singles} dos ${IS.art.length} artistas têm uma faixa só.`)} Na prática, o peso do catálogo equivale a cerca de ${Math.round(1 / hhi)} artistas de mesmo tamanho (índice de concentração de ${Math.round(hhi * 10000)} pontos).</li>` : ""}</ul>`,
-    viz: V.stack(seg), kick: [pc1(t5, NN), `das faixas estão nos 5 maiores artistas (${nf(t5)} de ${nf(NN)})`]};
+    body: capTxt ? `<p>${capTxt}</p>` : '',
+    mvClass: 'mv-top',
+    viz: segBlocks, kick: [pc1(t5, NN), `das faixas estão nos 5 maiores artistas (${nf(t5)} de ${nf(NN)})`]};
 });
 
 // CATÁLOGO · how recent the catalogue is
@@ -3319,10 +3330,19 @@ rule(() => {
   const xs = withDur.map(t => t.n), ys = withDur.map(t => t.sec), mx = sum(xs, x => x) / xs.length, my = avg;
   const r = sum(xs.map((x, i) => (x - mx) * (ys[i] - my)), v => v) / Math.sqrt(sum(xs, x => (x - mx) ** 2) * sum(ys, y => (y - my) ** 2) || 1);
   const ratio = hi.sec / lo.sec, rs = r.toLocaleString("pt-BR", {maximumFractionDigits: 2, minimumFractionDigits: 2});
-  return {tech: true, kind: "both", theme: 3, score: 50,
+  const durBlocks = [
+    [cleanTitle(hi.title), hi.artist, hi.sec, "hsl(var(--h),65%,52%)", "hsl(var(--h),85%,95%)"],
+    ["Média do catálogo",  faixas(withDur.length), avg, "hsla(var(--h),40%,60%,.22)", "var(--ink-2)"],
+    [cleanTitle(lo.title), lo.artist, lo.sec, "hsl(var(--h),80%,30%)", "hsl(var(--h),70%,90%)"]
+  ];
+  const durViz = `<div class="seg-fill">` +
+    durBlocks.map(([lbl, sub, v, bg, fg]) =>
+      `<div style="flex:${Math.round(v)};background:${bg};color:${fg}"><b>${esc(lbl)}</b><span>${esc(sub)} · ${fmtDur(v)}</span></div>`
+    ).join('') + `</div>`;
+  return {tech: true, kind: "both", theme: 3, score: 50, mvClass: 'mv-top',
     title: Math.abs(r) < .1 ? "O gosto mudou de banda, não de formato" : r > 0 ? "As faixas ficaram mais longas com o tempo" : "As faixas ficaram mais curtas com o tempo",
     body: `<p>${Math.abs(r) < .1 ? `Os extremos são distantes, mas a duração média não acompanha a ordem de entrada (correlação de ${rs}).` : `A duração acompanha a ordem de entrada (correlação de ${rs}): as adições ${r > 0 ? "recentes são mais longas" : "recentes são mais curtas"}.`}</p>`,
-    viz: V.dur([[cleanTitle(hi.title), hi.artist, hi.sec], ["Média do catálogo", faixas(withDur.length), avg], [cleanTitle(lo.title), lo.artist, lo.sec]], hi.sec),
+    viz: durViz,
     kick: [`${Math.round(ratio)}×`, `a faixa mais longa dura ${Math.round(ratio)} vezes a mais curta`]};
 });
 
@@ -3452,48 +3472,70 @@ rule(() => {
     const at = artTotals.get(artist) || runs.reduce((s, r) => s + r.length, 0);
     const blockRuns = runs.filter(r => r.length >= 2);
     const tc = blockRuns.reduce((s, r) => s + r.length, 0);
-    if (!tc) return { artist, runs: blockRuns, tc, at, score: 0 };
-    const sizePenalty = tc / at;
-    const allTracks = runs.flatMap(r => r);
-    const mu = allTracks.reduce((s, t) => s + t.n, 0) / allTracks.length;
-    let totalDist = 0;
-    for (const run of runs) {
-      const first = run[0].n, last = run[run.length - 1].n;
-      if (mu < first || mu > last) totalDist += Math.min(Math.abs(first - mu), Math.abs(last - mu));
+    // posições ordenadas de TODAS as faixas do artista na playlist
+    const allPos = runs.flatMap(r => r.map(t => t.n)).sort((a, b) => a - b);
+    const n = allPos.length;
+    // passo 1 — gravidade entre pares consecutivos; bond decai com faixas alheias entre elas
+    const LAMBDA = 0.18, MERGE_MIN = Math.exp(-LAMBDA * 4);
+    const parent = Array.from({length: n}, (_, i) => i);
+    const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const unite = (a, b) => { parent[find(a)] = find(b); };
+    for (let i = 0; i < n - 1; i++) {
+      const bond = Math.exp(-LAMBDA * (allPos[i + 1] - allPos[i] - 1));
+      if (bond >= MERGE_MIN) unite(i, i + 1);
     }
-    let albumSubTc = 0;
-    for (const run of blockRuns) {
-      let s = 0;
-      for (let i = 1; i <= run.length; i++) {
-        if (i === run.length || !run[i].album || run[i].album === NI || run[i].album !== run[s].album) {
-          if (run[s].album && run[s].album !== NI && i - s >= 2) albumSubTc += i - s;
-          s = i;
-        }
-      }
+    // passo 2 — Union-Find determina k (número de clusters) e rótulo inicial de cada faixa
+    const rootSet = new Set(); for (let i = 0; i < n; i++) rootSet.add(find(i));
+    const roots = [...rootSet];
+    const k = roots.length;
+    const rootToCluster = new Map(roots.map((r, ci) => [r, ci]));
+    let labels = Array.from({length: n}, (_, i) => rootToCluster.get(find(i)));
+    // passo 3 — k-means 1D até convergência (refina os centros de gravidade com k fixo)
+    let centers = Array.from({length: k}, (_, ci) => {
+      const pts = allPos.filter((_, i) => labels[i] === ci);
+      return pts.reduce((s, p) => s + p, 0) / pts.length;
+    });
+    for (let iter = 0; iter < 100; iter++) {
+      const newLabels = allPos.map(p => {
+        let best = 0, bestD = Infinity;
+        for (let ci = 0; ci < k; ci++) { const d = Math.abs(centers[ci] - p); if (d < bestD) { bestD = d; best = ci; } }
+        return best;
+      });
+      if (newLabels.every((l, i) => l === labels[i])) break;
+      labels = newLabels;
+      centers = Array.from({length: k}, (_, ci) => {
+        const pts = allPos.filter((_, i) => labels[i] === ci);
+        return pts.length ? pts.reduce((s, p) => s + p, 0) / pts.length : centers[ci];
+      });
     }
-    const albumBonus = tc > 0 ? albumSubTc / tc : 0;
-    const presenceFactor = at / NN;
-    return { artist, runs: blockRuns, allRunsCount: runs.length, tc, at,
-      f1: tc / at,
-      f2: totalDist,
-      f3: tc > 0 ? albumSubTc / tc : 0,
-      f4: presenceFactor };
-  }).filter(x => x.f1 > 0);
+    // f1: faixas por cluster (mais = mais denso)
+    const f1 = at / k;
+    // f2: soma das distâncias de cada faixa ao centro do cluster mais próximo (coesão intra-cluster)
+    const f2 = allPos.reduce((s, p, i) => s + Math.abs(centers[labels[i]] - p), 0);
+    // f3: soma das distâncias entre clusters consecutivos (dispersão inter-cluster)
+    const sortedCenters = [...centers].sort((a, b) => a - b);
+    const f3 = sortedCenters.reduce((s, c, i) => i > 0 ? s + (c - sortedCenters[i - 1]) : s, 0);
+    // f4: presença total na playlist
+    const f4 = at / NN;
+    return { artist, runs: blockRuns, allRunsCount: runs.length, clusterCount: k, tc, at, f1, f2, f3, f4 };
+  }).filter(x => x.at >= 2);
   if (!grouped.length) return null;
   const mx = [0,1,2,3].map(i => Math.max(...grouped.map(x => [x.f1,x.f2,x.f3,x.f4][i]), 1e-9));
-  grouped.forEach(x => { x.score = (x.f1/mx[0] * 32 + (1 - x.f2/mx[1]) * 29 + x.f3/mx[2] * 21 + x.f4/mx[3] * 18) / 100; });
+  grouped.forEach(x => { x.score = (x.f1/mx[0] * 25 + (1 - x.f2/mx[1]) * 25 + (1 - x.f3/mx[2]) * 20 + x.f4/mx[3] * 30) / 100; });
   grouped.sort((a, b) => b.score - a.score);
-  const top8 = grouped.slice(0, 8);
-  const groupedViz = `<div class="pf-h"><span>Artista · blocos</span><b>Densidade do artista</b></div>` +
+  const top8 = grouped.slice(0, 5);
+  const top1 = top8[0], top2 = top8[1];
+  const groupedViz = `<div class="pf-h"><span>Artista · clusters</span><b>Gravitação do artista</b></div>` +
     top8.map(x => {
-      const sub = `${x.at} faixas · ${x.allRunsCount} bloco${x.allRunsCount !== 1 ? 's' : ''}`;
+      const sub = `${x.at} faixa${x.at !== 1 ? 's' : ''} · ${x.clusterCount} cluster${x.clusterCount !== 1 ? 's' : ''}`;
       const pct = Math.round(x.score * 100) + "%";
       return `<div class="hrow"><div class="hl"><span>${esc(x.artist)} <em>${sub}</em></span><b>${pct}</b></div><div class="ht"><i style="width:${x.score * 100}%"></i></div></div>`;
-    }).join("") + `<div class="cap2">quanto mais concentrada e volumosa a entrada do artista, maior a densidade</div>`;
-  return {tech: true, kind: "pl", theme: 5, score: f >= .25 ? 68 : 48,
+    }).join("");
+  const bodyTxt = top1 ? `<p>${esc(top1.artist)} lidera: ${top1.at} faixa${top1.at !== 1 ? 's' : ''} em ${top1.clusterCount} cluster${top1.clusterCount !== 1 ? 's' : ''}, gravitação ${Math.round(top1.score * 100)}%.${top2 ? ` ${esc(top2.artist)} aparece logo atrás com ${top2.at} faixas.` : ''}</p>` : '';
+  return {tech: true, kind: "pl", theme: 5, score: f >= .25 ? 68 : 48, pairWith: "disc-row", rowBreak: true,
     title: f >= .3 ? "Você adiciona em blocos, não em singles" : f >= .15 ? "Maratonas pontuais no meio de faixas soltas" : "Você monta a playlist música a música",
-    body: `<p>${ar.length ? `Álbuns entram quase inteiros de uma vez: ${albTxt}.` : `As maiores sequências seguidas são curtas: ${top[0].length} faixas no máximo.`}</p>`,
-    viz: groupedViz, kick: [pc0(inBig, NN), `das faixas entraram em blocos densos do mesmo artista`]};
+    body: bodyTxt,
+    viz: groupedViz, kick: [pc0(inBig, NN), `das faixas entraram em sequências do mesmo artista`]};
 });
 
 // PLAYLIST · richest discovery segment
@@ -3546,10 +3588,10 @@ rule(() => {
     ? `Curva abaixo da linha — só ${midArtPct}% dos artistas na 1ª metade; exploração maior no final`
     : `Curva próxima da linha — ${midArtPct}% dos artistas na 1ª metade, ritmo equilibrado`;
 
-  return {tech: true, kind: "pl", theme: 4, score: 66,
+  return {tech: true, kind: "pl", theme: 5, score: 66,
     title: slow ? "A descoberta desacelerou" : "A playlist segue descobrindo artistas",
-    body: `<div class="dsc-keys"><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><path d="M0,5L28,5" fill="none" stroke="hsl(var(--h),55%,68%)" stroke-width="2"/></svg>artistas únicos acumulados</div><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><line x1="0" y1="5" x2="28" y2="5" stroke="hsla(var(--h),50%,80%,.5)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>ritmo ideal constante</div></div><p class="dsc-how">Cada ponto da curva mostra quantos artistas únicos já entraram até aquela faixa da playlist.</p><div class="dsc-stats"><div class="dsc-chip" id="dsc-rate-chip"><b>${rate}</b><span>faixas por artista novo</span></div><div class="dsc-chip" id="dsc-avg-chip"><b>${+(total / NN * 100).toFixed(2)}%</b><span>média de novidades por faixa</span></div><div class="dsc-chip" id="dsc-half-chip"><b>${halfPct}%</b><span>da playlist até a metade dos artistas</span></div><div class="dsc-chip" id="dsc-last-chip"><b>#${lastNew.n}</b><span>último artista novo</span></div><div class="dsc-chip" id="dsc-peak-chip"><b>—</b><span>pico de descoberta</span></div>${(() => { const [t] = curveInterpretShort.split(' — '); return `<div class="dsc-chip" id="dsc-curve-chip"><b>${midArtPctStr}%</b><span>dos artistas na 1ª metade · ${t.toLowerCase()}</span></div>`; })()}</div><div class="dsc-zones"></div>`,
-    wide: true, noSplit: true, viz: V.disc(), mvClass: "disc",
+    body: `<div class="dsc-keys"><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><path d="M0,5L28,5" fill="none" stroke="hsl(var(--h),55%,68%)" stroke-width="2"/></svg>artistas únicos acumulados</div><div class="dsc-key"><svg width="28" height="10" aria-hidden="true"><line x1="0" y1="5" x2="28" y2="5" stroke="hsla(var(--h),50%,80%,.5)" stroke-width="1.5" stroke-dasharray="4 3"/></svg>ritmo ideal constante</div></div><p class="dsc-how">Cada ponto da curva mostra quantos artistas únicos já entraram até aquela faixa da playlist.</p><div class="dsc-stats"><div class="dsc-chip" id="dsc-rate-chip"><b>${rate}</b><span>faixas por artista novo</span></div><div class="dsc-chip" id="dsc-avg-chip"><b>${+(total / NN * 100).toFixed(2)}%</b><span>média de novidades por faixa</span></div><div class="dsc-chip" id="dsc-half-chip"><b>${halfPct}%</b><span>da playlist até a metade dos artistas</span></div><div class="dsc-chip" id="dsc-last-chip"><b>#${lastNew.n}</b><span>último artista novo</span></div><div class="dsc-chip" id="dsc-gap-chip"><b>—</b><span>faixas seguidas sem artista novo</span></div>${(() => { const [t] = curveInterpretShort.split(' — '); return `<div class="dsc-chip" id="dsc-curve-chip"><b>${midArtPctStr}%</b><span>dos artistas na 1ª metade · ${t.toLowerCase()}</span></div>`; })()}</div><div class="dsc-zones"></div>`,
+    wide: true, noSplit: true, viz: V.disc(), mvClass: "disc", pairWith: "disc-row",
     kick: [nf(fresh.length), `artista${fresh.length === 1 ? "" : "s"} novo${fresh.length === 1 ? "" : "s"} nas últimas ${nf(NN - cut)} adições${col.length ? `, ${col.length} ${col.length > 1 ? "deles parcerias" : "deles parceria"}${colOwner ? ` de ${colOwner}` : ""}` : ""}`]};
 });
 
@@ -3850,8 +3892,15 @@ function buildCards(){
   cards = [...cards.filter(c => !c.extra).slice(0, 14), ...cards.filter(c => c.extra)];
   // interleave: by theme, catalogue first then playlist, so related readings sit side by side
   cards.sort((a, b) => a.theme - b.theme || (a.kind === "cat" ? 0 : 1) - (b.kind === "cat" ? 0 : 1) || b.score - a.score);
+  // pairWith: move each companion immediately after the first card in its pair group
+  const pairFirstIdx = new Map();
+  for (let i = 0; i < cards.length; i++) { if (cards[i].pairWith && !pairFirstIdx.has(cards[i].pairWith)) pairFirstIdx.set(cards[i].pairWith, i); }
+  for (const [key, firstIdx] of pairFirstIdx) {
+    const companions = cards.filter((c, i) => c.pairWith === key && i !== firstIdx);
+    for (const comp of companions) { const ci = cards.indexOf(comp); if (ci > firstIdx + 1) { cards.splice(ci, 1); cards.splice(firstIdx + 1, 0, comp); } }
+  }
   const rows = [];
-  for (const c of cards){ const w = c.wide ? 2 : 1; let r = rows.find(r => r.free >= w); if (!r){ r = {items: [], free: 3}; rows.push(r); } r.items.push(c); r.free -= w; }
+  for (const c of cards){ if (c.rowBreak) rows.push({items: [], free: 3}); const w = c.wide ? 2 : 1; let r = rows.find(r => r.free >= w); if (!r){ r = {items: [], free: 3}; rows.push(r); } r.items.push(c); r.free -= w; }
   const last = rows[rows.length - 1];
   if (last && last.free){
     const normal = last.items.find(c => !c.wide);
@@ -3866,7 +3915,7 @@ function renderCards(){
     const wide = c.wide || c.full;
     return `<article class="card ic${wide ? " wide" : ""}${c.full ? " full" : ""} rise" style="--d:${i + 3}"${c.panelCard ? ` data-panel="${c.panelCard}"` : ""}>
       <div class="num">${String(i + 1).padStart(2, "0")} ${tag(c.kind)}</div><h3>${esc(c.title)}</h3>
-      ${c.noSplit ? `<div class="disc-row"><div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div><div class="disc-side">${c.body}</div></div>` : wide ? `<div class="split${c.splitClass ? " " + c.splitClass : ""}"><div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>${c.body}</div>` : `${c.body}<div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>`}
+      ${c.noSplit ? `<div class="disc-row"><div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div><div class="disc-side">${c.body}</div></div>` : wide ? `<div class="split${c.splitClass ? " " + c.splitClass : ""}"><div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>${c.body}</div>` : `<div class="mv${c.mvClass ? " " + c.mvClass : ""}">${c.viz}</div>${c.body}`}
       <div class="kick"><b>${esc(c.kick[0])}</b><span>${esc(c.kick[1])}</span></div></article>`;
   }).join("");
   syncInsightBtns();
@@ -4009,7 +4058,8 @@ function renderDisc(){
   const el = $("#disc"); if (!el) return;
   const pl = state.upTo != null ? BY_PLAYLIST.filter(t => t.n <= state.upTo) : BY_PLAYLIST;
   const seen = new Set(); const cum = pl.map(t => (seen.add(t.artist), seen.size));
-  const W = 300, H = 300, n = cum.length, mx = cum[n - 1];
+  const W = 300, n = cum.length, mx = cum[n - 1];
+  const H = Math.max(Math.round(W * 0.5), Math.min(W, Math.round(mx * W / Math.max(n, 1) + 8)));
   // Curva começa em (0, H-4) = origem do gráfico (0 faixas → 0 artistas)
   const P = `0,${(H - 4).toFixed(1)}L` + cum.map((c, i) => `${(i / Math.max(1, n - 1) * W).toFixed(1)},${(H - 4 - (c / mx) * (H - 8)).toFixed(1)}`).join("L");
   const half = cum.findIndex(c => c >= Math.ceil(mx / 2));
@@ -4111,7 +4161,7 @@ function renderDisc(){
       phaseArtRanges.push([yTop, yBot]);
       const discLbl = abbr(z.label, zoneH - 8).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const dlx = (-sw / 2).toFixed(1), dly = discCy.toFixed(1);
-      if (discLbl) phaseSvg += `<text transform="rotate(-90,${dlx},${dly})" x="${dlx}" y="${dly}" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="var(--body)" font-weight="800" paint-order="stroke" stroke="rgba(0,0,0,0.78)" stroke-width="3" stroke-linejoin="round" fill="#fff">${discLbl}</text>`;
+      if (discLbl) phaseSvg += `<text transform="rotate(-90,${dlx},${dly})" x="${dlx}" y="${dly}" text-anchor="middle" dominant-baseline="central" font-size="7" font-family="var(--body)" font-weight="800" paint-order="stroke" stroke="rgba(0,0,0,0.78)" stroke-width="3" stroke-linejoin="round" fill="#fff">${discLbl}</text>`;
     } else {
       // Território Familiar: luz do topo para baixo até a curva (comportamento original)
       const bottomY = Math.max(...Array.from({length: tE-tS+1}, (_,k) => tY(tS+k)));
@@ -4127,7 +4177,7 @@ function renderDisc(){
       phaseMusX.push(famCx);
       phaseMusRanges.push([px1, px2]);
       const famLbl = abbr(z.label, stripeW - 4).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      if (famLbl) phaseSvg += `<text x="${famCx.toFixed(1)}" y="${(-stripH / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="9" font-family="var(--body)" font-weight="800" paint-order="stroke" stroke="rgba(0,0,0,0.78)" stroke-width="3" stroke-linejoin="round" fill="#fff">${famLbl}</text>`;
+      if (famLbl) phaseSvg += `<text x="${famCx.toFixed(1)}" y="${(-stripH / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="7" font-family="var(--body)" font-weight="800" paint-order="stroke" stroke="rgba(0,0,0,0.78)" stroke-width="3" stroke-linejoin="round" fill="#fff">${famLbl}</text>`;
     }
 
     // Glow na curva — igual evo personalizado (clipado + stroke borrado), igual para ambos os tipos
@@ -4140,42 +4190,14 @@ function renderDisc(){
     const t = r / rMax, pct = (i / NSEG * 100).toFixed(1);
     return `<stop offset="${pct}%" stop-color="hsla(var(--h),${Math.round(25 + t * 60)}%,${Math.round(32 + t * 32)}%,${(0.06 + t * 0.44).toFixed(2)})"/>`;
   }).join("") + (() => { const t = segRates[NSEG - 1] / rMax; return `<stop offset="100%" stop-color="hsla(var(--h),${Math.round(25 + t * 60)}%,${Math.round(32 + t * 32)}%,${(0.06 + t * 0.44).toFixed(2)})">`; })();
-  // Pico: faixa com maior distância euclidiana até a diagonal (0,H)→(W,4)
-  let peakK = 0, peakDist = -Infinity;
-  for (let k = 0; k < n; k++) {
-    const d = cum[k] / mx - k / Math.max(1, n - 1);
-    if (d > 0 && d > peakDist) { peakDist = d; peakK = k; }
-  }
-  const hasPeak = peakDist > 0;
-  const pkXv = tX(peakK), pkYv = tY(peakK);
-  const pkX = pkXv.toFixed(1), pkY = pkYv.toFixed(1);
-  const PEAK_COL = `hsl(calc(var(--h) + 180),55%,68%)`;
-  // Pico: coordenadas fixas no ponto natural
-  const pkLblY = pkYv + 3.5;
-  const pkLblX = pkXv;
-  const pkAnchorX = pkXv < 20 ? 'start' : pkXv > W - 20 ? 'end' : 'middle';
-
-  // Sobe #xpico enquanto colidir horizontalmente com retângulo de Território Familiar acima do chart
-  const PH_STRIP_H = 10;
-  let pkTopY = -8;
-  const PH_STRIP_GAP = 5; // folga após sair do retângulo
-  const xpicoHitsStrip = y => phaseMusRanges.some(([r1, r2]) =>
-    pkLblX > r1 - 15 && pkLblX < r2 + 15 && y > -(PH_STRIP_H + PH_STRIP_GAP)
-  );
-  while (xpicoHitsStrip(pkTopY) && pkTopY > -120) pkTopY--;
-
-  // Move ypico para a esquerda só se colidir com retângulo de Exploração; sem colisão = mesma coluna
-  const PH_SW = 10, PH_SW_GAP = 5;
-  let pkLeftX = -3;
-  const ypicoHitsStrip = x => phaseArtRanges.some(([yt, yb]) =>
-    pkLblY >= yt - 5 && pkLblY <= yb + 5 && x > -(PH_SW + PH_SW_GAP)
-  );
-  while (ypicoHitsStrip(pkLeftX) && pkLeftX > -120) pkLeftX--;
+  // Maior sequência consecutiva sem artista novo
+  let maxGap = 0, curGap = 0;
+  for (let i = 0; i < n; i++) { if (isNew[i]) { maxGap = Math.max(maxGap, curGap); curGap = 0; } else curGap++; }
+  maxGap = Math.max(maxGap, curGap);
 
   // "artistas →" rotacionado: ~77px de comprimento → raio visual ~40px
-  // pico y-label: ~20px → raio ~10px → gap mínimo real = 50px
   const ART_GAP = 50;
-  const ART_AVOID = [pkLblY, 10, H, ...phaseArtY];
+  const ART_AVOID = [10, H, ...phaseArtY];
   const collidesY = y => ART_AVOID.some(ay => Math.abs(y - ay) < ART_GAP);
   let artLblY = H / 3;
   if (collidesY(artLblY)) {
@@ -4189,9 +4211,9 @@ function renderDisc(){
     }
   }
 
-  // "músicas →": ~80px → raio ~40px; pico x-label ~25px → raio ~12px → gap = 55px
+  // "músicas →": ~80px → raio ~40px; gap = 55px
   const MUS_GAP = 55;
-  const MUS_AVOID = [pkLblX, 0, W, ...phaseMusX];
+  const MUS_AVOID = [0, W, ...phaseMusX];
   const collidesX = x => MUS_AVOID.some(ax => Math.abs(x - ax) < MUS_GAP);
   let musLblX = W / 2;
   if (collidesX(musLblX)) {
@@ -4219,31 +4241,29 @@ function renderDisc(){
   const midKx = Math.min(Math.round((n-1)/2), cum.length-1);
   const midCurveArt = cum[midKx];
   const midCurveTrack = pl[half] ? pl[half].n : half + 1;
-  // Posição dos labels — desviam de fases e do pico
+  // Posição dos labels — desviam de fases
   let midArtTopY = 2;
   const midArtCollides = y =>
-    (Math.abs(W/2 - pkLblX) < 25 && Math.abs(y - pkTopY) < 11) ||
-    phaseMusRanges.some(([r1, r2]) => W/2 > r1 - 15 && W/2 < r2 + 15 && y > -(PH_STRIP_H + PH_STRIP_GAP));
+    phaseMusRanges.some(([r1, r2]) => W/2 > r1 - 15 && W/2 < r2 + 15 && y > -15);
   while (midArtCollides(midArtTopY) && midArtTopY > -120) midArtTopY--;
   let midTrackLeftX = -5;
   const midTrackCollides = x =>
-    (Math.abs(parseFloat(midY) - pkLblY) < 11 && Math.abs(x - pkLeftX) < 25) ||
-    phaseArtRanges.some(([yt, yb]) => parseFloat(midY) >= yt - 5 && parseFloat(midY) <= yb + 5 && x > -(PH_SW + PH_SW_GAP));
+    phaseArtRanges.some(([yt, yb]) => parseFloat(midY) >= yt - 5 && parseFloat(midY) <= yb + 5 && x > -15);
   while (midTrackCollides(midTrackLeftX) && midTrackLeftX > -120) midTrackLeftX--;
   const midCurveArtPct = Math.round(midCurveArt / mx * 100);
   const midCurveTrackPct = Math.round(half / Math.max(1, n - 1) * 100);
   // Linhas tracejadas estendem até o label deslocado
   gridSvg += `<line x1="${midX}" y1="${midArtTopY}" x2="${midX}" y2="${H-4}" stroke="${midCurveCol}" stroke-width="1" stroke-dasharray="4 4" opacity=".35" vector-effect="non-scaling-stroke"/>`;
   gridSvg += `<line x1="${midTrackLeftX}" y1="${midY}" x2="${W}" y2="${midY}" stroke="${midCurveCol}" stroke-width="1" stroke-dasharray="4 4" opacity=".35" vector-effect="non-scaling-stroke"/>`;
-  gridSvg += `<text font-size="8" fill="${midCurveCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="auto" x="${midX}" y="${midArtTopY}">${midCurveArtPct}%</text>`;
-  gridSvg += `<text font-size="8" fill="${midCurveCol}" font-family="var(--body)" text-anchor="end" dominant-baseline="middle" x="${midTrackLeftX}" y="${midY}">#${midCurveTrackPct}%</text>`;
+  gridSvg += `<text font-size="6.5" fill="${midCurveCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="auto" x="${midX}" y="${midArtTopY}">${midCurveArtPct}%</text>`;
+  gridSvg += `<text font-size="6.5" fill="${midCurveCol}" font-family="var(--body)" text-anchor="start" dominant-baseline="middle" x="${midTrackLeftX + 4}" y="${midY}">#${midCurveTrackPct}%</text>`;
   // Marcações do eixo X
   for (let v = xStep; v < n; v += xStep) {
     const tx = (v / (n-1) * W).toFixed(1);
     gridSvg += `<line x1="${tx}" x2="${tx}" y1="4" y2="${H-4}" stroke="${aS}.05)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
     gridSvg += `<line x1="${tx}" x2="${tx}" y1="${H-4}" y2="${H-1}" stroke="${aS}.35)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
     if (Math.abs(+tx) >= 20 && Math.abs(+tx - W) >= 20 && Math.abs(+tx - W/2) >= 20)
-      xLblSvg += `<text font-size="8" fill="${aS}.4)" font-family="var(--body)" text-anchor="middle" x="${(pad + +tx).toFixed(1)}" y="${H+11}">#${v}</text>`;
+      xLblSvg += `<text font-size="6.5" fill="${aS}.4)" font-family="var(--body)" text-anchor="middle" x="${(pad + +tx).toFixed(1)}" y="${H+11}">#${v}</text>`;
   }
   // Marcações do eixo Y
   for (let v = yStep; v < mx; v += yStep) {
@@ -4251,19 +4271,18 @@ function renderDisc(){
     gridSvg += `<line x1="0" x2="${W}" y1="${ty}" y2="${ty}" stroke="${aS}.05)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
     gridSvg += `<line x1="-3" x2="0" y1="${ty}" y2="${ty}" stroke="${aS}.35)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
     if (Math.abs(+ty - 10) >= 12 && Math.abs(+ty - (H - 4)) >= 12)
-      yLblSvg += `<text font-size="8" fill="${aS}.4)" font-family="var(--body)" text-anchor="start" dominant-baseline="middle" x="${pad+W+6}" y="${ty}">${v}</text>`;
+      yLblSvg += `<text font-size="6.5" fill="${aS}.4)" font-family="var(--body)" text-anchor="start" dominant-baseline="middle" x="${pad+W+6}" y="${ty}">${v}</text>`;
   }
   // Labels do ponto médio — desviam se colidirem com outros labels
   // Ticks próximos de W/2 omitidos; label do pico fica acima do gráfico — sem colisão possível
   const xMidCollides = false;
-  xLblSvg += `<text font-size="8" fill="hsl(var(--h),55%,68%)" font-family="var(--body)" text-anchor="middle" x="${(pad + W/2).toFixed(1)}" y="${xMidCollides ? H+21 : H+11}">#${Math.round(n/2)}</text>`;
+  xLblSvg += `<text font-size="6.5" fill="hsl(var(--h),55%,68%)" font-family="var(--body)" text-anchor="middle" x="${(pad + W/2).toFixed(1)}" y="${xMidCollides ? H+21 : H+11}">#${Math.round(n/2)}</text>`;
   const yMidTy = (H-4+4)/2;
   const yMidCollides = (() => {
-    if (Math.abs(yMidTy - pkLblY) < 12) return true;
     for (let v = yStep; v < mx; v += yStep) { if (Math.abs(yMidTy - (H-4-(v/mx)*(H-8))) < 12) return true; }
     return false;
   })();
-  yLblSvg += `<text font-size="8" fill="hsl(var(--h),55%,68%)" font-family="var(--body)" text-anchor="start" dominant-baseline="middle" x="${yMidCollides ? pad+W+16 : pad+W+6}" y="${yMidTy.toFixed(1)}">${Math.round(mx/2)}</text>`;
+  yLblSvg += `<text font-size="6.5" fill="hsl(var(--h),55%,68%)" font-family="var(--body)" text-anchor="start" dominant-baseline="middle" x="${yMidCollides ? pad+W+16 : pad+W+6}" y="${yMidTy.toFixed(1)}">${Math.round(mx/2)}</text>`;
 
   // Setas dos eixos — ficam acima das fases e dos labels do pico
   // Setas ficam além de TODOS os labels relevantes de cada eixo
@@ -4272,62 +4291,44 @@ function renderDisc(){
   if (xMidCollides) belowLabelsY.push(H + 21); // mid x-label deslocado para H+21
   const arrowBotY = Math.max(...belowLabelsY) + 11;
   // Direita (artistas): coleta todos os x-extent de labels à direita do gráfico
-  const yNumW = Math.ceil(Math.max(String(mx).length, String(Math.round(mx/2)).length) * 5.5) + 2;
+  const yNumW = Math.ceil(Math.max(String(mx).length, String(Math.round(mx/2)).length) * 4.5) + 2;
   const rightLabelsX = [W + 6 + yNumW]; // tick labels, mx, 0 (text-anchor="start" a partir de W+6)
   if (yMidCollides) rightLabelsX.push(W + 16 + yNumW); // mid y-label deslocado para W+16
-  const arrowRightX = Math.max(...rightLabelsX) + 8;
+  const arrowRightX = Math.max(...rightLabelsX) + 3;
   const axCol = `hsla(var(--h),40%,70%,.7)`;
   const arrowMidY = ((H - 4 + 4) / 2).toFixed(1);
   let axisArrowsSvg = '';
   // Seta horizontal → (eixo músicas) — abaixo dos labels do eixo X
   axisArrowsSvg += `<line x1="0" y1="${arrowBotY}" x2="${W - 10}" y2="${arrowBotY}" stroke="${axCol}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
   axisArrowsSvg += `<path d="M${W-12},${arrowBotY-4} L${W},${arrowBotY} L${W-12},${arrowBotY+4}" fill="none" stroke="${axCol}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-  axisArrowsSvg += `<text font-size="10" fill="${axCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="hanging" x="${(W/2).toFixed(1)}" y="${arrowBotY + 4}">músicas</text>`;
+  axisArrowsSvg += `<text font-size="8" fill="${axCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="hanging" x="${(W/2).toFixed(1)}" y="${arrowBotY + 4}">músicas</text>`;
   // Seta vertical ↑ (eixo artistas) — à direita dos labels do eixo Y
   axisArrowsSvg += `<line x1="${arrowRightX}" y1="${H-4}" x2="${arrowRightX}" y2="12" stroke="${axCol}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
   axisArrowsSvg += `<path d="M${arrowRightX-4},12 L${arrowRightX},4 L${arrowRightX+4},12" fill="none" stroke="${axCol}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-  axisArrowsSvg += `<text font-size="10" fill="${axCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="middle" transform="rotate(90,${arrowRightX+5},${arrowMidY})" x="${arrowRightX+5}" y="${arrowMidY}">artistas</text>`;
-
-  // Oculta o círculo do pico se ele coincidir com a interseção dos tracejados do meio
-  const hidePeakCircle = Math.abs(pkXv - W/2) < 12 && Math.abs(pkYv - H/2) < 12;
+  axisArrowsSvg += `<text font-size="8" fill="${axCol}" font-family="var(--body)" text-anchor="middle" dominant-baseline="middle" transform="rotate(90,${arrowRightX+5},${arrowMidY})" x="${arrowRightX+5}" y="${arrowMidY}">artistas</text>`;
 
   el.innerHTML = `<svg viewBox="0 0 ${W + pad * 2} ${H + pad}" style="width:100%;height:100%;display:block;overflow:visible" aria-label="Artistas acumulados ao longo da playlist">
     <defs>
       <linearGradient id="dg" x1="0" x2="1" y1="0" y2="0" gradientUnits="objectBoundingBox">${gradStops}</linearGradient>
-      <clipPath id="cl-above"><polygon points="0,${H} ${W},4 ${W},-10 0,-10"/></clipPath>
-      <clipPath id="cl-below"><polygon points="0,${H} ${W},4 ${W},${H + 5} 0,${H + 5}"/></clipPath>
-      <filter id="pk-glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
       ${phaseDefs}
     </defs>
     <g transform="translate(${pad},0)">
       ${gridSvg}
-      <line x1="0" y1="${H}" x2="${W}" y2="4" stroke="hsla(var(--h),50%,80%,.22)" stroke-width="1" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
       ${phaseSvg}
       <path d="M${P}" fill="none" stroke="hsl(var(--h),55%,68%)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
       ${phaseGlow}
-      ${hasPeak ? `<line x1="${pkX}" x2="${pkX}" y1="${pkTopY}" y2="${H}" stroke="${PEAK_COL}" stroke-opacity=".45" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
-      <line x1="${pkLeftX}" y1="${pkY}" x2="${W}" y2="${pkY}" stroke="${PEAK_COL}" stroke-opacity=".45" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
-      ${hidePeakCircle ? '' : `<circle cx="${pkX}" cy="${pkY}" r="4" fill="none" stroke="${PEAK_COL}" stroke-width="1.5" opacity=".9" filter="url(#pk-glow)" vector-effect="non-scaling-stroke"/>
-      <circle cx="${pkX}" cy="${pkY}" r="4" fill="none" stroke="${PEAK_COL}" stroke-width="1.5" opacity=".9" vector-effect="non-scaling-stroke"/>`}
-      <text font-size="9" fill="${PEAK_COL}" font-family="var(--body)" text-anchor="${pkAnchorX}" x="${pkLblX.toFixed(1)}" y="${pkTopY}" dominant-baseline="auto" font-weight="700">#${pl[peakK] ? pl[peakK].n : peakK + 1}</text>
-      <text font-size="9" fill="${PEAK_COL}" font-family="var(--body)" text-anchor="end" x="${pkLeftX}" y="${pkLblY.toFixed(1)}" font-weight="700">${cum[peakK]}</text>` : ''}
       ${axisArrowsSvg}
     </g>
-    <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="middle" x="${pad}"      y="${H + 11}">#0</text>
-    <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="end"    x="${pad + W}" y="${H + 11}">#${n}</text>
-    <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="start"   x="${pad+W+6}"  y="10">${mx}</text>
-    <text font-size="10" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="start"   x="${pad+W+6}"  y="${H}"  dominant-baseline="middle">0</text>
+    <text font-size="8" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="middle" x="${pad}"      y="${H + 11}">#0</text>
+    <text font-size="8" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="end"    x="${pad + W}" y="${H + 11}">#${n}</text>
+    <text font-size="8" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="start"   x="${pad+W+6}"  y="10">${mx}</text>
+    <text font-size="8" fill="hsla(var(--h),40%,70%,.55)" font-family="var(--body)" text-anchor="start"   x="${pad+W+6}"  y="${H}"  dominant-baseline="middle">0</text>
     ${xLblSvg}${yLblSvg}
   </svg>`;
+  el.parentElement.style.aspectRatio = `${W + pad * 2}/${H + pad}`;
   el.style.display = "flex"; el.style.flexDirection = "column";
-  const peakChip = document.getElementById('dsc-peak-chip');
-  if (peakChip) {
-    const pTrack = pl[peakK];
-    const peakCovPct = +(cum[peakK] / mx * 100).toFixed(2);
-    peakChip.innerHTML = hasPeak
-      ? `<b>#${pTrack ? pTrack.n : peakK + 1}</b><span>${cum[peakK]} artistas · ${peakCovPct}% do total descoberto</span>`
-      : `<b>—</b><span>pico de descoberta</span>`;
-  }
+  const gapChip = document.getElementById('dsc-gap-chip');
+  if (gapChip) gapChip.innerHTML = `<b>${maxGap}</b><span>faixas seguidas sem artista novo</span>`;
   // Atualizar chips do card durante a animação
   const rateChip  = document.getElementById('dsc-rate-chip');
   const avgChip   = document.getElementById('dsc-avg-chip');
@@ -4360,15 +4361,16 @@ function renderDisc(){
     const disc = zones.filter(z => z.type === 'disc');
     const fam  = zones.filter(z => z.type === 'fam');
     const avgDensity = cum[n - 1] / n;
-    const peakTrackStr = pl[peakK] ? `#${pl[peakK].n}` : `#${peakK+1}`;
-    const peakDensityNum = cum[peakK] / (pl[peakK] ? pl[peakK].n : peakK + 1);
+    const ACCENT = `hsl(calc(var(--h) + 180),55%,68%)`;
+    const contrastRatio = (disc[0]?.density ?? 0) > 0 && (fam[0]?.density ?? 0) > 0
+      ? +((disc[0].density / fam[0].density).toFixed(1)) : null;
     const five = [
       {z: fam[0],  label: 'Familiar 1ª', numVal: fam[0]?.density ?? 0},
       {z: fam[1],  label: 'Familiar 2ª', numVal: fam[1]?.density ?? 0},
       {z: null,    label: 'Média',        density: avgDensity, numVal: avgDensity, col: 'hsl(var(--h),55%,68%)'},
       {z: disc[1], label: 'Expansão 2ª', numVal: disc[1]?.density ?? 0},
       {z: disc[0], label: 'Expansão 1ª', numVal: disc[0]?.density ?? 0},
-      {z: null,    label: 'Pico',         val: `${+(peakDensityNum * 100).toFixed(2)}%`, numVal: peakDensityNum, col: `hsl(calc(var(--h) + 180),55%,68%)`, rangeStr: peakTrackStr},
+      {z: null,    label: 'Contraste',    val: contrastRatio ? `${contrastRatio}×` : '—', numVal: -1, col: ACCENT},
     ].filter(p => p.z !== undefined).sort((a, b) => b.numVal - a.numVal);
     const fiveHtml = five.map(p => {
       const c = p.z ? zoneCol(p.z) : p.col;
