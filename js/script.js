@@ -411,6 +411,11 @@ const ASING = (() => { try { return JSON.parse(localStorage.getItem(ASING_KEY) |
 const ASING_IGN = (() => { try { return new Set(JSON.parse(localStorage.getItem(ASING_IGN_KEY) || "[]")); } catch (e) { return new Set(); } })();
 const saveASing = () => { try { localStorage.setItem(ASING_KEY, JSON.stringify(ASING)); } catch (e) {} };
 const saveASingIgn = () => { try { localStorage.setItem(ASING_IGN_KEY, JSON.stringify([...ASING_IGN])); } catch (e) {} };
+/* cobertura de álbum: total de faixas do original (sem bônus/deluxe). Semeia do m.tt do Spotify (mínimo entre variantes ≈ edição padrão) ou busca na Apple pelo nome canônico */
+const ALBTOT_KEY = "catalogo-musical:album-totals";
+const ALBTOTS = (() => { try { return JSON.parse(localStorage.getItem(ALBTOT_KEY) || "null") || {}; } catch (e) { return {}; } })();
+const saveAlbTots = () => { try { localStorage.setItem(ALBTOT_KEY, JSON.stringify(ALBTOTS)); } catch (e) {} };
+const albtotKey = (artist, album) => `${albArtKey(artist)}|${String(album || "").trim().toLowerCase()}`;
 const singleKey = t => `${(splitArtistsRaw(t.artist)[0] || "").toLowerCase()}|${normC(cleanTitle(t.title))}`;
 const T = RAW.map(([n, title, artist, album, sec, date, meta], ri) => {
   const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
@@ -1118,6 +1123,53 @@ function queueAppleGenres(){
   }});
   if (need.size) pumpCovers();
 }
+/* cobertura de álbum: total de faixas do original (sem bônus de deluxe).
+   Fase 1: semeia do m.tt já guardado (mínimo por álbum canônico ≈ edição padrão).
+   Fase 2: álbuns sem dado → 1 busca na Apple usando o nome canônico (sem marcas de edição),
+   preferindo a edição mais antiga e sem marcas na fila das capas */
+function queueAlbumTots(){
+  const spMin = new Map();
+  for (const t of T){
+    if (t.album === NI || !t.m || !(t.m.tt > 0) || t.ty === "single" || t.ty === "compilation") continue;
+    const k = albtotKey(t.artist, t.album);
+    spMin.set(k, Math.min(spMin.get(k) ?? Infinity, t.m.tt));
+  }
+  let changed = false;
+  for (const [k, tt] of spMin){ if (!(k in ALBTOTS)){ ALBTOTS[k] = {tt, src: "sp"}; changed = true; } }
+  if (changed) saveAlbTots();
+  // contar faixas por álbum para priorizar os maiores e ignorar álbuns com 1 faixa
+  const count = new Map();
+  for (const t of T){
+    if (t.album === NI || t.ty === "single" || t.ty === "compilation") continue;
+    const k = albtotKey(t.artist, t.album);
+    count.set(k, (count.get(k) || 0) + 1);
+  }
+  const need = new Map();
+  for (const [k, n] of count){
+    if (n < 2 || k in ALBTOTS) continue; // ignorar álbuns com 1 faixa e os já conhecidos
+    const t = T.find(x => albtotKey(x.artist, x.album) === k);
+    if (t) need.set(k, {artist: splitArtistsRaw(t.artist)[0], album: t.album, n});
+  }
+  // ordenar do maior para o menor (mais faixas = mais relevante para o usuário)
+  const sorted = [...need.entries()].sort((a, b) => b[1].n - a[1].n);
+  for (const [k, {artist, album}] of sorted) coverQueue.push({job: async () => {
+    const na = normC(artist), core = albCore(album).join(" ");
+    const res = await itunes(`search?entity=album&limit=15&term=${encodeURIComponent(artist + " " + album)}`);
+    const ok = res.filter(r => {
+      const ra = normC(r.artistName || "");
+      return ra && (ra === na || ra.includes(na) || na.includes(ra))
+        && albCore(r.collectionName || "").join(" ") === core
+        && r.collectionType === "Album"
+        && !/\s+-\s+(single|ep)$/i.test(r.collectionName || "");
+    });
+    const ed = r => albTokens(r.collectionName).join(" ") !== albCore(r.collectionName).join(" ") ? 1 : 0;
+    ok.sort((a, b) => ed(a) - ed(b) || String(a.releaseDate || "9").localeCompare(String(b.releaseDate || "9")));
+    ALBTOTS[k] = {tt: ok[0] ? (ok[0].trackCount || 0) : 0, src: "ap"};
+    saveAlbTots();
+    if (document.getElementById("insights") && document.getElementById("insights").classList.contains("on")) try { renderCards(); } catch(e) {}
+  }});
+  if (need.size) pumpCovers();
+}
 /* data completa: 1 busca na Apple por álbum cuja data (do Spotify) é só o ano. Mesma fila das capas e dos gêneros (depois deles).
    Em silêncio: sem aviso e sem recarregar. O que a Apple achar vale na próxima vez que o site abrir, e a busca segue aos poucos */
 /* faixa fora de álbum ou faixa de álbum? 1 busca na Apple por faixa que o Spotify não marca como álbum. Só vale um álbum "de verdade": sem - Single/EP, ao vivo ou coletânea; o mais antigo */
@@ -1674,8 +1726,88 @@ function albumTip(a){
 }
 /* card de álbuns com duas visões ("abas"): por quantidade de faixas (padrão) ou pelo tempo total somado (como era antes) */
 const ALB_KEY = "catalogo-musical:albums-mode";
-let albMode = (() => { try { return localStorage.getItem(ALB_KEY) === "duracao" ? "duracao" : "faixas"; } catch (e) { return "faixas"; } })();
+let albMode = (() => { try { const v = localStorage.getItem(ALB_KEY); return v === "duracao" ? "duracao" : v === "cobertura" ? "cobertura" : "faixas"; } catch (e) { return "faixas"; } })();
+function renderAlbumCoverage(){
+  if (albMode !== "cobertura") return;
+  const el = $("#coverage"); if (!el) return;
+  const byAlb = new Map();
+  for (const t of rows(true, false)){
+    if (t.album === NI || t.ty === "compilation") continue;
+    const k = albtotKey(t.artist, t.album);
+    if (!byAlb.has(k)) byAlb.set(k, {album: t.album, artist: splitArtistsRaw(t.artist)[0], n: 0});
+    byAlb.get(k).n++;
+  }
+  const withPct = [], singles = [];
+  for (const [k, {album, artist, n}] of byAlb){
+    if (n === 1){ singles.push({album, artist}); continue; }
+    const data = ALBTOTS[k]; if (!data || !data.tt) continue;
+    withPct.push({album, artist, n, tt: data.tt, pctVal: Math.min(1, n / data.tt)});
+  }
+  withPct.sort((a, b) => b.pctVal - a.pctVal || b.n - a.n);
+  const pending = [...byAlb.keys()].filter(k => byAlb.get(k).n > 1 && !(k in ALBTOTS)).length;
+  if (!withPct.length && !singles.length){
+    el.innerHTML = `<p class="cov-empty">${pending ? `Buscando ${pending} álbu${pending > 1 ? "ns" : "m"} na Apple Music…` : "Nenhum álbum com dados ainda."}</p>`;
+    return;
+  }
+  const bars = withPct.map((x, i) => {
+    const pctNum = Math.round(x.pctVal * 100);
+    const fillPct = Math.max(2, Math.round(x.pctVal * 100));
+    const cl = x.pctVal >= 1 ? "cov-bar full" : x.pctVal >= .5 ? "cov-bar mid" : "cov-bar low";
+    return `<div class="${cl}" title="${esc(x.album)} — ${esc(x.artist)}: ${x.n}/${x.tt} faixas (${pctNum}%)">
+      <span class="cov-b-pct">${pctNum}%</span>
+      <div class="cov-b-track" data-covi="${i}"><div class="cov-b-bg"></div><div class="cov-b-fill" style="height:${fillPct}%"></div></div>
+      <span class="cov-b-nm">${esc(x.album)}</span>
+      <span class="cov-b-cnt">${x.n}/${x.tt}</span>
+    </div>`;
+  }).join("");
+  el.innerHTML = bars;
+  // botão de singles no card-tools do header (mesma linha que play/cancelar)
+  const covTools = document.querySelector("#card-albums > header > .card-tools");
+  if (covTools) {
+    let sb = covTools.querySelector("#cov-singles-btn");
+    if (singles.length) {
+      if (!sb) {
+        sb = document.createElement("button");
+        sb.type = "button"; sb.id = "cov-singles-btn"; sb.className = "gbtn"; sb.style.order = "1";
+        covTools.prepend(sb);
+      }
+      sb.textContent = `${singles.length} álbu${singles.length > 1 ? "ns" : "m"} com 1 faixa`;
+      sb.hidden = false;
+      sb.onclick = () => {
+        const body = `<div class="cov-singles-modal">${singles.map(x => `<div class="cov-single-row"><span class="cov-s-nm">${esc(x.album)}</span><span class="cov-s-art">${esc(x.artist)}</span></div>`).join("")}</div>`;
+        openModal({title: `Álbuns com 1 faixa (${singles.length})`, sub: "Estes álbuns aparecem com apenas uma faixa na playlist", body, size: "sm"});
+      };
+    } else if (sb) {
+      sb.hidden = true;
+    }
+  }
+  const hint = $("#alb-hint"); if (hint) hint.textContent = `${withPct.length} álbu${withPct.length > 1 ? "ns" : "m"} · do mais completo para o menos${singles.length ? ` · ${singles.length} com 1 faixa` : ""}`;
+  withPct.forEach((x, i) => {
+    getCover(x.artist, x.album, url => {
+      if (!url) return;
+      const t = el.querySelector(`[data-covi="${i}"]`);
+      if (t) t.style.setProperty("--cov", `url("${url.replace(/"/g, '\\"')}")`);
+    });
+  });
+  // animar barras ao entrar
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches){
+    el.querySelectorAll(".cov-b-fill").forEach((fill, i) => {
+      const finalH = fill.style.height; fill.style.height = "0";
+      setTimeout(() => { fill.style.height = finalH; }, 60 + i * 20);
+    });
+  }
+}
 function renderAlbums(){
+  const covEl = $("#cov-body-inner"), albEl = $("#albums");
+  const isCov = albMode === "cobertura";
+  if (covEl) covEl.style.display = isCov ? "flex" : "none";
+  if (albEl) albEl.style.display = isCov ? "none" : "";
+  if (isCov){
+    if (albEl) albEl.style.display = "none";
+    $("#alb-title").textContent = "Cobertura por álbum";
+    $("#alb-mode").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === albMode)));
+    renderAlbumCoverage(); return;
+  }
   const g = groupBy(rows(true, false), "album"), byDur = albMode === "duracao";
   const items = [...g].map(([k, rs]) => ({k, value: byDur ? sum(rs, r => r.sec) : rs.length, n: rs.length, sec: sum(rs, r => r.sec)}))
     .sort((a, b) => b.value - a.value || (byDur ? b.n - a.n : b.sec - a.sec) || coll.compare(a.k, b.k));
@@ -2169,7 +2301,7 @@ function render(){
   $("#empty").classList.toggle("on", empty);
   if (empty){ hideTip(); return; }
   renderKPIs(R);
-  for (const k of ["wave", "years", "tree", "albums", "rank", "genres", "decades", "profile"]) cardRender(k);   // cada card com o seu tempo (animação por card)
+  for (const k of ["wave", "years", "tree", "albums", "coverage", "rank", "genres", "decades", "profile"]) cardRender(k);   // cada card com o seu tempo (animação por card)
   // o gráfico de evolução compara bandas/gêneros entre si: com banda, álbum ou gênero filtrado ele não faz sentido, então some (a máquina do tempo não esconde)
   const evoOff = state.bands.size + state.albums.size + state.genres.size + state.years.size > 0;
   $("#evo-card").style.display = evoOff ? "none" : "";
@@ -3865,6 +3997,40 @@ rule(() => {
     title: span >= 30 ? `Catálogo de ${nDec} décadas, com pico nos ${decLabel(peak.d)}` : `Concentrado nos ${decLabel(peak.d)}${nDec >= 2 ? ` com presença nos ${decLabel(second.d)}` : ""}`,
     body: `<ul>${li.join("")}</ul>`, viz: V.decades(),
     kick: [pc1(peak.c, total), `das faixas datadas são dos ${decLabel(peak.d)} (${faixas(peak.c)})`]};
+});
+
+// CATÁLOGO · cobertura de álbuns (quantas faixas do original estão na playlist)
+rule(() => {
+  const byAlb = new Map();
+  for (const t of rows()){
+    if (t.album === NI || t.ty === "compilation") continue;
+    const k = albtotKey(t.artist, t.album);
+    if (!byAlb.has(k)) byAlb.set(k, {album: t.album, artist: splitArtistsRaw(t.artist)[0], n: 0});
+    byAlb.get(k).n++;
+  }
+  const items = [];
+  for (const [k, {album, artist, n}] of byAlb){
+    const data = ALBTOTS[k]; if (!data || !data.tt) continue;
+    const pctVal = Math.min(1, n / data.tt);
+    items.push({album, artist, n, tt: data.tt, pctVal});
+  }
+  if (items.length < 3) return null;
+  items.sort((a, b) => b.pctVal - a.pctVal || b.n - a.n);
+  const complete = items.filter(x => x.pctVal >= 1).length;
+  const avg = Math.round(sum(items, x => x.pctVal) / items.length * 100);
+  const shown = items.slice(0, 15), more = items.length - shown.length;
+  const viz = sbars(shown.map(x => [
+    `${x.album} · ${x.artist}`,
+    `${x.n}/${x.tt} · ${Math.round(x.pctVal * 100)}%`,
+    x.pctVal
+  ])) + (more > 0 ? `<div class="cap2">+ ${more} álbu${more > 1 ? "ns" : "m"} a mais</div>` : "");
+  const pending = [...byAlb.keys()].filter(k => !(k in ALBTOTS)).length;
+  const bodyExtra = pending ? `<p style="color:var(--ink-3);font-size:12px">${pending} álbu${pending > 1 ? "ns" : "m"} ainda sendo buscado${pending > 1 ? "s" : ""} na Apple Music…</p>` : "";
+  return {kind: "cat", theme: 3, score: 68, wide: true,
+    title: complete >= items.length && !pending ? "Cobertura de álbuns — coleção completa" : `Cobertura de álbuns: ${avg}% de média`,
+    body: `<p>${complete ? `${B(`${complete} álbu${complete > 1 ? "ns" : "m"}`)} ${complete > 1 ? "completos" : "completo"} (100%). ` : ""}Média de ${B(`${avg}%`)} de cobertura — das faixas do álbum original sem contar bônus de edições deluxe.</p>${bodyExtra}`,
+    viz,
+    kick: [nf(complete), `álbu${complete > 1 ? "ns" : "m"} com 100% das faixas originais na playlist`]};
 });
 
 /* ---------- selection, ordering and row packing ---------- */
@@ -6574,6 +6740,7 @@ function boot(){
   queueMBGenres();
   queueTADBGenres();
   if (STORE){ queueAppleDates(); queueAppleSingles(); }
+  queueAlbumTots();
   const flash = takeFlash(); if (flash) setTimeout(() => toast(flash), 900);
   if (STORE){
     let fresh = null; try { fresh = JSON.parse(ssGet("fresh") || "null"); } catch (e) {}
