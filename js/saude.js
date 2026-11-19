@@ -1172,8 +1172,8 @@ function openCrossedData(groups){
       ? `<span style="font-size:12px;color:var(--red)">✗ ${esc(autoMsg)}</span>`
       : "";
     body.innerHTML = `
-      ${apiTracks.length && pendingCount > 0 ? `
-        <p class="mdesc">${pendingCount === 1 ? "Uma faixa tem" : `${nf(pendingCount)} faixas têm`} dados corrompidos. Abra o Spotify, selecione todas as músicas da playlist (<strong>Ctrl+A</strong>) e copie (<strong>Ctrl+C</strong>), depois cole abaixo.</p>
+      ${apiTracks.length ? `
+        <p class="mdesc">${pendingCount > 0 ? (pendingCount === 1 ? "Uma faixa tem" : `${nf(pendingCount)} faixas têm`) + " dados corrompidos." : "Faixas corrigidas."} Abra o Spotify, selecione todas as músicas da playlist (<strong>Ctrl+A</strong>) e copie (<strong>Ctrl+C</strong>), depois cole abaixo.</p>
         <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px">
           <textarea id="cx-pl-inp" rows="3"
             placeholder="Cole aqui o conteúdo copiado da playlist do Spotify…" autocomplete="off" spellcheck="false"

@@ -4627,10 +4627,16 @@ function openModal({title, sub = "", body, foot, size = "", headerExtra = "", on
   const api = {bg, m, close, q: s => m.querySelector(s)};
   bg.addEventListener("pointerdown", e => { if (e.target === bg) close(); });
   const mb = m.querySelector(".mb");
-  bg.addEventListener("wheel", e => {
+  if (mb) bg.addEventListener("wheel", e => {
+    // Se o evento vem de um elemento interno com scroll próprio e ainda tem conteúdo para rolar, não interceptar
+    const inner = e.target.closest('.ptab, .list, .tbscroll, .cd-side');
+    if (inner && inner.scrollHeight > inner.clientHeight) {
+      const atTop = inner.scrollTop <= 0 && e.deltaY < 0;
+      const atBottom = inner.scrollTop + inner.clientHeight >= inner.scrollHeight - 1 && e.deltaY > 0;
+      if (!atTop && !atBottom) return;
+    }
     e.preventDefault();
-    e.stopPropagation();
-    if (mb) mb.scrollTop += e.deltaY;
+    mb.scrollTop += e.deltaY;
   }, {passive: false});
   m.querySelector(".mx").addEventListener("click", close);
   document.body.appendChild(bg); document.body.style.overflow = "hidden";
