@@ -2301,7 +2301,7 @@ function render(){
   $("#empty").classList.toggle("on", empty);
   if (empty){ hideTip(); return; }
   renderKPIs(R);
-  for (const k of ["wave", "years", "tree", "albums", "coverage", "rank", "genres", "decades", "profile"]) cardRender(k);   // cada card com o seu tempo (animação por card)
+  for (const k of ["wave", "years", "tree", "albums", "rank", "genres", "decades", "profile"]) cardRender(k);   // cada card com o seu tempo (animação por card)
   // o gráfico de evolução compara bandas/gêneros entre si: com banda, álbum ou gênero filtrado ele não faz sentido, então some (a máquina do tempo não esconde)
   const evoOff = state.bands.size + state.albums.size + state.genres.size + state.years.size > 0;
   $("#evo-card").style.display = evoOff ? "none" : "";
@@ -4626,6 +4626,12 @@ function openModal({title, sub = "", body, foot, size = "", headerExtra = "", on
   const close = () => { bg.classList.remove("on"); setTimeout(() => bg.remove(), 250); const i = modalStack.indexOf(api); if (i >= 0) modalStack.splice(i, 1); onClose && onClose(); if (!modalStack.length) document.body.style.overflow = ""; };
   const api = {bg, m, close, q: s => m.querySelector(s)};
   bg.addEventListener("pointerdown", e => { if (e.target === bg) close(); });
+  const mb = m.querySelector(".mb");
+  bg.addEventListener("wheel", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (mb) mb.scrollTop += e.deltaY;
+  }, {passive: false});
   m.querySelector(".mx").addEventListener("click", close);
   document.body.appendChild(bg); document.body.style.overflow = "hidden";
   requestAnimationFrame(() => bg.classList.add("on"));
@@ -6477,8 +6483,24 @@ function openDups(opt = {}){
     sg("tab").hidden = true;   // em "Para tratar" duplicadas e covers vêm juntas: a pessoa é que diz qual é o problema
     if (tab === "ignored"){ drawTreated(); return; }
     const list = pend;
-    const B = (x, a, l) => `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="${a}">${l}</button>`;
-    const btn = x => `<span class="dup-btns">${x.kind === "c" ? B(x, "conf", "Cover") + B(x, "band", "Duplicada") : B(x, "rep", "Repetida") + B(x, "ver", "Outra versão") + B(x, "conf", "Cover")}${B(x, "ign", "Outra música")}</span>`;
+    const B = (x, a, l, extra = "") => `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="${a}"${extra}>${l}</button>`;
+    const P = (x, a, l, extra = "") => `<button class="pbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="${a}"${extra}>${l}</button>`;
+    const bigDurDiff = x => { const s = x.rs.map(r => r.sec).filter(Boolean); if (s.length < 2) return false; const mn = Math.min(...s), mx = Math.max(...s); return mx - mn > 60 || (mn > 0 && (mx - mn) / mn > 0.35); };
+    const detectBestAction = x => {
+      if (x.kind === "c"){ if (bigDurDiff(x) || x.fuzzy) return {action: "ign", vd: null}; return {action: "conf", vd: null}; }
+      const vd = detectVersionType(x);
+      if (vd) return {action: "ver", vd};
+      if (bigDurDiff(x)) return {action: "ign", vd: null};
+      return {action: "rep", vd: null};
+    };
+    const btn = x => {
+      const {action, vd} = detectBestAction(x);
+      const pri = a => action === a;
+      if (x.kind === "c") return `<span class="dup-btns">${(pri("conf") ? P : B)(x, "conf", "Cover")}${B(x, "band", "Duplicada")}${(pri("ign") ? P : B)(x, "ign", "Outra música")}</span>`;
+      const vExtra = vd ? ` data-ver="${vd.type}"` : "";
+      const vLabel = vd ? vd.label : "Outra versão";
+      return `<span class="dup-btns">${(pri("rep") ? P : B)(x, "rep", "Repetida")}${(pri("ver") ? P : B)(x, "ver", vLabel, vExtra)}${B(x, "conf", "Cover")}${(pri("ign") ? P : B)(x, "ign", "Outra música")}</span>`;
+    };
     const tag = x => x.fuzzy
       ? ` · <span style="text-transform:none;letter-spacing:0;color:var(--ink-3)">nomes diferentes</span>`
       : ` · <span style="text-transform:none;letter-spacing:0">${x.kind === "c" ? "cover" : "repetida"}</span>`;
@@ -6503,12 +6525,28 @@ function openDups(opt = {}){
   }
   // nomes (artista principal) que aparecem no grupo, com o nº de faixas de cada um
   const mainNames = item => { const m = new Map(); for (const t of item.rs){ const n = splitArtistsRaw(t.artist)[0]; m.set(n, (m.get(n) || 0) + 1); } return [...m].map(([name, count]) => ({name, count})).sort((a, b) => b.count - a.count); };
+  // infere o tipo de versão pelos títulos das faixas do grupo → {type, label} ou null
+  const detectVersionType = item => {
+    const text = item.rs.map(r => r.title || "").join(" ").toLowerCase();
+    if (/\b(live|ao\s+vivo|concerto?)\b/.test(text)) return {type: "live", label: "Ao vivo"};
+    if (/\bremaster(?:ed|izada?|ized)?|\d{4}\s+remaster/.test(text)) return {type: "remaster", label: "Remaster"};
+    if (/\b(deluxe|super\s+deluxe|expanded|anniversary|special\s+edition|limited\s+edition|platinum|collector|bonus\s+track)/.test(text)) return {type: "deluxe", label: "Deluxe"};
+    if (/\bdemos?\b/.test(text)) return {type: "other", label: "Demo"};
+    if (/\b(acoustic|acústic[ao])\b/.test(text)) return {type: "other", label: "Acústica"};
+    if (/\bremix\b/.test(text)) return {type: "other", label: "Remix"};
+    if (/\binstrumental\b/.test(text)) return {type: "other", label: "Instrumental"};
+    if (/\b(mono|hyper|single\s+version|radio\s+(?:edit|version)|alternate(?:ive)?\s+(?:version|mix)|early\s+version)\b/.test(text)) return {type: "other", label: "Outra versão"};
+    return null;
+  };
   // pergunta que tipo de versão é (ao vivo, remaster, deluxe, outra)
   const pickVersion = item => new Promise(res => {
     let done = false;
+    const detected = detectVersionType(item);
+    const defaultKey = detected ? detected.type : Object.keys(VERS_LABEL)[0];
     const pb = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
     pb.innerHTML = `<div class="confirm"><p>Que tipo de versão são as ${item.rs.length} faixas <strong>"${esc(item.title)}"</strong>?</p>
-      <div class="du-rows">${Object.entries(VERS_LABEL).map(([k, l], i) => `<label class="chk"><input type="radio" name="vers" value="${k}"${i === 0 ? " checked" : ""}><span>${l[0].toUpperCase() + l.slice(1)}</span></label>`).join("")}</div></div>`;
+      <div class="du-rows">${Object.entries(VERS_LABEL).map(([k, l]) => `<label class="chk"><input type="radio" name="vers" value="${k}"${k === defaultKey ? " checked" : ""}><span>${l[0].toUpperCase() + l.slice(1)}</span></label>`).join("")}</div>
+      ${detected ? `<p class="muted" style="margin-top:8px;font-size:12.5px">Sugerido automaticamente pelo título — confirme se está certo.</p>` : ""}</div>`;
     foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-o autofocus>Marcar</button>`;
     const pm = openModal({title: "Mesma música, outra versão", body: pb, foot, size: "sm", onClose: () => { if (!done) res(null); }});
     foot.querySelector("[data-c]").onclick = pm.close;
@@ -6526,7 +6564,7 @@ function openDups(opt = {}){
       toast(b.dataset.a === "alb-confirm" ? "Confirmado como o mesmo álbum." : b.dataset.a === "alb-yes" ? "Álbuns juntados. O painel atualiza quando você fechar esta tela." : b.dataset.a === "alb-undo" ? "Voltou para as listas." : "Mantidos como álbuns diferentes. O painel atualiza quando você fechar esta tela.");
       return;
     }
-    let verItem = null;
+
     if (b.dataset.a === "dup-undo"){ undoDupMark(b.dataset.id); return; }
     if (b.dataset.a === "band"){
       const item = sim.covers.find(x => x.id === b.dataset.id);
@@ -6548,8 +6586,7 @@ function openDups(opt = {}){
     if (b.dataset.a === "conf"){ CONF.add(b.dataset.id); saveConf(); }
     else if (b.dataset.a === "ver"){
       const item = [...sim.dups, ...sim.covers].find(x => x.id === b.dataset.id);
-      verItem = item;
-      const type = item && await pickVersion(item);
+      const type = item && (b.dataset.ver || await pickVersion(item));
       if (!type){ return; }
       DUPIGN.add(item.id); VERS[item.id] = type; saveVers();
     } else if (b.dataset.a === "ign"){
@@ -6558,11 +6595,6 @@ function openDups(opt = {}){
       DUPIGN.add(b.dataset.id);
     } else { DUPIGN.delete(b.dataset.id); if (CONF.delete(b.dataset.id)) saveConf(); if (VERS[b.dataset.id]){ delete VERS[b.dataset.id]; saveVers(); } }
     if (b.dataset.a !== "conf") saveDupIgn(); sim = similarTitles(); draw();
-    if (verItem){
-      const again = await confirmModal({title: "Apagar alguma versão?", ok: "Escolher quais", cancel: "Agora não",
-        html: `<p>As ${verItem.rs.length} faixas <strong>"${esc(verItem.title)}"</strong> são a mesma música em versões diferentes. Costuma valer a pena ficar só com uma.</p><p class="muted">Isso não pesa na nota da Saúde: apagar é só uma sugestão.</p>`});
-      if (again) openDeleteList(verItem, `Marque as versões que quer apagar. Sempre fica pelo menos uma.`);
-    }
     toast(b.dataset.a === "undo" ? "Voltou para as listas." : "Tratado. Ele foi para \"Tratados\" (a análise de covers atualiza ao recarregar a página).");
   });
   md.m.querySelectorAll('.seg[data-g="tab"] button').forEach(b => b.addEventListener("click", () => { if (kind === "albums") atab = b.dataset.t; else tab = b.dataset.t; draw(); }));

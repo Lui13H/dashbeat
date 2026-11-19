@@ -4,7 +4,7 @@
    Nenhuma ação gasta busca sozinha: os botões só abrem as telas que já pedem confirmação. */
 (() => {
 "use strict";
-const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, cv: 5, ad: 5, au: 5, sg: 0, dr: 5, dm: 5, nm: 0, tn: 0, gd: 0, sy: 5};   // peso de cada verificação na nota (soma 110: nunca zera só por isso; peso 0 = só informa)
+const HEALTH_W = {a: 25, b: 5, c: 10, e: 15, f: 10, g: 10, gw: 0, h: 5, ad: 5, sg: 0, dr: 5, dm: 5, nm: 0, tn: 0, gd: 0, sy: 0, cx: 5};   // peso de cada verificação na nota (soma 100: nunca zera só por isso; peso 0 = só informa)
 const FULL_AT = 0.25;                                                       // com 25% das faixas afetadas o item já custa o peso inteiro
 const MAX_SEC = 20 * 60;
 
@@ -28,6 +28,25 @@ const saveAlbClean = () => { try { localStorage.setItem(ALB_CLEAN_KEY, JSON.stri
 const SAME_YEAR_CFM_KEY = "catalogo-musical:same-year-cfm";
 const SAME_YEAR_CFM = (() => { try { return new Set(JSON.parse(localStorage.getItem(SAME_YEAR_CFM_KEY) || "[]")); } catch(e) { return new Set(); } })();
 const saveSameYearCfm = () => { try { localStorage.setItem(SAME_YEAR_CFM_KEY, JSON.stringify([...SAME_YEAR_CFM])); } catch(e) {} };
+
+const ALB_CHECK_KEY = "catalogo-musical:alb-check";
+const ALB_CHECK_VER = "v4";
+const ALB_CHECK = (() => { try { const r = JSON.parse(localStorage.getItem(ALB_CHECK_KEY) || "null") || {}; return r._ver === ALB_CHECK_VER ? r : {_ver: ALB_CHECK_VER}; } catch(e) { return {_ver: ALB_CHECK_VER}; } })();
+const saveAlbCheck = () => { try { localStorage.setItem(ALB_CHECK_KEY, JSON.stringify(ALB_CHECK)); } catch(e) {} };
+const albCheckKey = (artist, albumRaw) => normC((splitArtistsRaw(artist)[0] || artist)) + "|" + normC(albumRaw);
+
+const ARTIST_DISC_KEY = "catalogo-musical:artist-disc";
+const ARTIST_DISC_VER = "v1";
+const ARTIST_DISC = (() => {
+  try {
+    const r = JSON.parse(localStorage.getItem(ARTIST_DISC_KEY) || "null") || {};
+    if (r._ver !== ARTIST_DISC_VER) return {_ver: ARTIST_DISC_VER};
+    // limpa entradas vazias (falhas cacheadas de execuções anteriores)
+    for (const k of Object.keys(r)) if (k !== "_ver" && Array.isArray(r[k]) && r[k].length === 0) delete r[k];
+    return r;
+  } catch(e) { return {_ver: ARTIST_DISC_VER}; }
+})();
+const saveArtistDisc = () => { try { localStorage.setItem(ARTIST_DISC_KEY, JSON.stringify(ARTIST_DISC)); } catch(e) {} };
 let _healthRef = null;   // { md, body, rerender } — mantém o modal de saúde aberto ao navegar entre sub-modais
 
 // detecta sufixos de edição/versão no final do nome do álbum e sugere o nome limpo
@@ -153,6 +172,8 @@ function healthChecks(list = BY_PLAYLIST){
   const tnIssues = trackTitleIssues(list);
   const gdIssues = genreDivergence(list);
   const syGroups = sameYearAlbums(list);
+  const cxGroups = crossedDataIssues(list);
+  const cxPending = cxPendingCount(list);
   const mk = (k, count, frac, level, extra) => ({k, count, frac, level: count ? level : "ok", w: HEALTH_W[k], ...extra});
   const items = [
     // w:25 — crítico
@@ -160,16 +181,15 @@ function healthChecks(list = BY_PLAYLIST){
     // w:15
     mk("e", ni.length, ni.length / N, "warn", {tracks: ni}),
     // w:10 — warn antes de help
-    mk("f", sim.dups.length, dupTracks.length / N, "warn", {tracks: dupTracks, groups: sim.dups}),
+    mk("f", sim.dups.length + sim.covers.length, (dupTracks.length + uniq(sim.covers.flatMap(x => x.rs)).length) / N, "warn", {tracks: [...dupTracks, ...uniq(sim.covers.flatMap(x => x.rs))], dups: sim.dups.length, covers: sim.covers.length}),
     mk("g", oddDur.length, oddDur.length / N, "warn", {tracks: oddDur}),
     mk("c", genres.length, Math.min(1, genres.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {artists: genres}),
     // w:5 — warn
-    mk("cv", sim.covers.length, uniq(sim.covers.flatMap(x => x.rs)).length / N, "warn", {tracks: uniq(sim.covers.flatMap(x => x.rs))}),
-    mk("ad", ai.doubts.length, Math.min(1, ai.doubts.reduce((n, e) => n + e.ca + e.cb, 0) / N), "warn", {}),
-    mk("au", autoG.length, Math.min(1, autoG.reduce((n, g) => n + g.variants.reduce((m, v) => m + v.count, 0), 0) / N), "warn", {}),
+    mk("ad", ai.doubts.length + autoG.length, Math.min(1, (ai.doubts.reduce((n, e) => n + e.ca + e.cb, 0) + autoG.reduce((n, g) => n + g.variants.reduce((m, v) => m + v.count, 0), 0)) / N), "warn", {doubts: ai.doubts.length, autos: autoG.length}),
     mk("dr", review.length, review.length / N, "warn", {tracks: review}),
     mk("dm", missingDate.length, missingDate.reduce((n, x) => n + x.tracks.length, 0) / N, "warn", {albums: missingDate}),
     mk("sy", syGroups.filter(x => !x.confirmed).length, Math.min(1, syGroups.filter(x => !x.confirmed).reduce((n, x) => n + x.tracks.length, 0) / N), "warn", {groups: syGroups}),
+    mk("cx", cxGroups.reduce((n, g) => n + g.tracks.length, 0), Math.min(1, cxGroups.reduce((n, g) => n + g.tracks.length, 0) / N), "warn", {groups: cxGroups, pending: cxPending}),
     // w:5 — help
     mk("b", noLink.length, noLink.length / N, "help", {tracks: noLink}),
     mk("h", spell.length, Math.min(1, spell.length / Math.max(1, uniq(list.flatMap(t => t.bands)).length)), "help", {groups: spell}),
@@ -194,10 +214,8 @@ const META = {
   b: {t: "Músicas sem o link guardado", ok: "Todas as músicas com dados têm o link guardado.", d: n => `${plural(n, "música tem", "músicas têm")} dados mas não tem o link do Spotify salvo.`, act: "upd"},
   c: {t: "Artistas sem gênero", ok: "Todos os artistas têm gênero do Spotify.", d: n => `${plural(n, "artista está", "artistas estão")} sem gênero do Spotify.`, act: "upd"},
   e: {t: "Campos \u201cNão identificado\u201d", ok: "Nenhum artista, álbum ou data em branco.", d: n => `${plural(n, "faixa tem", "faixas têm")} artista, álbum ou data em branco.`, act: "list"},
-  cv: {t: "Covers", ok: "Nenhum título gravado por artistas diferentes.", d: n => `${plural(n, "título aparece", "títulos aparecem")} com artistas diferentes — avalie se é cover ou música distinta.`, act: "covers"},
-  ad: {t: "Álbuns em dúvida", ok: "Nenhum álbum em dúvida.", d: n => `${plural(n, "par de álbuns pode", "pares de álbuns podem")} ser o mesmo álbum.`, act: "adoubt"},
-  au: {t: "Álbuns que o site acha iguais", ok: "Nenhum álbum aguardando confirmação.", d: n => `${plural(n, "grupo de álbuns", "grupos de álbuns")} considerados iguais — confirme ou separe.`, act: "aauto"},
-  f: {t: "Prováveis duplicadas", ok: "Nenhuma música repetida.", d: n => `${plural(n, "caso de música provavelmente repetida", "casos de músicas provavelmente repetidas")} (mesmo título e artista).`, act: "dups"},
+  ad: {t: "Álbuns duplicados", ok: "Nenhum álbum duplicado ou aguardando confirmação.", d: (n, it) => { const d = (it && it.doubts) || 0, a = n - d; return d && a ? `${plural(d, "par de álbuns", "pares de álbuns")} em dúvida e ${plural(a, "grupo", "grupos")} aguardando confirmação.` : d ? `${plural(d, "par de álbuns pode", "pares de álbuns podem")} ser o mesmo álbum.` : `${plural(a, "grupo de álbuns", "grupos de álbuns")} considerados iguais — confirme ou separe.`; }, act: "adoubt"},
+  f: {t: "Duplicadas e covers", ok: "Nenhuma música repetida ou título suspeito de cover.", d: (n, it) => { const d = (it && it.dups) || 0, c = n - d; return d && c ? `${plural(d, "grupo repetido", "grupos repetidos")} e ${plural(c, "título", "títulos")} com artistas diferentes.` : d ? `${plural(d, "caso de música provavelmente repetida", "casos de músicas provavelmente repetidas")} (mesmo título e artista).` : `${plural(c, "título aparece", "títulos aparecem")} com artistas diferentes — avalie se é cover ou música distinta.`; }, act: "dupcv"},
   g: {t: "Duração suspeita", ok: "Nenhuma duração estranha.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração de 0 s ou acima de 20 minutos.`, act: "dur"},
   gw: {t: "Duração longa confirmada", ok: "Nenhuma faixa com duração longa confirmada pendente.", d: n => `${plural(n, "faixa tem", "faixas têm")} duração longa confirmada — pode editar ou confirmar novamente.`, act: "dur"},
   sg: {t: "Singles com álbum na Apple", ok: "Nenhuma sugestão de álbum para singles.", d: n => `${plural(n, "faixa marcada como single ou EP existe", "faixas marcadas como single ou EP existem")} num álbum, segundo a Apple.`, act: "singles"},
@@ -207,7 +225,8 @@ const META = {
   tn: {t: "Títulos com sufixo de versão", ok: "Nenhum título de faixa com sufixo de versão.", d: n => `${plural(n, "faixa tem", "faixas têm")} sufixo de versão no título (Remix, Live…).`, act: "tn"},
   gd: {t: "Gênero divergente entre fontes", ok: "Nenhum gênero divergente detectado.", d: n => `${plural(n, "artista tem", "artistas têm")} gênero divergente entre Spotify, Apple e MusicBrainz.`, act: "gd"},
   h: {t: "Grafias parecidas do mesmo artista", ok: "Nenhum artista escrito de duas formas.", d: n => `${plural(n, "artista aparece", "artistas aparecem")} escrito de mais de um jeito.`, act: "spell"},
-  sy: {t: "Álbuns do mesmo artista no mesmo ano", ok: "Nenhum artista com dois álbuns no mesmo ano.", d: n => `${plural(n, "artista tem", "artistas têm")} dois ou mais álbuns lançados no mesmo ano — confirme se as datas estão certas.`, act: "sameyear"}
+  sy: {t: "Álbuns do mesmo artista no mesmo ano", ok: "Nenhum artista com dois álbuns no mesmo ano.", d: n => `${plural(n, "artista tem", "artistas têm")} dois ou mais álbuns lançados no mesmo ano — confirme se as datas estão certas.`, act: "sameyear"},
+  cx: {t: "Integridade dos dados", ok: "Nenhum dado de artista/álbum inconsistente.", d: (n, it) => { const p = it && it.pending ? ` · verificando…` : ""; return `${plural(n, "faixa foi", "faixas foram")} corrompida${n !== 1 ? "s" : ""} na importação.${p}`; }, act: "cx"}
 };
 const LEVEL = {ok: "ok", warn: "atenção", help: "ajuda"};
 
@@ -426,6 +445,81 @@ async function checkDurWithSources(t) {
   return DUR_CHECK[key];
 }
 
+async function fetchArtistDisc(mainArtist){
+  const ak = normC(mainArtist);
+  if (!ak) return [];
+  if (ARTIST_DISC[ak] !== undefined) return ARTIST_DISC[ak];
+  try {
+    await new Promise(r => setTimeout(r, 400));
+    const artists = await itunes(`search?entity=musicArtist&limit=5&term=${encodeURIComponent(mainArtist)}`);
+    const who = (artists || []).find(r => { const rA = normC(r.artistName || ""); return rA === ak || rA.includes(ak) || ak.includes(rA); });
+    if (who){
+      await new Promise(r => setTimeout(r, 3200));
+      const albs = await itunes(`lookup?id=${who.artistId}&entity=album&limit=200`);
+      const disc = (albs || [])
+        .filter(r => r.wrapperType === "collection")
+        .map(r => albCore(cleanTitle(r.collectionName || "")).join(" ").trim())
+        .filter(Boolean);
+      if (disc.length > 0){ ARTIST_DISC[ak] = disc; saveArtistDisc(); return disc; }
+    }
+  } catch(e) {}
+  return []; // não cacheia falhas — próxima chamada tentará de novo
+}
+
+async function checkAlbumInCatalog(artist, albumRaw){
+  const key = albCheckKey(artist, albumRaw);
+  const mainArtist = (splitArtistsRaw(artist)[0] || artist).trim();
+  const albClean = albCore(cleanTitle(albumRaw)).join(" ").trim() || normC(albumRaw).trim();
+  const mA = normC(mainArtist);
+  const FAKE_RE = /karaoke|tribute|cover\s+(version|band|series)|made\s+famous|originally\s+performed|instrumental\s+version|backing\s+track/i;
+
+  const save = r => { ALB_CHECK[key] = r; saveAlbCheck(); if (_healthRef) _healthRef.rerender(); return r; };
+
+  if (!albClean || albClean.length < 2) return save({status: "warn", foundArtist: null});
+
+  const albumMatch = r => {
+    const rC = albCore(cleanTitle(r.collectionName || "")).join(" ");
+    return rC === albClean || normC(r.collectionName || "") === normC(albumRaw);
+  };
+  const artistMatch = r => { const rA = normC(r.artistName || ""); return rA === mA || rA.includes(mA) || mA.includes(rA); };
+
+  // Passo 1 — Discografia completa do artista via iTunes (método mais confiável)
+  // Se o artista existe no iTunes, verificamos se o álbum está na discografia deles
+  const disc = await fetchArtistDisc(mainArtist);
+  if (disc.length > 0){
+    const inDisc = disc.some(d => d === albClean || (d.length > 4 && albClean.length > 4 && (d.includes(albClean) || albClean.includes(d))));
+    if (inDisc) return save({status: "ok", foundArtist: null});
+
+    // Artista existe no iTunes mas álbum NÃO está na discografia → quem tem esse álbum?
+    let foundArtist = null;
+    try {
+      await new Promise(r => setTimeout(r, 400));
+      const res = await itunes(`search?entity=album&limit=20&term=${encodeURIComponent(albClean)}`);
+      if (res && res.length > 0){
+        const hits = res.filter(r => albumMatch(r) && !FAKE_RE.test(r.artistName || ""));
+        if (hits.some(artistMatch)) return save({status: "ok", foundArtist: null});
+        if (hits.length > 0) foundArtist = hits[0].artistName || null;
+      }
+    } catch(e) {}
+    return save(foundArtist ? {status: "mismatch", foundArtist} : {status: "warn", foundArtist: null});
+  }
+
+  // Artista não encontrado no iTunes — fallback MusicBrainz + iTunes direto
+  try {
+    await new Promise(r => setTimeout(r, 1200));
+    const j = await mbJSON("release/?query=" + encodeURIComponent(`release:"${albClean}" AND artist:"${mainArtist}"`) + "&limit=5");
+    if (((j && j.releases) || []).length > 0) return save({status: "ok", foundArtist: null});
+  } catch(e) {}
+
+  try {
+    await new Promise(r => setTimeout(r, 400));
+    const res = await itunes(`search?entity=album&limit=10&term=${encodeURIComponent(mainArtist + " " + albClean)}`);
+    if ((res || []).some(r => artistMatch(r) && albumMatch(r))) return save({status: "ok", foundArtist: null});
+  } catch(e) {}
+
+  return save({status: "warn", foundArtist: null});
+}
+
 if (STORE) {
   const longTracks = BY_PLAYLIST.filter(t => t.sec > MAX_SEC);
   const needCheck = longTracks.filter(t => {
@@ -451,6 +545,21 @@ if (STORE) {
   }
   if (needCheck.length) pumpCovers();
 }
+
+if (STORE){
+  const COMP_RE_Q = /\b(greatest\s+hits?|best\s+of|compilation|soundtrack|trilha\s+sonora|colet[aâ]nea|various\s+artists?|v[aá]rios\s+artistas?)\b/i;
+  const need = new Map();
+  for (const t of BY_PLAYLIST){
+    if (!t.artist || t.artist === NI || !t.albumRaw || t.albumRaw === NI) continue;
+    if (COMP_RE_Q.test(t.albumRaw)) continue;
+    const k = albCheckKey(t.artist, t.albumRaw);
+    if (!ALB_CHECK[k]) need.set(k, {artist: t.artist, albumRaw: t.albumRaw});
+  }
+  for (const {artist, albumRaw} of need.values())
+    coverQueue.push({job: async () => { await checkAlbumInCatalog(artist, albumRaw); }});
+  if (need.size) pumpCovers();
+}
+
 function openDurReview(tracks) {
   const body = document.createElement("div");
   const fmt = ms => ms !== null ? durTxt(Math.round(ms / 1000)) : "—";
@@ -537,6 +646,10 @@ function openTrackTitleClean(issues){
 }
 
 function openTrackTitleUndo(back){
+  // remove entradas cujo número de faixa já não existe na playlist
+  const nsNow = new Set(BY_PLAYLIST.map(t => t.n));
+  const staleT = TRACK_TITLE_CLEAN.filter(e => !nsNow.has(e.n));
+  if (staleT.length){ for (const e of staleT) TRACK_TITLE_CLEAN.splice(TRACK_TITLE_CLEAN.indexOf(e), 1); saveTrackTitleClean(); }
   if (!TRACK_TITLE_CLEAN.length) return;
   const body = document.createElement("div");
 
@@ -602,6 +715,10 @@ function openAlbumNameClean(issues){
 }
 
 function openAlbumNameUndo(back){
+  // remove entradas cujo álbum já não existe na playlist (faixas removidas ou playlist trocada)
+  const albumsNow = new Set(BY_PLAYLIST.map(t => t.albumRaw));
+  const stale = ALB_CLEAN.filter(e => !albumsNow.has(e.raw) && !albumsNow.has(e.clean));
+  if (stale.length){ for (const e of stale) ALB_CLEAN.splice(ALB_CLEAN.indexOf(e), 1); saveAlbClean(); }
   if (!ALB_CLEAN.length) return;
   const body = document.createElement("div");
 
@@ -875,18 +992,33 @@ function openRescanProgress(priorityKeys, total){
     return {body, h};
   }
 
+  const CIRC = +(2 * Math.PI * 14).toFixed(2);
   function showBubble(){
     if (bubble || state.isDone) return;
+    if (!document.querySelector("#rp-kf")){ const st = document.createElement("style"); st.id = "rp-kf"; st.textContent = ".rp-spin{display:inline-block;animation:rp-rot .8s linear infinite}@keyframes rp-rot{to{transform:rotate(360deg)}}"; document.head.appendChild(st); }
     bubble = document.createElement("button");
     bubble.id = "rescan-bubble";
-    bubble.style.cssText = "position:fixed;bottom:24px;right:24px;z-index:9999;background:var(--accent,#5b50e8);color:#fff;border:none;border-radius:24px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.35);display:flex;align-items:center;gap:8px";
-    bubble.innerHTML = `<span class="rp-spin" style="display:inline-block;animation:rp-rot .8s linear infinite">↺</span><span id="bubble-lbl">Revisando…</span>`;
+    bubble.setAttribute("aria-label", "Revisão em andamento — clique para ver detalhes");
+    bubble.style.cssText = "position:fixed;bottom:24px;right:24px;z-index:9999;background:linear-gradient(180deg,hsla(var(--h),43%,13%,.97),hsla(var(--h),50%,7%,.99));color:var(--ink);border:1px solid var(--line-2);border-radius:18px;padding:10px 16px 10px 10px;cursor:pointer;box-shadow:0 8px 32px -8px rgba(0,0,0,.55);display:flex;align-items:center;gap:10px;transition:box-shadow .2s";
+    bubble.innerHTML = `<svg viewBox="0 0 36 36" width="38" height="38" style="flex:none;overflow:visible"><circle cx="18" cy="18" r="14" fill="none" stroke="hsla(var(--h),40%,40%,.35)" stroke-width="3.2"/><circle id="rb-arc" cx="18" cy="18" r="14" fill="none" stroke="var(--glow)" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="0 ${CIRC}" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .4s"/><text x="18" y="22" text-anchor="middle" font-size="8.5" font-weight="700" fill="var(--ink)" id="rb-pct">0%</text></svg><div style="min-width:0;text-align:left"><div style="font-size:12.5px;font-weight:700;white-space:nowrap">Revisão em andamento</div><div id="rb-sub" style="font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">aguardando…</div></div>`;
     bubble.addEventListener("click", () => { hideBubble(); openModal_(); });
     document.body.appendChild(bubble);
-    if (!document.querySelector("#rp-kf")){ const st = document.createElement("style"); st.id = "rp-kf"; st.textContent = ".rp-spin{display:inline-block;animation:rp-rot .8s linear infinite}@keyframes rp-rot{to{transform:rotate(360deg)}}"; document.head.appendChild(st); }
+    updateBubble();
   }
   function hideBubble(){ if (bubble){ bubble.remove(); bubble = null; } }
-  function updateBubble(){ const lbl = bubble && bubble.querySelector("#bubble-lbl"); if (lbl) lbl.textContent = `Revisando${state.changes.length ? ` · ${state.changes.length} ✓` : "…"}`; }
+  function updateBubble(){
+    if (!bubble) return;
+    const totalDone = SRC.reduce((sum, s) => sum + state.sources[s].done, 0);
+    const totalSteps = total * SRC.length;
+    const pct = totalSteps ? Math.min(100, Math.round(100 * totalDone / totalSteps)) : 0;
+    const arc = bubble.querySelector("#rb-arc"), pctEl = bubble.querySelector("#rb-pct"), sub = bubble.querySelector("#rb-sub");
+    if (arc) arc.setAttribute("stroke-dasharray", `${+(CIRC * pct / 100).toFixed(1)} ${CIRC}`);
+    if (pctEl) pctEl.textContent = `${pct}%`;
+    if (sub){
+      const act = SRC.find(s => !state.sources[s].finished && state.sources[s].album !== "aguardando…");
+      sub.textContent = act ? `${act}: ${state.sources[act].album}` : `${totalDone}/${totalSteps} verificadas`;
+    }
+  }
 
   function openModal_(){
     const {body, h} = buildBody();
@@ -899,6 +1031,7 @@ function openRescanProgress(priorityKeys, total){
     onSourceUpdate(data){
       Object.assign(state.sources[data.source], data);
       if (curHandlers) curHandlers.srcUpdate(data);
+      updateBubble();
     },
     onProgress(c){
       state.changes.push(c);
@@ -920,7 +1053,7 @@ function openRescanProgress(priorityKeys, total){
     }
   });
 
-  openModal_();
+  showBubble();
 }
 function openSameYearDetail(x){
   // todos os álbuns desse artista na playlist, agrupados por nome de álbum
@@ -945,6 +1078,560 @@ function openSameYearDetail(x){
     </div>`;
   }).join("")}</div></div>`;
   openModal({title: `Discografia de ${esc(x.art)} na playlist`, sub: `Destacado: álbuns de ${x.year}`, body, size: "md"});
+}
+
+function crossedDataIssues(list){
+  const COMP_RE = /\b(greatest\s+hits?|best\s+of|compilation|soundtrack|trilha\s+sonora|colet[aâ]nea|various\s+artists?|v[aá]rios\s+artistas?)\b/i;
+  const byAlbum = new Map();
+  for (const t of list){
+    if (!t.albumRaw || t.albumRaw === NI) continue;
+    const k = normC(t.albumRaw);
+    if (!byAlbum.has(k)) byAlbum.set(k, {album: t.albumRaw, tracks: []});
+    byAlbum.get(k).tracks.push(t);
+  }
+  const groups = [];
+  const flaggedAlbumKeys = new Set();
+  for (const {album, tracks} of byAlbum.values()){
+    if (COMP_RE.test(album)) continue;
+    if (tracks.length < 2) continue;
+    const artistMap = new Map();
+    for (const t of tracks){
+      if (t.artist === NI) continue;
+      const primary = (splitArtistsRaw(t.artist)[0] || t.artist).trim();
+      const nk = normC(primary);
+      if (!artistMap.has(nk)) artistMap.set(nk, {name: primary, tracks: []});
+      artistMap.get(nk).tracks.push(t);
+    }
+    if (artistMap.size >= 2){
+      const artists = [...artistMap.values()].sort((a, b) => b.tracks.length - a.tracks.length);
+      groups.push({album, tracks, artists, source: "local"});
+      flaggedAlbumKeys.add(normC(album));
+    }
+  }
+  // Mismatches detectados pela API (álbum não pertence a esse artista segundo iTunes/MB)
+  const apiByAlbum = new Map();
+  for (const t of list){
+    if (!t.artist || t.artist === NI || !t.albumRaw || t.albumRaw === NI) continue;
+    if (COMP_RE.test(t.albumRaw)) continue;
+    if (flaggedAlbumKeys.has(normC(t.albumRaw))) continue;
+    const ck = albCheckKey(t.artist, t.albumRaw);
+    const check = ALB_CHECK[ck];
+    if (check && check.status === "mismatch"){
+      const ak = normC(t.albumRaw);
+      if (!apiByAlbum.has(ak)) apiByAlbum.set(ak, {album: t.albumRaw, tracks: [], foundArtist: check.foundArtist});
+      apiByAlbum.get(ak).tracks.push(t);
+    }
+  }
+  for (const {album, tracks, foundArtist} of apiByAlbum.values())
+    groups.push({album, tracks, artists: [{name: tracks[0].artist, tracks}], source: "api", foundArtist});
+  return groups;
+}
+
+function cxPendingCount(list){
+  const COMP_RE = /\b(greatest\s+hits?|best\s+of|compilation|soundtrack|trilha\s+sonora|colet[aâ]nea|various\s+artists?|v[aá]rios\s+artistas?)\b/i;
+  const seen = new Set();
+  let n = 0;
+  for (const t of list){
+    if (!t.artist || t.artist === NI || !t.albumRaw || t.albumRaw === NI) continue;
+    if (COMP_RE.test(t.albumRaw)) continue;
+    const k = albCheckKey(t.artist, t.albumRaw);
+    if (seen.has(k)) continue; seen.add(k);
+    if (!ALB_CHECK[k]) n++;
+  }
+  return n;
+}
+
+function openCrossedData(groups){
+  const body = document.createElement("div");
+  const fixes = new Map(); // t.n → {status, data, link, msg}
+
+  // Separa faixas corrompidas por API (título+álbum errados) de conflitos locais (mesmo álbum, 2 artistas)
+  const apiTracks = [];
+  const localGroups = [];
+  for (const g of groups){
+    if (g.source === "api") for (const t of g.tracks) apiTracks.push({t, foundArtist: g.foundArtist, album: g.album});
+    else localGroups.push(g);
+  }
+  apiTracks.sort((a, b) => a.t.n - b.t.n);
+
+  let autoStatus = ""; // "" | "loading" | "done" | "err" | "no-token"
+  let autoMsg = "";
+
+  const render = () => {
+    const verifiedCount = [...fixes.values()].filter(f => f.status === "ok").length;
+    const pendingCount = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok").length;
+    const autoStatusHtml = autoStatus === "loading"
+      ? `<span class="muted" style="font-size:12px">Corrigindo…</span>`
+      : autoStatus === "done"
+      ? `<span style="font-size:12px;color:var(--emerald)">✓ ${esc(autoMsg)}</span>`
+      : autoStatus === "no-token"
+      ? autoMsg === "reconnect"
+        ? `<span style="font-size:12px;color:var(--red)">Token inválido — </span><button class="gbtn" type="button" id="cx-sp-connect" style="font-size:12px">Reconectar Spotify</button>`
+        : `<span style="font-size:12px;color:var(--red)">Spotify não conectado — </span><button class="gbtn" type="button" id="cx-sp-connect" style="font-size:12px">Conectar Spotify</button>`
+      : autoStatus === "err"
+      ? `<span style="font-size:12px;color:var(--red)">✗ ${esc(autoMsg)}</span>`
+      : "";
+    body.innerHTML = `
+      ${apiTracks.length && pendingCount > 0 ? `
+        <p class="mdesc">${pendingCount === 1 ? "Uma faixa tem" : `${nf(pendingCount)} faixas têm`} dados corrompidos. Abra o Spotify, selecione todas as músicas da playlist (<strong>Ctrl+A</strong>) e copie (<strong>Ctrl+C</strong>), depois cole abaixo.</p>
+        <div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px">
+          <textarea id="cx-pl-inp" rows="3"
+            placeholder="Cole aqui o conteúdo copiado da playlist do Spotify…" autocomplete="off" spellcheck="false"
+            style="flex:1;padding:5px 8px;font-size:13px;background:var(--inp-bg,var(--bg2));border:1px solid var(--line);border-radius:6px;color:inherit;outline:none;min-width:0;resize:vertical;font-family:inherit"></textarea>
+          <button class="pbtn" type="button" id="cx-auto-btn" style="flex-shrink:0;align-self:flex-end">Corrigir</button>
+        </div>
+        ${autoStatusHtml ? `<div style="margin-bottom:8px">${autoStatusHtml}</div>` : ""}
+      ` : ""}
+      <div class="du-rows">
+        ${apiTracks.map(({t}) => {
+          const fix = fixes.get(t.n) || {};
+          const statusHtml = fix.status === "loading"
+            ? `<span class="muted" style="font-size:12px">Verificando…</span>`
+            : fix.status === "ok"
+            ? `<span style="font-size:12px;color:var(--emerald)">✓ ${esc(fix.data.title)} · ${esc(fix.data.album)}</span>`
+            : fix.status === "err" && fix.msg !== "no-token"
+            ? `<span style="font-size:12px;color:var(--red)">✗ ${esc(fix.msg)}</span>`
+            : "";
+          return `<div class="alb-row" style="flex-direction:column;align-items:stretch;gap:6px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div><strong>#${t.n}</strong> <span class="muted">· ${esc(t.artist)}</span>${statusHtml ? " " + statusHtml : ""}</div>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                ${fix.status !== "ok" ? `<button class="gbtn" type="button" data-manual="${t.n}" style="font-size:11px">${(fix._manual || false) ? "Ocultar" : "Link manual"}</button>` : ""}
+                <button class="gbtn" type="button" data-edit="${t.n}" style="font-size:11px">Editar</button>
+              </div>
+            </div>
+            ${fix._manual || fix.status === "err" ? `<div style="display:flex;gap:6px;align-items:center">
+              <input type="text" class="cx-link-inp" data-n="${t.n}"
+                placeholder="https://open.spotify.com/track/…" autocomplete="off" spellcheck="false"
+                style="flex:1;padding:5px 8px;font-size:13px;background:var(--inp-bg,var(--bg2));border:1px solid var(--line);border-radius:6px;color:inherit;outline:none;min-width:0"
+                value="${esc(fix.link || "")}">
+              <button class="gbtn" type="button" data-verify="${t.n}" style="flex-shrink:0">Verificar</button>
+            </div>` : ""}
+          </div>`;
+        }).join("")}
+        ${localGroups.length && apiTracks.length ? `<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"></div>` : ""}
+        ${localGroups.map((g, gi) => {
+          const majority = g.artists[0], minority = g.artists.slice(1);
+          return `<div class="alb-row">
+            <div class="alb-main">
+              <div><strong>${esc(g.album)}</strong> <span class="muted">· ${faixas(g.tracks.length)}</span></div>
+              <div style="margin-top:4px"><span class="alb-new">${esc(majority.name)}</span> <span class="muted" style="font-size:12px">${faixas(majority.tracks.length)}</span>${minority.map(a => ` · <span class="alb-old">${esc(a.name)}</span> <span class="muted" style="font-size:12px">${faixas(a.tracks.length)}</span>`).join("")}</div>
+            </div>
+            <div class="alb-btns"><button class="gbtn" type="button" data-local-exp="${gi}">Ver faixas</button></div>
+          </div>
+          <div id="cx-local-${gi}" hidden style="margin-bottom:6px">
+            ${g.tracks.map(t => `<div class="alb-row" style="margin-left:16px;border-left:2px solid var(--line);padding-left:10px">
+              <div class="alb-main"><div><strong>#${t.n}</strong> ${esc(t.title)}</div><div style="font-size:12px" class="muted">${esc(t.artist)}</div></div>
+              <div class="alb-btns"><button class="gbtn" type="button" data-edit="${t.n}">Editar</button></div>
+            </div>`).join("")}
+          </div>`;
+        }).join("")}
+      </div>
+      ${verifiedCount > 0 ? `<div style="margin-top:12px;text-align:right">
+        <button class="pbtn" type="button" id="cx-save-btn">Salvar ${verifiedCount === 1 ? "1 correção" : `${nf(verifiedCount)} correções`}</button>
+      </div>` : ""}`;
+  };
+  render();
+
+  const md = openModal({
+    title: "Integridade dos dados",
+    sub: `${nf(apiTracks.length + localGroups.reduce((n,g)=>n+g.tracks.length,0))} faixa${(apiTracks.length + localGroups.length) !== 1 ? "s" : ""} com dados inconsistentes`,
+    body, size: "lg", onClose: () => openHealth()
+  });
+
+  async function getToken(){
+    try {
+      const oauth = typeof loadSpotifyOAuth === "function" ? loadSpotifyOAuth() : null;
+      if (oauth && oauth.access_token){
+        if (!oauth.expires_at || Date.now() < oauth.expires_at) return oauth.access_token;
+        // expirado: usa spotifyUserToken que gerencia rotação do refresh token PKCE
+        if (typeof spotifyUserToken === "function"){
+          try { const tok = await spotifyUserToken(); if (tok) return tok; } catch(e2){}
+        }
+        return oauth.access_token; // último recurso: retorna expirado
+      }
+    } catch(e) {}
+    // sem OAuth: credenciais de cliente
+    try {
+      const creds = typeof loadSpotifyCreds === "function" ? loadSpotifyCreds() : null;
+      if (creds?.id && creds?.secret) return await spotifyToken(creds.id, creds.secret);
+    } catch(e) {}
+    return null;
+  }
+
+  function hasOAuthStored(){
+    try { const o = loadSpotifyOAuth(); return !!(o && o.access_token); } catch(e) { return false; }
+  }
+
+  async function verifyLink(trackN){
+    const item = apiTracks.find(x => x.t.n === trackN);
+    if (!item) return;
+    const inp = body.querySelector(`input[data-n="${trackN}"]`);
+    const link = inp ? inp.value.trim() : "";
+    const ids = typeof parseSpotifyIds === "function" ? parseSpotifyIds(link) : [];
+    if (!ids.length){
+      fixes.set(trackN, {status: "err", msg: "Link inválido — cole um link open.spotify.com/track/…", link});
+      render(); return;
+    }
+    fixes.set(trackN, {status: "loading", link});
+    render();
+    try {
+      const token = await getToken();
+      if (token){
+        const r = await fetch(`https://api.spotify.com/v1/tracks/${ids[0]}`, {headers: {Authorization: `Bearer ${token}`}});
+        if (!r.ok){ if (r.status === 401 || r.status === 403){ /* cai no path sem auth */ } else { throw new Error(`Spotify retornou HTTP ${r.status}.`); } }
+        else {
+          const tr = await r.json();
+          const fetchedArtists = (tr.artists || []).map(a => a.name);
+          const storedPrimary = (splitArtistsRaw(item.t.artist)[0] || item.t.artist).trim();
+          const artistOk = fetchedArtists.some(fa => { const nFa = normC(fa), nSt = normC(storedPrimary); return nFa === nSt || nFa.includes(nSt) || nSt.includes(nFa); });
+          if (!artistOk){ fixes.set(trackN, {status:"err", msg:`Esta faixa é de "${fetchedArtists[0]||"?"}", não de "${storedPrimary}".`, link}); render(); return; }
+          const newMeta = {...(item.t.m||{}), id:tr.id};
+          if (tr.album?.album_type) newMeta.ty=tr.album.album_type;
+          if (tr.explicit!==undefined) newMeta.x=tr.explicit?1:0;
+          if (tr.track_number) newMeta.tn=tr.track_number;
+          if (tr.album?.total_tracks) newMeta.tt=tr.album.total_tracks;
+          fixes.set(trackN, {status:"ok", data:{title:tr.name, album:tr.album?.name||item.t.albumRaw, sec:tr.duration_ms?Math.round(tr.duration_ms/1000):item.t.sec, date:tr.album?.release_date||item.t.dateRaw, meta:newMeta}, link});
+          render(); return;
+        }
+      }
+      // sem token ou 401/403: tenta MusicBrainz + iTunes
+      fixes.set(trackN, {status:"loading", link}); render();
+      const mb = await mbLookup(ids[0], `https://open.spotify.com/track/${ids[0]}`)
+                 || await mbLookup(ids[0], `spotify:track:${ids[0]}`);
+      if (!mb){ fixes.set(trackN, {status:"err", msg:"Não encontrado no MusicBrainz. Sem login não é possível verificar.", link}); render(); return; }
+      const artist2 = (splitArtistsRaw(item.t.artist)[0]||item.t.artist).trim();
+      let album2=item.t.album, sec2=mb.sec||item.t.sec, date2=item.t.dateRaw;
+      try {
+        const q=encodeURIComponent(artist2+" "+mb.title);
+        const ri=await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=10`);
+        if (ri.ok){ const ji=await ri.json(); const hit=(ji.results||[]).find(x=>normC(x.trackName)===normC(mb.title)&&(normC(x.artistName)===normC(artist2)||normC(x.artistName).includes(normC(artist2))||normC(artist2).includes(normC(x.artistName)))); if(hit){if(hit.collectionName)album2=hit.collectionName;if(hit.trackTimeMillis)sec2=Math.round(hit.trackTimeMillis/1000);if(hit.releaseDate)date2=hit.releaseDate.slice(0,10);} }
+      } catch(e2){}
+      fixes.set(trackN, {status:"ok", data:{title:mb.title, album:album2, sec:sec2, date:date2, meta:{...(item.t.m||{}),id:ids[0]}}, link});
+      render();
+    } catch(e) {
+      fixes.set(trackN, {status: "err", msg: e.message || String(e), link});
+      render();
+    }
+  }
+
+  async function applyFixes(){
+    const toFix = [...fixes.entries()].filter(([, f]) => f.status === "ok");
+    if (!toFix.length) return;
+    const ok = await confirmModal({title: "Salvar correções?", ok: "Salvar",
+      html: `<p>Serão atualizadas <strong>${toFix.length}</strong> faixa${toFix.length > 1 ? "s" : ""} com os dados corretos do Spotify.</p>`});
+    if (!ok) return;
+    const fixMap = new Map(toFix.map(([n, f]) => [n, f.data]));
+    const rows = currentRows().map(r => {
+      const fix = fixMap.get(r[0]);
+      if (!fix) return r;
+      return [r[0], fix.title, r[2], fix.album, fix.sec, fix.date, fix.meta];
+    });
+    ssSet("health", "1");
+    commitRows(rows, `${toFix.length === 1 ? "1 faixa corrigida" : `${toFix.length} faixas corrigidas`} via Spotify`);
+  }
+
+  function parseClipboardRows(text){
+    // Parseia clipboard do Spotify (tab-separado) → Map<posição, {title,artist,album,sec,date}>
+    // Suporta com ou sem número de posição na primeira coluna
+    const rows = new Map();
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let rowIdx = 0;
+    for (const line of lines){
+      const cols = line.split("\t");
+      if (cols.length < 2) continue;
+      let pos, title, artist, album, durStr, date;
+      if (/^\d+$/.test(cols[0].trim()) && cols.length >= 3){
+        // formato com posição: n\ttítulo\tartista\tálbum\tduração\tdata
+        pos = parseInt(cols[0]);
+        [, title, artist, album, durStr, date] = cols;
+      } else {
+        // formato sem posição: título\tartista\tálbum\tduração\tdata
+        rowIdx++;
+        pos = rowIdx;
+        [title, artist, album, durStr, date] = cols;
+      }
+      if (!pos || !title || !artist) continue;
+      let sec = 0;
+      if (durStr){ const m = (durStr || "").trim().match(/^(\d+):(\d+)/); if (m) sec = +m[1]*60 + +m[2]; }
+      rows.set(pos, {title: title.trim(), artist: artist.trim(), album: (album||"").trim(), sec, date: (date||"").trim()});
+    }
+    return rows;
+  }
+
+  function extractAllIds(text){
+    // extrai IDs de faixas preservando duplicatas e ordem
+    const ids = [];
+    for (const tok of text.split(/[\s,]+/)){ const m = tok.match(/track[/:]([A-Za-z0-9]{22})/); if (m) ids.push(m[1]); }
+    return ids;
+  }
+
+  function autoFixFromPaste(text){
+    autoStatus = "loading"; autoMsg = "";
+    render();
+
+    // 1. Tenta links de faixas em ordem (pasta toda a playlist)
+    const orderedIds = extractAllIds(text);
+    if (orderedIds.length > 0){
+      const maxN = Math.max(...apiTracks.map(x => x.t.n));
+      if (orderedIds.length >= maxN){
+        // IDs suficientes para indexar por posição
+        const posMap = new Map(); // t.n → track ID correto
+        for (const {t} of apiTracks){
+          if (fixes.get(t.n)?.status === "ok") continue;
+          const id = orderedIds[t.n - 1];
+          if (id) posMap.set(t.n, id);
+        }
+        if (posMap.size > 0){ autoFixFromPositionIds(posMap); return; }
+      }
+      // IDs insuficientes (só as corrompidas) — tenta por artista
+      autoFixFromTrackIds([...new Set(orderedIds)]);
+      return;
+    }
+
+    // 2. Tenta clipboard tab-separado por posição (Ctrl+A+C no Spotify)
+    const clipRows = parseClipboardRows(text);
+    if (clipRows.size > 0){
+      let fixed = 0;
+      for (const {t} of apiTracks){
+        if (fixes.get(t.n)?.status === "ok"){ fixed++; continue; }
+        const row = clipRows.get(t.n);
+        if (!row) continue;
+        const sp = (splitArtistsRaw(t.artist)[0] || t.artist).trim();
+        const artistOk = normC(row.artist) === normC(sp) || normC(row.artist).includes(normC(sp)) || normC(sp).includes(normC(row.artist));
+        if (!artistOk) continue;
+        fixes.set(t.n, {status:"ok", data:{title:row.title, album:row.album||t.album, sec:row.sec||t.sec, date:row.date||t.dateRaw, meta:t.m||{}}, link:""});
+        fixed++;
+      }
+      const skipped = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok").length;
+      if (fixed === 0){ autoStatus = "err"; autoMsg = `Leu ${nf(clipRows.size)} linhas mas nenhuma posição bateu — verifique se copiou toda a playlist em ordem.`; }
+      else if (skipped > 0){ autoStatus = "done"; autoMsg = `${nf(fixed)} corrigida${fixed!==1?"s":""}. ${nf(skipped)} não encontrada${skipped!==1?"s":""}.`; for (const {t} of apiTracks){ if (!fixes.get(t.n)||fixes.get(t.n).status!=="ok") fixes.set(t.n,{...(fixes.get(t.n)||{}),_manual:true}); } }
+      else { autoStatus = "done"; autoMsg = `Todas as ${nf(fixed)} faixas corrigidas. Clique em Salvar para aplicar.`; }
+      render(); return;
+    }
+
+    autoStatus = "err"; autoMsg = "Formato não reconhecido — cole links do Spotify ou conteúdo copiado da playlist."; render();
+  }
+
+  async function autoFixFromPositionIds(posMap){
+    // posMap: Map<t.n, spotifyTrackId> — IDs obtidos pela posição na playlist colada
+    try {
+      const token = await getToken();
+      if (!token){ await autoFixNoAuth(posMap); return; }
+      const ids = [...posMap.values()];
+      const r = await fetch(`https://api.spotify.com/v1/tracks?ids=${ids.join(",")}`, {headers:{Authorization:`Bearer ${token}`}});
+      if (!r.ok){
+        let d=""; try{const ej=await r.json();d=ej?.error?.message||"";}catch(e2){}
+        if (r.status===401||r.status===403){ await autoFixNoAuth(posMap); return; }
+        throw new Error(`Spotify HTTP ${r.status}${d?": "+d:""}`);
+      }
+      const tracks = (await r.json()).tracks || [];
+      let fixed = 0;
+      for (const [n, id] of posMap){
+        const tr = tracks.find(t => t && t.id === id);
+        if (!tr) continue;
+        const item = apiTracks.find(x => x.t.n === n);
+        if (!item) continue;
+        const {t} = item;
+        const fetchedArtists = (tr.artists||[]).map(a=>a.name);
+        const sp = (splitArtistsRaw(t.artist)[0]||t.artist).trim();
+        const artistOk = fetchedArtists.some(fa=>{const nFa=normC(fa),nSt=normC(sp); return nFa===nSt||nFa.includes(nSt)||nSt.includes(nFa);});
+        if (!artistOk) continue;
+        const newMeta={...(t.m||{}),id:tr.id};
+        if(tr.album?.album_type) newMeta.ty=tr.album.album_type;
+        if(tr.explicit!==undefined) newMeta.x=tr.explicit?1:0;
+        if(tr.track_number) newMeta.tn=tr.track_number;
+        if(tr.album?.total_tracks) newMeta.tt=tr.album.total_tracks;
+        fixes.set(n,{status:"ok",data:{title:tr.name,album:tr.album?.name||t.album,sec:tr.duration_ms?Math.round(tr.duration_ms/1000):t.sec,date:tr.album?.release_date||t.dateRaw,meta:newMeta},link:""});
+        fixed++;
+      }
+      const skipped = apiTracks.filter(x=>!fixes.get(x.t.n)||fixes.get(x.t.n).status!=="ok").length;
+      if(fixed===0){autoStatus="err";autoMsg="Nenhuma faixa correspondeu — artista não bateu. Verifique se a playlist colada é a correta.";}
+      else if(skipped>0){autoStatus="done";autoMsg=`${nf(fixed)} corrigida${fixed!==1?"s":""}. ${nf(skipped)} falta${skipped!==1?"m":""}.`;}
+      else{autoStatus="done";autoMsg=`Todas as ${nf(fixed)} faixas corrigidas. Clique em Salvar para aplicar.`;}
+      render();
+    } catch(e){ autoStatus="err"; autoMsg=e.message||String(e); render(); }
+  }
+
+  async function mbLookup(id, resourceUrl){
+    try {
+      const r = await fetch(
+        `https://musicbrainz.org/ws/2/url?resource=${encodeURIComponent(resourceUrl)}&inc=recording-rels&fmt=json`,
+        {headers:{"User-Agent":"PainelMusical/1.0 (personal-music-dashboard)"}}
+      );
+      if (!r.ok) return null;
+      const j = await r.json();
+      const rec = (j.relations||[]).find(x=>x["target-type"]==="recording")?.recording;
+      return rec?.title ? {title:rec.title, sec:rec.length?Math.round(rec.length/1000):null, id} : null;
+    } catch(e){ return null; }
+  }
+
+  async function autoFixNoAuth(posMap){
+    // Sem token: MusicBrainz (CORS ok) + iTunes Search; pré-preenche link manual p/ faixas não encontradas
+    const total = posMap.size;
+    // Estimativa: ~2.5s/faixa na fase MB + ~3.5s/faixa pior caso na fase verify
+    const estSecs = Math.ceil(total * 6);
+    const startTime = Date.now();
+    let currentStep = `Buscando metadados (0/${total})`;
+    const timer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(1, estSecs - elapsed);
+      autoMsg = `${currentStep} — ⏱ ~${remaining}s restantes`; render();
+    }, 1000);
+    autoStatus = "loading"; autoMsg = `${currentStep} — ⏱ ~${estSecs}s restantes`; render();
+    try {
+      const meta = new Map();
+      const entries = [...posMap.entries()];
+      let reqIdx = 0;
+      for (let i = 0; i < entries.length; i++){
+        const [n, id] = entries[i];
+        currentStep = `Buscando metadados (${i+1}/${total})`;
+        // Tentativa 1: https:// format
+        if (reqIdx > 0) await new Promise(r => setTimeout(r, 1100));
+        reqIdx++;
+        let found = await mbLookup(id, `https://open.spotify.com/track/${id}`);
+        // Tentativa 2: spotify:track: URI format
+        if (!found){
+          await new Promise(r => setTimeout(r, 1100)); reqIdx++;
+          found = await mbLookup(id, `spotify:track:${id}`);
+        }
+        if (found) meta.set(n, found);
+      }
+
+      // iTunes Search em paralelo: título + artista → álbum + data
+      if (meta.size > 0) currentStep = "Buscando álbuns no iTunes";
+      let fixed = 0;
+      await Promise.all([...meta.entries()].map(async ([n, {title, sec, id}]) => {
+        try {
+          const item = apiTracks.find(x => x.t.n === n);
+          if (!item) return;
+          const {t} = item;
+          const artist = (splitArtistsRaw(t.artist)[0]||t.artist).trim();
+          let album = t.album, finalSec = sec||t.sec, date = t.dateRaw;
+          try {
+            const q = encodeURIComponent(artist+" "+title);
+            const ri = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=10`);
+            if (ri.ok){
+              const ji = await ri.json();
+              const hit = (ji.results||[]).find(x =>
+                normC(x.trackName)===normC(title) &&
+                (normC(x.artistName)===normC(artist)||normC(x.artistName).includes(normC(artist))||normC(artist).includes(normC(x.artistName)))
+              );
+              if (hit){ if (hit.collectionName) album=hit.collectionName; if (hit.trackTimeMillis) finalSec=Math.round(hit.trackTimeMillis/1000); if (hit.releaseDate) date=hit.releaseDate.slice(0,10); }
+            }
+          } catch(e2){}
+          fixes.set(n,{status:"ok",data:{title,album,sec:finalSec,date,meta:{...(t.m||{}),id}},link:""});
+          fixed++;
+        } catch(e){}
+      }));
+
+      // Faixas não encontradas: pré-preenche e enfileira para auto-verificação
+      const prefilledNs = [];
+      for (const [n, id] of posMap){
+        const f = fixes.get(n);
+        if (!f || f.status !== "ok"){
+          fixes.set(n, {_manual:true, link:`https://open.spotify.com/track/${id}`});
+          prefilledNs.push(n);
+        }
+      }
+
+      // Auto-verifica as pré-preenchidas sequencialmente (cada verifyLink usa MB+iTunes)
+      if (prefilledNs.length > 0){
+        autoStatus="loading";
+        for (let i = 0; i < prefilledNs.length; i++){
+          currentStep = `Verificando faixa ${i+1}/${prefilledNs.length}`;
+          if (i > 0) await new Promise(r => setTimeout(r, 2000));
+          await verifyLink(prefilledNs[i]);
+        }
+      }
+
+      clearInterval(timer);
+      const finalOk = [...fixes.values()].filter(f=>f.status==="ok").length;
+      const finalFail = posMap.size - finalOk;
+      if(finalOk === total){
+        autoStatus="done"; autoMsg=`Todas as ${nf(total)} faixas corrigidas. Clique em Salvar para aplicar.`;
+      } else {
+        autoStatus="done";
+        autoMsg = finalOk > 0
+          ? `${nf(finalOk)} corrigida${finalOk!==1?"s":""}. ${nf(finalFail)} não encontradas — use Link manual.`
+          : `Nenhuma faixa corrigida. Dados não encontrados nas bases públicas.`;
+      }
+      render();
+    } catch(e){ clearInterval(timer); autoStatus="err"; autoMsg=e.message||String(e); render(); }
+  }
+
+  async function autoFixFromTrackIds(trackIds){
+    try {
+      const token = await getToken();
+      if (!token){ autoStatus = "no-token"; autoMsg = hasOAuthStored() ? "reconnect" : ""; render(); return; }
+      const unique = [...new Set(trackIds)].slice(0, 50);
+      const r = await fetch(`https://api.spotify.com/v1/tracks?ids=${unique.join(",")}`, {headers: {Authorization: `Bearer ${token}`}});
+      if (!r.ok){
+        let detail = ""; try { const ej = await r.json(); detail = ej?.error?.message || ""; } catch(e2) {}
+        if (r.status === 401){ autoStatus = "no-token"; autoMsg = hasOAuthStored() ? "reconnect" : ""; render(); return; }
+        if (r.status === 403){ autoStatus="err"; autoMsg=`Spotify recusou acesso (HTTP 403${detail?": "+detail:""}) — reconecte sua conta OAuth.`; render(); return; }
+        throw new Error(`Spotify HTTP ${r.status}${detail ? ": " + detail : ""}`);
+      }
+      const tracks = (await r.json()).tracks || [];
+      const pending = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok");
+      let fixed = 0;
+      for (const tr of tracks){
+        if (!tr) continue;
+        const fetchedArtists = (tr.artists || []).map(a => a.name);
+        const match = pending.find(({t}) => {
+          if (fixes.get(t.n)?.status === "ok") return false;
+          const sp = (splitArtistsRaw(t.artist)[0] || t.artist).trim();
+          return fetchedArtists.some(fa => { const nFa = normC(fa), nSt = normC(sp); return nFa === nSt || nFa.includes(nSt) || nSt.includes(nFa); });
+        });
+        if (!match) continue;
+        const {t} = match;
+        const newMeta = {...(t.m||{}), id: tr.id};
+        if (tr.album?.album_type) newMeta.ty = tr.album.album_type;
+        if (tr.explicit !== undefined) newMeta.x = tr.explicit ? 1 : 0;
+        if (tr.track_number) newMeta.tn = tr.track_number;
+        if (tr.album?.total_tracks) newMeta.tt = tr.album.total_tracks;
+        fixes.set(t.n, {status: "ok", data: {title: tr.name, album: tr.album?.name || t.album, sec: tr.duration_ms ? Math.round(tr.duration_ms/1000) : t.sec, date: tr.album?.release_date || t.dateRaw, meta: newMeta}, link: ""});
+        fixed++;
+      }
+      const skipped = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok").length;
+      if (fixed === 0){ autoStatus = "err"; autoMsg = "Nenhuma faixa correspondeu — verifique os links."; }
+      else if (skipped > 0){ autoStatus = "done"; autoMsg = `${nf(fixed)} corrigida${fixed!==1?"s":""}. ${nf(skipped)} falta${skipped!==1?"m":""}.`; }
+      else { autoStatus = "done"; autoMsg = `Todas as ${nf(fixed)} faixas corrigidas. Clique em Salvar para aplicar.`; }
+      render();
+    } catch(e){ autoStatus = "err"; autoMsg = e.message || String(e); render(); }
+  }
+
+  body.addEventListener("click", e => {
+    const verify = e.target.closest("[data-verify]");
+    const edit = e.target.closest("[data-edit]");
+    const localExp = e.target.closest("[data-local-exp]");
+    const saveBtn = e.target.closest("#cx-save-btn");
+    const autoBtn = e.target.closest("#cx-auto-btn");
+    const manualBtn = e.target.closest("[data-manual]");
+    if (verify) verifyLink(+verify.dataset.verify);
+    else if (edit){ const t = BY_PLAYLIST.find(x => x.n === +edit.dataset.edit); if (t) editTrack(t); }
+    else if (localExp){ const p = body.querySelector(`#cx-local-${localExp.dataset.localExp}`); if (p){ p.hidden = !p.hidden; localExp.textContent = p.hidden ? "Ver faixas" : "Ocultar"; } }
+    else if (saveBtn) applyFixes();
+    else if (autoBtn){
+      const inp = body.querySelector("#cx-pl-inp");
+      const text = inp ? inp.value.trim() : "";
+      if (!text){ autoStatus = "err"; autoMsg = "Cole o conteúdo da playlist antes de corrigir."; render(); }
+      else autoFixFromPaste(text);
+    }
+    else if (e.target.closest("#cx-sp-connect")){
+      md.close();
+      if (typeof openPlaylistAuthModal === "function") openPlaylistAuthModal();
+    }
+    else if (manualBtn){
+      const n = +manualBtn.dataset.manual;
+      const existing = fixes.get(n) || {};
+      fixes.set(n, {...existing, _manual: !existing._manual});
+      render();
+    }
+  });
+  body.addEventListener("keydown", e => {
+    if (e.key === "Enter"){ const inp = e.target.closest(".cx-link-inp"); if (inp) verifyLink(+inp.dataset.n); }
+  });
 }
 
 function openSameYear(groups){
@@ -1051,7 +1738,7 @@ function openHealth(){
     const m = META[it.k];
     if (!it.count) {
       const resp = wasAddressed(it);
-      const okBtn = it.k === "tn" && TRACK_TITLE_CLEAN.length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="tn-undo">Conferir (${TRACK_TITLE_CLEAN.length})</button></div>` : it.k === "nm" && ALB_CLEAN.length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="nm-undo">Conferir (${ALB_CLEAN.length})</button></div>` : it.k === "h" && Object.keys(ALIAS).length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="spell" data-k="h">Nomes juntados (${Object.keys(ALIAS).length})</button></div>` : "";
+      const okBtn = it.k === "tn" && TRACK_TITLE_CLEAN.length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="tn-undo">Conferir (${TRACK_TITLE_CLEAN.length})</button></div>` : it.k === "nm" && ALB_CLEAN.length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="nm-undo">Conferir (${ALB_CLEAN.length})</button></div>` : it.k === "h" && Object.keys(ALIAS).length ? `<div class="sd-act"><button class="gbtn" type="button" data-act="spell" data-k="h">Nomes juntados (${Object.keys(ALIAS).length})</button></div>` : it.k === "cx" && it.pending ? `<div class="sd-act"><span class="muted" style="font-size:12px">verificando catálogos…</span></div>` : "";
       return `<li class="sd-i ok${resp?" sd-resp":""}"><span class="sd-dot" aria-hidden="true">✓</span><div class="sd-tx"><b>${m.t}</b>${resp?`<span class="sd-resp-lbl">Respondido</span>`:""}<span>${m.ok}</span></div><span class="sd-lv">${LEVEL.ok}</span>${okBtn}</li>`;
     }
     const btn = m.act === "upd" ? `<button class="gbtn" type="button" data-act="upd">Atualizar dados</button>`
@@ -1061,12 +1748,14 @@ function openHealth(){
       : m.act === "tn" ? `<button class="gbtn" type="button" data-act="tn">Revisar (${nf(it.count)})</button>`
       : m.act === "singles" ? `<button class="gbtn" type="button" data-act="singles">Revisar (${nf(it.count)})</button>`
       : m.act === "aauto" ? `<button class="gbtn" type="button" data-act="dups" data-o="aauto">Revisar (${nf(it.count)})</button>`
+      : m.act === "dupcv" ? `<button class="gbtn" type="button" data-act="dups" data-o="dupcv">Revisar (${nf(it.count)})</button>`
       : m.act === "dups" ? `<button class="gbtn" type="button" data-act="dups" data-o="dups">Revisar (${nf(it.count)})</button>`
       : m.act === "spell" ? `<button class="gbtn" type="button" data-act="spell" data-k="${it.k}">Juntar nomes (${nf(it.count)})</button>`
       : m.act === "dur" ? `<button class="gbtn" type="button" data-act="dur" data-k="${it.k}">Revisar (${nf(it.count)})</button>`
       : m.act === "gd" ? `<button class="gbtn" type="button" data-act="gd">Revisar (${nf(it.count)})</button>`
       : m.act === "datefix" ? `<button class="gbtn" type="button" data-act="datefix">Revisar (${nf(it.count)})</button>`
       : m.act === "sameyear" ? `<button class="gbtn" type="button" data-act="sameyear">Confirmar (${nf(it.count)})</button>`
+      : m.act === "cx" ? `<button class="gbtn" type="button" data-act="cx">Revisar (${nf(it.count)})</button>`
       : `<button class="gbtn" type="button" data-act="list" data-k="${it.k}">Revisar (${nf(it.count)})</button>`;
     return `<li class="sd-i ${it.level}"><span class="sd-dot" aria-hidden="true">${it.level === "warn" ? "!" : "i"}</span><div class="sd-tx"><b>${m.t}</b><span>${m.d(it.count, it)}</span></div><span class="sd-lv">${LEVEL[it.level]}</span><div class="sd-act">${btn}</div></li>`;
   };
@@ -1083,8 +1772,8 @@ function openHealth(){
     const baseItems = H.noSpotify
       ? H.items.filter(i => !HIDDEN_K.includes(i.k) && !["a","b","c"].includes(i.k))
       : H.items.filter(i => !HIDDEN_K.includes(i.k));
-    const CAT_MAP = {a:"Música",b:"Música",e:"Música",f:"Música",cv:"Música",g:"Música",tn:"Música",ad:"Álbum",au:"Álbum",nm:"Álbum",sg:"Álbum",dr:"Data",dm:"Data",sy:"Data",c:"Artista",h:"Artista",gd:"Artista"};
-    const CATS_ORDER = ["Música","Álbum","Data","Artista"];
+    const CAT_MAP = {cx:"Integridade",a:"Música",b:"Música",e:"Música",f:"Música",cv:"Música",g:"Música",tn:"Música",ad:"Álbum",au:"Álbum",nm:"Álbum",sg:"Álbum",dr:"Data",dm:"Data",sy:"Data",c:"Artista",h:"Artista",gd:"Artista"};
+    const CATS_ORDER = ["Integridade","Música","Álbum","Data","Artista"];
     const byCat = its => {
       const g = {};
       for (const it of [...its].sort((a,b)=>b.w-a.w)){ const c=CAT_MAP[it.k]||"Outros"; (g[c]=g[c]||[]).push(it); }
@@ -1117,7 +1806,7 @@ function openHealth(){
     const a = b.dataset.act;
     const by = k => H.items.find(i => i.k === k);
     if (a === "upd"){ md.close(); openDataUpdate(); }
-    else if (a === "dups"){ md.close(); const o = b.dataset.o, back = openHealth; openDups(o === "covers" ? {tab: "covers", kind: "songs", back} : o === "adoubt" ? {kind: "albums", atab: "doubt", back} : o === "aauto" ? {kind: "albums", atab: "doubt", back} : {tab: "dups", kind: "songs", back}); }
+    else if (a === "dups"){ md.close(); const o = b.dataset.o, back = openHealth; openDups(o === "covers" ? {tab: "covers", kind: "songs", back} : o === "adoubt" ? {kind: "albums", atab: "doubt", back} : o === "aauto" ? {kind: "albums", atab: "doubt", back} : o === "dupcv" ? {kind: "songs", back} : {tab: "dups", kind: "songs", back}); }
     else if (a === "fix"){ md.close(); openFixOrder(); }
     else if (a === "rev"){ md.close(); askReverse(); }
     else if (a === "list"){ const it = by(b.dataset.k); list(META[it.k].t, it.tracks, `${faixas(it.tracks.length)} · "—" é o que está em branco`); }
@@ -1128,6 +1817,7 @@ function openHealth(){
     else if (a === "gd"){ openGenreDivergence(by("gd").artists); }
     else if (a === "datefix"){ openDateFix(by("dm").albums); }
     else if (a === "sameyear"){ openSameYear(by("sy").groups); }
+    else if (a === "cx"){ openCrossedData(by("cx").groups); }
     else if (a === "singles"){ openSingles(by("sg").tracks); }
     else if (a === "dur"){ const it = by(b.dataset.k); openDurReview(it.tracks); }
     else if (a === "hist"){ openHealthHistory(); }
@@ -1192,6 +1882,14 @@ function autoFixAlbumDates(){
 }
 
 function autoApplySuffixClean(){
+  // purga entradas cujo álbum/faixa já não existe na playlist (playlist trocada ou faixas removidas)
+  const albumsNow = new Set(BY_PLAYLIST.map(t => t.albumRaw));
+  const nsNow = new Set(BY_PLAYLIST.map(t => t.n));
+  const staleAlb = ALB_CLEAN.filter(e => !albumsNow.has(e.raw) && !albumsNow.has(e.clean));
+  if (staleAlb.length){ for (const e of staleAlb) ALB_CLEAN.splice(ALB_CLEAN.indexOf(e), 1); saveAlbClean(); }
+  const staleT = TRACK_TITLE_CLEAN.filter(e => !nsNow.has(e.n));
+  if (staleT.length){ for (const e of staleT) TRACK_TITLE_CLEAN.splice(TRACK_TITLE_CLEAN.indexOf(e), 1); saveTrackTitleClean(); }
+
   const tnI = trackTitleIssues(BY_PLAYLIST);
   const nmI = albumNameIssues(BY_PLAYLIST);
   if (!tnI.length && !nmI.length) return false;
