@@ -1726,7 +1726,7 @@ function albumTip(a){
 }
 /* card de álbuns com duas visões ("abas"): por quantidade de faixas (padrão) ou pelo tempo total somado (como era antes) */
 const ALB_KEY = "catalogo-musical:albums-mode";
-let albMode = (() => { try { const v = localStorage.getItem(ALB_KEY); return v === "duracao" ? "duracao" : v === "cobertura" ? "cobertura" : "faixas"; } catch (e) { return "faixas"; } })();
+let albMode = (() => { try { const v = localStorage.getItem(ALB_KEY); return v === "duracao" ? "duracao" : v === "faixas" ? "faixas" : "cobertura"; } catch (e) { return "cobertura"; } })();
 function renderAlbumCoverage(){
   if (albMode !== "cobertura") return;
   const el = $("#coverage"); if (!el) return;

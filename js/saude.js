@@ -1462,7 +1462,9 @@ function openCrossedData(groups){
       if (!r.ok) return null;
       const j = await r.json();
       const rec = (j.relations||[]).find(x=>x["target-type"]==="recording")?.recording;
-      return rec?.title ? {title:rec.title, sec:rec.length?Math.round(rec.length/1000):null, id} : null;
+      if (!rec?.title) return null;
+      const artist = (rec['artist-credit']||[]).map(ac => ac.artist?.name||ac.name||"").filter(Boolean).join(", ") || null;
+      return {title:rec.title, sec:rec.length?Math.round(rec.length/1000):null, id, artist};
     } catch(e){ return null; }
   }
 
@@ -1562,43 +1564,61 @@ function openCrossedData(groups){
 
   async function autoFixFromTrackIds(trackIds){
     try {
-      const token = await getToken();
-      if (!token){ autoStatus = "no-token"; autoMsg = hasOAuthStored() ? "reconnect" : ""; render(); return; }
       const unique = [...new Set(trackIds)].slice(0, 50);
-      const r = await fetch(`https://api.spotify.com/v1/tracks?ids=${unique.join(",")}`, {headers: {Authorization: `Bearer ${token}`}});
-      if (!r.ok){
+      const token = await getToken();
+      if (token && unique.length > 0){
+        const r = await fetch(`https://api.spotify.com/v1/tracks?ids=${unique.join(",")}`, {headers: {Authorization: `Bearer ${token}`}});
+        if (r.ok){
+          const tracks = (await r.json()).tracks || [];
+          const pending = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok");
+          let fixed = 0;
+          for (const tr of tracks){
+            if (!tr) continue;
+            const fetchedArtists = (tr.artists || []).map(a => a.name);
+            const match = pending.find(({t}) => {
+              if (fixes.get(t.n)?.status === "ok") return false;
+              const sp = (splitArtistsRaw(t.artist)[0] || t.artist).trim();
+              return fetchedArtists.some(fa => { const nFa = normC(fa), nSt = normC(sp); return nFa === nSt || nFa.includes(nSt) || nSt.includes(nFa); });
+            });
+            if (!match) continue;
+            const {t} = match;
+            const newMeta = {...(t.m||{}), id: tr.id};
+            if (tr.album?.album_type) newMeta.ty = tr.album.album_type;
+            if (tr.explicit !== undefined) newMeta.x = tr.explicit ? 1 : 0;
+            if (tr.track_number) newMeta.tn = tr.track_number;
+            if (tr.album?.total_tracks) newMeta.tt = tr.album.total_tracks;
+            fixes.set(t.n, {status:"ok", data:{title:tr.name, album:tr.album?.name||t.album, sec:tr.duration_ms?Math.round(tr.duration_ms/1000):t.sec, date:tr.album?.release_date||t.dateRaw, meta:newMeta}, link:""});
+            fixed++;
+          }
+          const skipped = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok").length;
+          if (fixed === 0){ autoStatus="err"; autoMsg="Nenhuma faixa correspondeu — verifique os links."; }
+          else if (skipped > 0){ autoStatus="done"; autoMsg=`${nf(fixed)} corrigida${fixed!==1?"s":""}. ${nf(skipped)} falta${skipped!==1?"m":""}.`; }
+          else { autoStatus="done"; autoMsg=`Todas as ${nf(fixed)} faixas corrigidas. Clique em Salvar para aplicar.`; }
+          render(); return;
+        }
         let detail = ""; try { const ej = await r.json(); detail = ej?.error?.message || ""; } catch(e2) {}
-        if (r.status === 401){ autoStatus = "no-token"; autoMsg = hasOAuthStored() ? "reconnect" : ""; render(); return; }
-        if (r.status === 403){ autoStatus="err"; autoMsg=`Spotify recusou acesso (HTTP 403${detail?": "+detail:""}) — reconecte sua conta OAuth.`; render(); return; }
-        throw new Error(`Spotify HTTP ${r.status}${detail ? ": " + detail : ""}`);
+        if (r.status !== 401 && r.status !== 403) throw new Error(`Spotify HTTP ${r.status}${detail ? ": " + detail : ""}`);
+        // 401/403: cai no path MB abaixo
       }
-      const tracks = (await r.json()).tracks || [];
-      const pending = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok");
-      let fixed = 0;
-      for (const tr of tracks){
-        if (!tr) continue;
-        const fetchedArtists = (tr.artists || []).map(a => a.name);
-        const match = pending.find(({t}) => {
-          if (fixes.get(t.n)?.status === "ok") return false;
-          const sp = (splitArtistsRaw(t.artist)[0] || t.artist).trim();
-          return fetchedArtists.some(fa => { const nFa = normC(fa), nSt = normC(sp); return nFa === nSt || nFa.includes(nSt) || nSt.includes(nFa); });
+      // Sem token ou 401/403: tenta MusicBrainz com matching por artista
+      if (unique.length === 0){ autoStatus="no-token"; autoMsg=hasOAuthStored()?"reconnect":""; render(); return; }
+      const posMap = new Map();
+      for (let i = 0; i < unique.length; i++){
+        autoMsg=`Buscando via MusicBrainz (${i+1}/${unique.length})…`; render();
+        if (i > 0) await new Promise(res => setTimeout(res, 1100));
+        let mb = await mbLookup(unique[i], `https://open.spotify.com/track/${unique[i]}`);
+        if (!mb){ await new Promise(res => setTimeout(res, 1100)); mb = await mbLookup(unique[i], `spotify:track:${unique[i]}`); }
+        if (!mb?.artist) continue;
+        const stillPending = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok");
+        const match = stillPending.find(({t}) => {
+          const sp = (splitArtistsRaw(t.artist)[0]||t.artist).trim();
+          return normC(mb.artist)===normC(sp) || normC(mb.artist).includes(normC(sp)) || normC(sp).includes(normC(mb.artist));
         });
-        if (!match) continue;
-        const {t} = match;
-        const newMeta = {...(t.m||{}), id: tr.id};
-        if (tr.album?.album_type) newMeta.ty = tr.album.album_type;
-        if (tr.explicit !== undefined) newMeta.x = tr.explicit ? 1 : 0;
-        if (tr.track_number) newMeta.tn = tr.track_number;
-        if (tr.album?.total_tracks) newMeta.tt = tr.album.total_tracks;
-        fixes.set(t.n, {status: "ok", data: {title: tr.name, album: tr.album?.name || t.album, sec: tr.duration_ms ? Math.round(tr.duration_ms/1000) : t.sec, date: tr.album?.release_date || t.dateRaw, meta: newMeta}, link: ""});
-        fixed++;
+        if (match) posMap.set(match.t.n, unique[i]);
       }
-      const skipped = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok").length;
-      if (fixed === 0){ autoStatus = "err"; autoMsg = "Nenhuma faixa correspondeu — verifique os links."; }
-      else if (skipped > 0){ autoStatus = "done"; autoMsg = `${nf(fixed)} corrigida${fixed!==1?"s":""}. ${nf(skipped)} falta${skipped!==1?"m":""}.`; }
-      else { autoStatus = "done"; autoMsg = `Todas as ${nf(fixed)} faixas corrigidas. Clique em Salvar para aplicar.`; }
-      render();
-    } catch(e){ autoStatus = "err"; autoMsg = e.message || String(e); render(); }
+      if (posMap.size > 0){ await autoFixNoAuth(posMap); return; }
+      autoStatus="err"; autoMsg="Nenhuma faixa encontrada no MusicBrainz. Use Link manual para corrigir individualmente."; render();
+    } catch(e){ autoStatus="err"; autoMsg=e.message||String(e); render(); }
   }
 
   body.addEventListener("click", e => {
