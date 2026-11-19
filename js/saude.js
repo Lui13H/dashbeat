@@ -1143,7 +1143,8 @@ function cxPendingCount(list){
 
 function openCrossedData(groups){
   const body = document.createElement("div");
-  const fixes = new Map(); // t.n → {status, data, link, msg}
+  const fixes = new Map();      // t.n → {status, data, link, msg}  (faixas da API)
+  const localFixes = new Map(); // t.n → artista correto             (conflitos locais)
 
   // Separa faixas corrompidas por API (título+álbum errados) de conflitos locais (mesmo álbum, 2 artistas)
   const apiTracks = [];
@@ -1154,11 +1155,23 @@ function openCrossedData(groups){
   }
   apiTracks.sort((a, b) => a.t.n - b.t.n);
 
+  function autoFixLocalGroups(){
+    for (const g of localGroups){
+      const majority = g.artists[0];
+      for (const a of g.artists.slice(1)){
+        for (const t of a.tracks){
+          if (!localFixes.has(t.n)) localFixes.set(t.n, majority.name);
+        }
+      }
+    }
+  }
+
   let autoStatus = ""; // "" | "loading" | "done" | "err" | "no-token"
   let autoMsg = "";
 
   const render = () => {
     const verifiedCount = [...fixes.values()].filter(f => f.status === "ok").length;
+    const totalSave = verifiedCount + localFixes.size;
     const pendingCount = apiTracks.filter(x => !fixes.get(x.t.n) || fixes.get(x.t.n).status !== "ok").length;
     const autoStatusHtml = autoStatus === "loading"
       ? `<span class="muted" style="font-size:12px">Corrigindo…</span>`
@@ -1212,10 +1225,11 @@ function openCrossedData(groups){
         ${localGroups.length && apiTracks.length ? `<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"></div>` : ""}
         ${localGroups.map((g, gi) => {
           const majority = g.artists[0], minority = g.artists.slice(1);
+          const allFixed = minority.every(a => a.tracks.every(t => localFixes.has(t.n)));
           return `<div class="alb-row">
             <div class="alb-main">
-              <div><strong>${esc(g.album)}</strong> <span class="muted">· ${faixas(g.tracks.length)}</span></div>
-              <div style="margin-top:4px"><span class="alb-new">${esc(majority.name)}</span> <span class="muted" style="font-size:12px">${faixas(majority.tracks.length)}</span>${minority.map(a => ` · <span class="alb-old">${esc(a.name)}</span> <span class="muted" style="font-size:12px">${faixas(a.tracks.length)}</span>`).join("")}</div>
+              <div><strong>${esc(g.album)}</strong> <span class="muted">· ${faixas(g.tracks.length)}</span>${allFixed ? ` <span style="font-size:12px;color:var(--emerald)">✓ corrigido</span>` : ""}</div>
+              <div style="margin-top:4px"><span class="alb-new">${esc(majority.name)}</span> <span class="muted" style="font-size:12px">${faixas(majority.tracks.length)}</span>${minority.map(a => ` · <span class="${allFixed?"":"alb-old"}">${esc(a.name)}</span> <span class="muted" style="font-size:12px">${faixas(a.tracks.length)}</span>`).join("")}</div>
             </div>
             <div class="alb-btns"><button class="gbtn" type="button" data-local-exp="${gi}">Ver faixas</button></div>
           </div>
@@ -1227,8 +1241,8 @@ function openCrossedData(groups){
           </div>`;
         }).join("")}
       </div>
-      ${verifiedCount > 0 ? `<div style="margin-top:12px;text-align:right">
-        <button class="pbtn" type="button" id="cx-save-btn">Salvar ${verifiedCount === 1 ? "1 correção" : `${nf(verifiedCount)} correções`}</button>
+      ${totalSave > 0 ? `<div style="margin-top:12px;text-align:right">
+        <button class="pbtn" type="button" id="cx-save-btn">Salvar ${totalSave === 1 ? "1 correção" : `${nf(totalSave)} correções`}</button>
       </div>` : ""}`;
   };
   render();
@@ -1317,18 +1331,21 @@ function openCrossedData(groups){
 
   async function applyFixes(){
     const toFix = [...fixes.entries()].filter(([, f]) => f.status === "ok");
-    if (!toFix.length) return;
+    const totalFix = toFix.length + localFixes.size;
+    if (!totalFix) return;
     const ok = await confirmModal({title: "Salvar correções?", ok: "Salvar",
-      html: `<p>Serão atualizadas <strong>${toFix.length}</strong> faixa${toFix.length > 1 ? "s" : ""} com os dados corretos do Spotify.</p>`});
+      html: `<p>Serão atualizadas <strong>${totalFix}</strong> faixa${totalFix > 1 ? "s" : ""} com os dados corrigidos.</p>`});
     if (!ok) return;
     const fixMap = new Map(toFix.map(([n, f]) => [n, f.data]));
     const rows = currentRows().map(r => {
       const fix = fixMap.get(r[0]);
-      if (!fix) return r;
-      return [r[0], fix.title, r[2], fix.album, fix.sec, fix.date, fix.meta];
+      if (fix) return [r[0], fix.title, r[2], fix.album, fix.sec, fix.date, fix.meta];
+      const localArtist = localFixes.get(r[0]);
+      if (localArtist) return [r[0], r[1], localArtist, r[3], r[4], r[5], r[6]];
+      return r;
     });
     ssSet("health", "1");
-    commitRows(rows, `${toFix.length === 1 ? "1 faixa corrigida" : `${toFix.length} faixas corrigidas`} via Spotify`);
+    commitRows(rows, `${totalFix === 1 ? "1 faixa corrigida" : `${totalFix} faixas corrigidas`} via Integridade`);
   }
 
   function parseClipboardRows(text){
@@ -1635,8 +1652,17 @@ function openCrossedData(groups){
     else if (autoBtn){
       const inp = body.querySelector("#cx-pl-inp");
       const text = inp ? inp.value.trim() : "";
-      if (!text){ autoStatus = "err"; autoMsg = "Cole o conteúdo da playlist antes de corrigir."; render(); }
-      else autoFixFromPaste(text);
+      autoFixLocalGroups(); // conflitos locais não precisam de paste
+      if (!text){
+        if (localFixes.size > 0){
+          autoStatus="done"; autoMsg=`${nf(localFixes.size)} conflito${localFixes.size!==1?"s":""} local${localFixes.size!==1?"is":""} resolvido${localFixes.size!==1?"s":""}. Clique em Salvar para aplicar.`;
+        } else {
+          autoStatus="err"; autoMsg="Cole o conteúdo da playlist antes de corrigir.";
+        }
+        render();
+      } else {
+        autoFixFromPaste(text);
+      }
     }
     else if (e.target.closest("#cx-sp-connect")){
       md.close();
