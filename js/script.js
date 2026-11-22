@@ -583,10 +583,10 @@ $("#tree-mode").addEventListener("click", e => {
   if (treePref === "bandas") { state.bands.clear(); state.years.clear(); }   // voltar para as bandas: sai do leque (banda/ano escolhidos)
   render();
 });
-function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.tags.clear(); state.upTo = null; tmSync(); render(); }
+function clearAll(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.tags.clear(); state.upTo = null; decDrillKey = null; decDrillBand = null; decDrillTab = null; decDrillAlbum = null; tmSync(); render(); }
 const activeFilters = () => state.bands.size + state.albums.size + state.genres.size + state.years.size + state.tags.size;
 // "Limpar filtros" de cada card: tira banda, álbum, gênero, ano e etiqueta (a máquina do tempo tem o próprio botão de cancelar)
-function clearFilters(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.tags.clear(); render(); }
+function clearFilters(){ state.bands.clear(); state.albums.clear(); state.genres.clear(); state.years.clear(); state.tags.clear(); decDrillKey = null; decDrillBand = null; decDrillTab = null; decDrillAlbum = null; render(); }
 $("#clear").addEventListener("click", clearAll);
 $("#empty-clear").addEventListener("click", clearAll);
 
@@ -1871,7 +1871,7 @@ $("#alb-mode").addEventListener("click", e => {
 });
 $("#dec-mode").addEventListener("click", e => {
   const b = e.target.closest("button[data-m]"); if (!b || b.dataset.m === decTab) return;
-  decTab = b.dataset.m; cardRender("decades");
+  decTab = b.dataset.m; decDrillKey = null; decDrillBand = null; decDrillTab = null; decDrillAlbum = null; cardRender("decades");
 });
 function rankTip(b){
   const base = rows(false, true);
@@ -1947,12 +1947,28 @@ function renderDecades(){
     ? [...byGroup.keys()].sort((a, b) => a - b)
     : Array.from({length: nParts}, (_, i) => i + 1);
   if (!groupKeys.length){ box.innerHTML = '<p class="none">Sem dados</p>'; return; }
+
+  const sortedR = !isDecades ? allR.slice().sort((a, b) => +a.order - +b.order) : null;
+  const blockYears = k => isDecades
+    ? ALL_YEARS.filter(y => y !== NI && Math.floor(+y / 10) * 10 === k)
+    : [...new Set(sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === k).map(r => r.year).filter(y => y !== NI))];
+  const blockLabel = k => isDecades
+    ? (k < 1000 ? `${k}s` : `${String(k).slice(-2)}s`)
+    : (CHI && CHI[k - 1] ? CHI[k - 1].name : `É${k}`);
+
+  if (decDrillTab !== decTab) { decDrillKey = null; decDrillBand = null; decDrillTab = null; }
+  if (decDrillKey !== null && !groupKeys.includes(decDrillKey)) { decDrillKey = null; decDrillBand = null; decDrillTab = null; }
+  if (decDrillKey !== null && isDecades && !state.years.size) { decDrillKey = null; decDrillBand = null; }
+  if (decDrillBand !== null && !state.bands.size) decDrillBand = null;
+  if (decDrillAlbum !== null && !state.albums.size) decDrillAlbum = null;
+
   const activeDec = isDecades ? (() => {
     if (!state.years.size) return null;
     const decs = new Set([...state.years].filter(y => y !== NI).map(y => Math.floor(+y / 10) * 10));
     return decs.size === 1 ? [...decs][0] : null;
-  })() : null;
-  const activeBand = isDecades && state.bands.size === 1 ? [...state.bands][0] : null;
+  })() : decDrillKey;
+  const activeBand = state.bands.size === 1 ? [...state.bands][0] : null;
+
   const topByGroup = new Map(groupKeys.map(k => [k,
     [...(byGroup.get(k) || new Map()).entries()].filter(([nm]) => nm && nm !== NI).sort((a, b) => b[1] - a[1]).slice(0, 4)]));
   const DEC_MAX = 18, decStep = 19.5;
@@ -1980,85 +1996,210 @@ function renderDecades(){
   const bandOff = new Map(allBands.map(b => [b, decSlots[bandSlot.get(b) ?? 0]]));
   const modeEl = $("#dec-mode");
   if (modeEl) modeEl.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === decTab)));
-  const nRanks = Math.max(...groupKeys.map(k => (topByGroup.get(k) || []).length));
   const nCols = groupKeys.length;
   const usePairs = nCols <= 6;
+  // calcula colunas por linha p/ drill: maximiza preenchimento da última linha e cabe no max-height do card
+  const drillCols = n => {
+    if (n <= 1) return 1;
+    if (n <= 4) return n;
+    const availH = Math.max(200, window.innerHeight * 0.65 - 120); // 65vh - cabeçalhos/padding
+    const boxW = box.clientWidth || 900;
+    let best = 5, bestScore = -Infinity;
+    for (let c = 3; c <= Math.min(12, n); c++) {
+      const r = n % c;
+      const lastFill = r === 0 ? c : r;
+      if (lastFill < Math.max(2, Math.ceil(c / 3))) continue;
+      const photoW = (boxW - (c - 1) * 10) / c;
+      const rows = Math.ceil(n / c);
+      const totalH = rows * (photoW + 44); // foto quadrada + nome + count + padding
+      const overflowPenalty = Math.max(0, totalH - availH) / availH * 4;
+      const score = lastFill / c - rows * 0.1 - overflowPenalty;
+      if (score > bestScore) { bestScore = score; best = c; }
+    }
+    return best;
+  };
+  const drillItemW = c => `calc((100% - ${(c - 1) * 10}px) / ${c})`;
+
+  box.onclick = e => {
+    if (decDrillKey !== null) {
+      const back = e.target.closest('.dec-back');
+      const dArt = e.target.closest('.dec-drill-art[data-band]');
+      const dAlb = e.target.closest('.dec-drill-alb[data-album]');
+      const hrt = e.target.closest('.dec-tl-hrt[data-n]');
+      const albSortBtn = e.target.closest('[data-alb-sort]');
+      if (albSortBtn) {
+        const s = albSortBtn.dataset.albSort;
+        decAlbSort = s === 'year' ? (decAlbSort === 'year-asc' ? 'year-desc' : 'year-asc') : s;
+        const yearBtn = box.querySelector('[data-alb-sort="year"]');
+        if (yearBtn) { yearBtn.classList.toggle('on', decAlbSort.startsWith('year')); yearBtn.classList.toggle('sort-year-desc', decAlbSort === 'year-desc'); }
+        setTimeout(() => render(), 300);
+        return;
+      }
+      if (back) {
+        if (back.dataset.to === 'albums') { decDrillAlbum = null; state.albums.clear(); }
+        else if (back.dataset.to === 'bands') { decDrillBand = null; decDrillAlbum = null; state.bands.clear(); state.albums.clear(); }
+        else { decDrillKey = null; decDrillBand = null; decDrillTab = null; decDrillAlbum = null; state.years.clear(); state.bands.clear(); state.albums.clear(); }
+        render(); return;
+      }
+      if (hrt) { const t = BY_PLAYLIST.find(x => x.n === +hrt.dataset.n); if (t) { toggleTrackFav(t); render(); } return; }
+      if (dArt) { decDrillBand = dArt.dataset.band; decAlbSort = decTab === 'parts' ? 'count' : 'year-asc'; state.bands.clear(); state.bands.add(decDrillBand); render(); return; }
+      if (dAlb) { decDrillAlbum = dAlb.dataset.album; state.albums.clear(); state.albums.add(decDrillAlbum); render(); return; }
+      return;
+    }
+    const lbl = e.target.closest('.dec-label[data-dec]');
+    const art = e.target.closest('.dec-art[data-band][data-dec]');
+    if (!lbl && !art) return;
+    if (lbl) {
+      const k = +lbl.dataset.dec;
+      const alreadyOn = decDrillKey === k && !decDrillBand;
+      state.years.clear(); state.bands.clear(); decDrillKey = null; decDrillBand = null; decDrillTab = null;
+      if (!alreadyOn) { blockYears(k).forEach(y => state.years.add(y)); decDrillKey = k; decDrillTab = decTab; }
+    } else {
+      const k = +art.dataset.dec, nm = art.dataset.band;
+      const alreadyOn = decDrillKey === k && decDrillBand === nm;
+      state.years.clear(); state.bands.clear(); decDrillKey = null; decDrillBand = null; decDrillTab = null;
+      if (!alreadyOn) { blockYears(k).forEach(y => state.years.add(y)); state.bands.add(nm); decDrillKey = k; decDrillBand = nm; decDrillTab = decTab; }
+    }
+    render();
+  };
+
+  if (decDrillKey !== null) {
+    const k = decDrillKey;
+    const kLabel = blockLabel(k);
+    const blockMap = byGroup.get(k) || new Map();
+    const blockTotal = [...blockMap.values()].reduce((s, v) => s + v, 0) || 1;
+    const drillAvailH = Math.max(150, window.innerHeight * 0.65 - 130);
+    const boxW = box.clientWidth || 900;
+    // número de colunas: começa no ideal do drillCols e aumenta até tudo caber em drillAvailH
+    const fitCols = n => {
+      let c = drillCols(n);
+      while (true) {
+        const photoW = (boxW - (c - 1) * 10) / c;
+        if (Math.ceil(n / c) * (photoW + 44 + 10) <= drillAvailH) break;
+        if (photoW < 55) break;
+        c++;
+      }
+      return c;
+    };
+    if (decDrillBand !== null) {
+      const nm = decDrillBand;
+      const blockTracks = isDecades
+        ? allR.filter(r => Math.floor(+r.year / 10) * 10 === k && hasBand(r, nm))
+        : sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === k && hasBand(r, nm));
+      const albumCounts = new Map();
+      for (const r of blockTracks) if (r.album && r.album !== NI && r.ty !== "single" && r.ty !== "compilation" && !/\s*-\s*(single|ep)$/i.test(r.album)) albumCounts.set(r.album, (albumCounts.get(r.album) || 0) + 1);
+      const albYearMap = new Map();
+      for (const r of blockTracks) if (r.album && !albYearMap.has(r.album) && r.year && r.year !== NI) albYearMap.set(r.album, +r.year);
+      const albums = [...albumCounts.entries()].sort((a, b) => {
+        if (decAlbSort === 'year-asc') return (albYearMap.get(a[0]) || 0) - (albYearMap.get(b[0]) || 0);
+        if (decAlbSort === 'year-desc') return (albYearMap.get(b[0]) || 0) - (albYearMap.get(a[0]) || 0);
+        return b[1] - a[1]; // count desc (padrão)
+      });
+      // pula direto pro interior se só tem um álbum
+      if (decDrillAlbum === null && albums.length === 1) {
+        decDrillAlbum = albums[0][0]; state.albums.clear(); state.albums.add(decDrillAlbum);
+      }
+      if (decDrillAlbum !== null) {
+        const albName = decDrillAlbum;
+        const singleAlbum = albums.length <= 1;
+        const allTracks = blockTracks.filter(r => r.album === albName).sort((a, b) => a.n - b.n);
+        const tCols = 4, tW = drillItemW(tCols);
+        const tRowH = 44 + 10;
+        const tMaxRows = Math.max(1, Math.floor(drillAvailH / tRowH));
+        const tMax = tCols * tMaxRows;
+        const visTracks = allTracks.slice(0, tMax), extraT = allTracks.length - visTracks.length;
+        const mkTlRow = t => { const fav = isFavTrack(t); return `<div class="dec-tl-row" style="flex:0 0 ${tW};width:${tW}"><div class="dec-tl-cov"></div><div class="dec-tl-info"><span class="dec-tl-nm">${esc(t.title)}</span></div><span class="dec-tl-dur">${fmtDur(t.sec)}</span><button class="hrt-btn dec-tl-hrt${fav ? ' on' : ''}" data-n="${t.n}" aria-pressed="${fav}" aria-label="Favoritar ${esc(t.title)}">${fav ? '♥' : '♡'}</button></div>`; };
+        const albTotData = ALBTOTS[albtotKey(nm, albName)];
+        const albTt = albTotData && albTotData.tt > 0 ? albTotData.tt : null;
+        const albPct = albTt ? Math.round(allTracks.length / albTt * 100) : null;
+        const albSub = albTt ? `${allTracks.length}/${albTt} · ${albPct}% salvas` : `${allTracks.length} música${allTracks.length !== 1 ? 's' : ''}`;
+        const backTo = singleAlbum ? 'bands' : 'albums', backLbl = singleAlbum ? '← Artistas' : '← Álbuns';
+        const heroH = 100;
+        const tMaxRowsAdj = Math.max(1, Math.floor((drillAvailH - heroH) / tRowH));
+        const visTracks2 = allTracks.slice(0, tCols * tMaxRowsAdj), extraT2 = allTracks.length - visTracks2.length;
+        box.innerHTML = `<div class="dec-drill"><div class="dec-drill-hd dec-drill-hd-alb"><div class="dec-alb-hero-cov"></div><div class="dec-alb-hero-info"><button class="dec-back" data-to="${backTo}" type="button">${backLbl}</button><span class="dec-drill-title">${esc(albName)}</span><span class="dec-drill-sub">${esc(nm)} · ${albSub}</span></div></div><div class="dec-tl">${visTracks2.map(t => mkTlRow(t)).join('')}</div>${extraT2 > 0 ? `<p class="dec-drill-more">+${extraT2} faixa${extraT2 > 1 ? 's' : ''}</p>` : ''}</div>`;
+        const applyBg = (sel, url) => { if (!url) return; const bg = `url("${url.replace(/"/g, '\\"')}")`; box.querySelectorAll(sel).forEach(el => { el.style.backgroundImage = bg; }); };
+        if (IS.artMap && allTracks.length) getCover(nm, albName, url => { applyBg('.dec-tl-cov', url); applyBg('.dec-alb-hero-cov', url); });
+        return;
+      }
+      let aC = drillCols(albums.length || 1);
+      while (true) {
+        const photoW = (boxW - (aC - 1) * 10) / aC;
+        if (Math.ceil((albums.length || 1) / aC) * (photoW + 44 + 10) <= drillAvailH) break;
+        if (photoW < 55) break;
+        aC++;
+      }
+      const aW = `calc((100% - ${(aC - 1) * 10}px) / ${aC})`;
+      const totalSaved = blockTracks.length;
+      const hdSub = `${albums.length} álbu${albums.length !== 1 ? 'ns' : 'm'} · ${totalSaved} música${totalSaved !== 1 ? 's' : ''}`;
+      box.innerHTML = `<div class="dec-drill"><div class="dec-drill-hd"><button class="dec-back" data-to="bands" type="button">← Artistas</button><span class="dec-drill-title">${esc(nm)} · ${esc(kLabel)}</span><span class="dec-drill-sub">${hdSub}</span><div class="sort-seg" style="margin-left:auto"><button class="sort-seg-btn${decAlbSort==='count'?' on':''}" data-alb-sort="count" title="Ordenar por faixas salvas">Faixas</button><button class="sort-seg-btn${decAlbSort.startsWith('year')?' on':''}" data-alb-sort="year" title="Ordenar por ano">Ano <span class="sort-arr">↑</span></button></div></div><div class="dec-drill-list" style="justify-content:flex-start">${albums.map(([alb, cnt]) => { const aYear = albYearMap.get(alb); const totD = ALBTOTS[albtotKey(nm, alb)]; const tot = totD && totD.tt > 0 ? totD.tt : null; const cntLbl = tot ? `${cnt} de ${tot}` : `${cnt}`; return `<button class="dec-drill-alb${state.albums.has(alb) ? ' dec-on' : ''}" type="button" data-album="${esc(alb)}" title="${esc(alb)}" style="flex:0 0 ${aW};width:${aW}"><div class="dec-art-cov"></div><span>${esc(alb)}</span><em>${cntLbl}${aYear ? ' · ' + aYear : ''}</em></button>`; }).join('')}</div></div>`;
+      if (decAlbSort === 'year-desc') requestAnimationFrame(() => { const b = box.querySelector('[data-alb-sort="year"]'); if (b) b.classList.add('sort-year-desc'); });
+      if (IS.artMap) albums.forEach(([alb], i) => {
+        const el = box.querySelectorAll('.dec-drill-alb .dec-art-cov')[i];
+        if (!el) return;
+        getCover(nm, alb, url => { if (url && el) el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`; });
+      });
+    } else {
+      const allBlockBands = [...blockMap.entries()].filter(([nm]) => nm && nm !== NI).sort((a, b) => b[1] - a[1]);
+      const bC = fitCols(allBlockBands.length), bW = drillItemW(bC);
+      box.innerHTML = `<div class="dec-drill"><div class="dec-drill-hd"><button class="dec-back" type="button">← Voltar</button><span class="dec-drill-title">Artistas · ${esc(kLabel)}</span></div><div class="dec-drill-list">${allBlockBands.map(([nm, cnt], i) => { const off = bandOff.get(nm) ?? decSlots[i % DEC_MAX]; return `<button class="dec-art dec-drill-art" type="button" title="${esc(nm)}" data-band="${esc(nm)}" data-dec="${k}" style="flex:0 0 ${bW};width:${bW}"><span>${esc(nm)}</span><div class="dec-art-cov" data-nm="${esc(nm)}" data-grp="${k}" style="background-color:hsl(calc(var(--h) + ${off}),62%,38%)"></div><em>${cnt} · ${Math.round(cnt/blockTotal*100)}%</em></button>`; }).join('')}</div></div>`;
+      if (IS.artMap) box.querySelectorAll('.dec-art-cov[data-nm][data-grp]').forEach(el => {
+        const nm = el.dataset.nm, gk = +el.dataset.grp;
+        const groupTracks = isDecades
+          ? allR.filter(r => Math.floor(+r.year / 10) * 10 === gk && hasBand(r, nm))
+          : sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === gk && hasBand(r, nm));
+        const topAlb = topAlbumOf(groupTracks);
+        if (!topAlb) return;
+        getCover(nm, topAlb, url => { if (url && el) el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`; });
+      });
+    }
+    return;
+  }
+
+  const nRanks = Math.max(...groupKeys.map(k => (topByGroup.get(k) || []).length));
   const nRows = usePairs ? Math.ceil(nRanks / 2) : nRanks;
   const colsTpl = Array(nCols).fill('1fr').join(' ');
   const rowsTpl = `auto ${Array(nRows).fill('auto').join(' ')}`;
-  const mkArt = (nm, cnt, pct, off, k, isDecades, isOn) => {
-    const covSt = `background-color:hsl(calc(var(--h) + ${off}),62%,38%)`;
-    if (isDecades) {
-      const isChipOn = isOn && activeBand === nm;
-      return `<button class="dec-art${isChipOn ? ' dec-on' : ''}" type="button" title="${esc(nm)}" data-band="${esc(nm)}" data-dec="${k}"><span data-nm="${esc(nm)}">${esc(nm)}</span><div class="dec-art-cov" data-nm="${esc(nm)}" data-grp="${k}" style="${covSt}"></div><em>${cnt} · ${pct}%</em></button>`;
-    }
-    return `<span class="dec-art dec-art-ro" title="${esc(nm)}"><span data-nm="${esc(nm)}">${esc(nm)}</span><div class="dec-art-cov" data-nm="${esc(nm)}" data-grp="${k}" style="${covSt}"></div><em>${cnt} · ${pct}%</em></span>`;
+  const mkArt = (nm, cnt, pct, off, k, isOn) => {
+    const isChipOn = isOn && activeBand === nm;
+    return `<button class="dec-art${isChipOn ? ' dec-on' : ''}" type="button" title="${esc(nm)}" data-band="${esc(nm)}" data-dec="${k}"><span data-nm="${esc(nm)}">${esc(nm)}</span><div class="dec-art-cov" data-nm="${esc(nm)}" data-grp="${k}" style="background-color:hsl(calc(var(--h) + ${off}),62%,38%)"></div><em>${cnt} · ${pct}%</em></button>`;
   };
   const cells = [];
   groupKeys.forEach(k => {
-    const isOn = isDecades && activeDec === k;
+    const isOn = activeDec === k;
     const chapName = !isDecades && CHI && CHI[k - 1] ? CHI[k - 1].name : null;
-    const label = isDecades ? (k < 1000 ? `${k}s` : `${String(k).slice(-2)}s`) : (chapName || `É${k}`);
-    cells.push(isDecades
-      ? `<button class="dec-label${isOn ? ' dec-on' : ''}" type="button" data-dec="${k}"${chapName ? ` title="${esc(chapName)}"` : ''}>${label}</button>`
-      : `<span class="dec-label dec-label-ro"${chapName ? ` title="${esc(chapName)}"` : ''}>${label}</span>`);
+    cells.push(`<button class="dec-label${isOn ? ' dec-on' : ''}" type="button" data-dec="${k}"${chapName ? ` title="${esc(chapName)}"` : ''}>${blockLabel(k)}</button>`);
   });
   for (let ri = 0; ri < nRows; ri++) {
     const idx1 = usePairs ? ri * 2 : ri;
     const idx2 = usePairs ? ri * 2 + 1 : -1;
     groupKeys.forEach(k => {
-      const isOn = isDecades && activeDec === k;
+      const isOn = activeDec === k;
       const total = [...(byGroup.get(k) || new Map()).values()].reduce((s, v) => s + v, 0);
       if (!usePairs) {
         const entry = (topByGroup.get(k) || [])[idx1];
         if (!entry) { cells.push(`<div></div>`); return; }
         const [nm, cnt] = entry;
-        cells.push(mkArt(nm, cnt, Math.round(cnt/total*100), bandOff.get(nm)??0, k, isDecades, isOn));
+        cells.push(mkArt(nm, cnt, Math.round(cnt/total*100), bandOff.get(nm)??0, k, isOn));
       } else {
         const e1 = (topByGroup.get(k) || [])[idx1];
         const e2 = (topByGroup.get(k) || [])[idx2];
-        const a1 = e1 ? mkArt(e1[0], e1[1], Math.round(e1[1]/total*100), bandOff.get(e1[0])??0, k, isDecades, isOn) : '';
-        const a2 = e2 ? mkArt(e2[0], e2[1], Math.round(e2[1]/total*100), bandOff.get(e2[0])??0, k, isDecades, isOn) : '';
+        const a1 = e1 ? mkArt(e1[0], e1[1], Math.round(e1[1]/total*100), bandOff.get(e1[0])??0, k, isOn) : '';
+        const a2 = e2 ? mkArt(e2[0], e2[1], Math.round(e2[1]/total*100), bandOff.get(e2[0])??0, k, isOn) : '';
         cells.push(`<div class="dec-pair">${a1}${a2}</div>`);
       }
     });
   }
   box.innerHTML = `<div class="dec-matrix${usePairs ? ' dec-matrix-pairs' : ''}" style="grid-template-columns:${colsTpl};grid-template-rows:${rowsTpl}">${cells.join('')}</div>`;
-  // carregar fotos: album mais presente da banda no bloco (época/década)
-  if (IS.artMap) {
-    const sortedR = !isDecades ? allR.slice().sort((a, b) => +a.order - +b.order) : null;
-    box.querySelectorAll('.dec-art-cov[data-nm][data-grp]').forEach(el => {
-      const nm = el.dataset.nm;
-      const k = +el.dataset.grp;
-      const groupTracks = isDecades
-        ? allR.filter(r => Math.floor(+r.year / 10) * 10 === k && hasBand(r, nm))
-        : sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === k && hasBand(r, nm));
-      const topAlb = topAlbumOf(groupTracks);
-      if (!topAlb) return;
-      getCover(nm, topAlb, url => {
-        if (url && el) el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
-      });
-    });
-  }
-  box.onclick = e => {
-    if (!isDecades) return;
-    const lbl = e.target.closest('.dec-label[data-dec]');
-    const art = e.target.closest('.dec-art[data-dec]');
-    if (!lbl && !art) return;
-    const decYears = yrs => ALL_YEARS.filter(y => y !== NI && Math.floor(+y / 10) * 10 === yrs);
-    if (lbl){
-      const dec = +lbl.dataset.dec;
-      const alreadyOn = activeDec === dec && !state.bands.size;
-      state.years.clear(); state.bands.clear();
-      if (!alreadyOn) decYears(dec).forEach(y => state.years.add(y));
-    } else {
-      const dec = +art.dataset.dec, nm = art.dataset.band;
-      const alreadyOn = activeDec === dec && activeBand === nm;
-      state.years.clear(); state.bands.clear();
-      if (!alreadyOn){ decYears(dec).forEach(y => state.years.add(y)); state.bands.add(nm); }
-    }
-    render();
-  };
+  if (IS.artMap) box.querySelectorAll('.dec-art-cov[data-nm][data-grp]').forEach(el => {
+    const nm = el.dataset.nm, k = +el.dataset.grp;
+    const groupTracks = isDecades
+      ? allR.filter(r => Math.floor(+r.year / 10) * 10 === k && hasBand(r, nm))
+      : sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === k && hasBand(r, nm));
+    const topAlb = topAlbumOf(groupTracks);
+    if (!topAlb) return;
+    getCover(nm, topAlb, url => { if (url && el) el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`; });
+  });
 }
 function renderGenres(){
   const base = rows(true, true, false), el = $("#genres");
@@ -2334,42 +2475,55 @@ const songView = r => { const a = (r.artist || "").trim() || NI; return {n: r.n,
 const songTable = list => `<div class="ptab"><table><thead><tr>${songHead(false)}</tr></thead><tbody>${list.map(t => `<tr>${songCells(t)}</tr>`).join("")}</tbody></table></div>`;
 
 /* ---------------- render ---------------- */
-$("#filtered-list-card thead tr").innerHTML = `<th class="fv" title="Favoritos / Etiquetas">♡</th>` + songHead();
-let flSortK = "n", flSortDir = 1;
+let flSort = null; // null | 'asc' | 'desc'
 function renderFilteredList(R){
   const card = $("#filtered-list-card");
   const active = state.bands.size + state.albums.size + state.genres.size + state.years.size > 0;
-  card.style.display = active ? "" : "none";
-  if (!active) return;
-  const list = [...R].sort(cmpSong(flSortK, flSortDir));
-  $("#filtered-list-body").innerHTML = list.map((t, i) => {
-    const fav = isFavTrack(t);
-    return `<tr title="Posição original na playlist: #${t.n}"><td class="fv"><button class="hrt-btn fv-hrt${fav ? " on" : ""}" data-n="${t.n}" aria-pressed="${fav}" aria-label="Favoritar ${esc(t.title)}">${fav ? "♥" : "♡"}</button></td>${songCells(t, i + 1)}</tr>`;
-  }).join("");
-  $("#filtered-list-hint").textContent = `${faixas(list.length)} no filtro atual`;
-  card.querySelectorAll("th[data-k]").forEach(th => th.setAttribute("aria-sort", th.dataset.k === flSortK ? (flSortDir > 0 ? "ascending" : "descending") : "none"));
+  card.style.display = (active && decDrillAlbum === null) ? "" : "none";
+  if (!active || decDrillAlbum !== null) return;
+  const tW = 'calc((100% - 30px) / 4)';
+  const body = $("#filtered-list-body");
+  document.querySelectorAll('#fl-sort-seg .sort-seg-btn').forEach(b => {
+    const isYear = b.dataset.flSort === 'year';
+    b.classList.toggle('on', isYear ? (flSort === 'asc' || flSort === 'desc') : !flSort);
+    if (isYear) b.classList.toggle('sort-year-desc', flSort === 'desc');
+  });
+  const sortedR = flSort ? [...R].sort((a, b) => {
+    const ya = a.year !== NI && a.year ? +a.year : (flSort === 'asc' ? 9999 : -1);
+    const yb = b.year !== NI && b.year ? +b.year : (flSort === 'asc' ? 9999 : -1);
+    return flSort === 'asc' ? ya - yb : yb - ya;
+  }) : R;
+  body.innerHTML = sortedR.map(t => { const fav = isFavTrack(t); return `<div class="dec-tl-row fl-row" style="flex:0 0 ${tW};width:${tW}"><div class="dec-tl-cov"></div><div class="dec-tl-info"><span class="dec-tl-nm">${esc(t.title)}</span><span class="dec-tl-sub">${esc(t.album)} · ${esc(t.artist)}</span></div><span class="dec-tl-dur">${fmtDur(t.sec)}</span><button class="hrt-btn dec-tl-hrt fv-hrt${fav ? ' on' : ''}" data-n="${t.n}" aria-pressed="${fav}" aria-label="Favoritar ${esc(t.title)}">${fav ? '♥' : '♡'}</button></div>`; }).join('');
+  $("#filtered-list-hint").textContent = `${faixas(R.length)} no filtro atual`;
+  if (IS.artMap) {
+    const covEls = new Map();
+    body.querySelectorAll('.dec-tl-cov').forEach((el, i) => {
+      const t = sortedR[i]; if (!t || !t.album || t.album === NI || t.ty === 'single') return;
+      const key = splitArtistsRaw(t.artist)[0] + '|' + t.album;
+      if (!covEls.has(key)) covEls.set(key, []);
+      covEls.get(key).push(el);
+    });
+    covEls.forEach((els, key) => {
+      const sep = key.indexOf('|'), artist = key.slice(0, sep), album = key.slice(sep + 1);
+      getCover(artist, album, url => { if (!url) return; const bg = `url("${url.replace(/"/g, '\\"')}")`; els.forEach(el => { el.style.backgroundImage = bg; }); });
+    });
+  }
 }
-$("#filtered-list-card tbody").addEventListener("click", e => {
+
+document.getElementById("fl-sort-seg").addEventListener("click", e => {
+  const b = e.target.closest(".sort-seg-btn[data-fl-sort]"); if (!b) return;
+  if (b.dataset.flSort === 'year') flSort = flSort === 'asc' ? 'desc' : 'asc';
+  else flSort = null;
+  renderFilteredList(rows());
+});
+$("#filtered-list-body").addEventListener("click", e => {
   const b = e.target.closest(".fv-hrt"); if (!b) return;
   const n = +b.dataset.n, t = BY_PLAYLIST.find(x => x.n === n);
   if (t){ const added = toggleTrackFav(t); render(); if (added && window.openTagPopover) window.openTagPopover(t, e, () => render()); else if (!added && window.maybySuggestRemoveCategories) window.maybySuggestRemoveCategories({ label: t.title, getTags: () => trackTagsOf(t), removeAllTags: () => [...trackTagsOf(t)].forEach(tag => removeTagFromTrack(t, tag)), onDone: () => render() }); }
 });
-$("#filtered-list-card").querySelectorAll("th[data-k]").forEach(th => {
-  const go = () => { if (flSortK === th.dataset.k) flSortDir *= -1; else { flSortK = th.dataset.k; flSortDir = 1; } render(); };
-  th.addEventListener("click", go);
-  th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); go(); } });
-});
-let flCompact = true;
 let decTab = 'decades';
-(function initFlCompact(){
-  const card = $("#filtered-list-card"), btn = $("#fl-detail-toggle");
-  card.classList.add("fl-compact");
-  btn.addEventListener("click", () => {
-    flCompact = !flCompact;
-    card.classList.toggle("fl-compact", flCompact);
-    btn.textContent = flCompact ? "Mostrar mais" : "Mostrar menos";
-  });
-})();
+let decAlbSort = 'year-asc';
+let decDrillKey = null, decDrillBand = null, decDrillTab = null, decDrillAlbum = null;
 function render(){
   renderFilters();
   const R = rows();
