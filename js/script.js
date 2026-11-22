@@ -685,6 +685,22 @@ function renderKPIs(R){
   const a = modeOf(R, "artist");
   fitKpiText($("#k-top"), a.best || "—");
   $("#k-top-sub").textContent = a.best ? `${a.max} faixa${a.max > 1 ? "s" : ""} · ${pct(a.max, total)} do recorte${a.ties ? ` · empate com +${a.ties}` : ""}` : "";
+  const kCov = $("#k-top-cov");
+  if (kCov) {
+    const artRs = R.filter(r => hasBand(r, a.best));
+    const topAlb = topAlbumOf(artRs);
+    if (a.best && topAlb) {
+      const tile = TILES.get(a.best);
+      const covEl = tile ? tile.querySelector(".cov") : null;
+      if (covEl && covEl.style.backgroundImage) {
+        kCov.style.backgroundImage = covEl.style.backgroundImage;
+      } else {
+        getCover(a.best, topAlb, url => { if (url) kCov.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`; });
+      }
+    } else {
+      kCov.style.backgroundImage = "";
+    }
+  }
 }
 
 /* ---------------- wave (surprise: every track as a stroke) ---------------- */
@@ -1657,6 +1673,7 @@ document.addEventListener("change", e => {
 
 /* ---------------- ranked lists (albums & ranking) with FLIP reordering ---------------- */
 function renderList(container, items, opts){
+  if (opts.cover) container.classList.add("has-covers");
   const before = new Map();
   for (const el of container.children) before.set(el.dataset.k, el.getBoundingClientRect().top);
   const keep = new Map([...container.children].map(el => [el.dataset.k, el]));
@@ -1667,10 +1684,11 @@ function renderList(container, items, opts){
     let el = keep.get(d.k);
     if (!el){
       el = document.createElement("div"); el.className = "row"; el.dataset.k = d.k;
-      el.innerHTML = (opts.rank ? `<span class="rk"></span>` : "") + `<span class="nm"></span>` +
+      el.innerHTML = (opts.rank ? `<span class="rk"></span>` : "") +
+        (opts.cover ? `<span class="nm"><div class="row-cov"></div><span class="row-nm-txt"></span></span>` : `<span class="nm"></span>`) +
         (opts.heart ? `<button class="hrt-btn" type="button" aria-label="Favoritar" aria-pressed="false">♡</button>` : "") +
         `<span class="vl"></span><div class="tr"><div class="fl"></div></div>`;
-      el.querySelector(".nm").textContent = d.k;
+      (el.querySelector(".row-nm-txt") || el.querySelector(".nm")).textContent = d.k;
       el.addEventListener("click", e => { if (!e.target.closest(".hrt-btn")) toggle(opts.kind, d.k); });
       if (opts.heart) el.querySelector(".hrt-btn").addEventListener("click", e => { e.stopPropagation(); opts.heart(d.k, e); });
       bindTip(el, () => opts.tip(d.k));
@@ -1684,9 +1702,10 @@ function renderList(container, items, opts){
     const sel = opts.selected.has(d.k);
     el.classList.toggle("sel", sel); el.classList.toggle("dim", hasSel && !sel);
     el._w = (d.value / max) * 100;
+    if (opts.cover) opts.cover(d, el);
     frag.appendChild(el);
   });
-  for (const el of keep.values()) el.remove();
+  for (const el of keep.values()) { if (el._covObs) { el._covObs.disconnect(); el._covObs = null; } el.remove(); }
   container.appendChild(frag);
   const rm = tmBusy || matchMedia("(prefers-reduced-motion: reduce)").matches;
   for (const el of container.children){
@@ -1734,12 +1753,12 @@ function renderAlbumCoverage(){
   for (const t of rows(true, false)){
     if (t.album === NI || t.ty === "compilation") continue;
     const k = albtotKey(t.artist, t.album);
-    if (!byAlb.has(k)) byAlb.set(k, {album: t.album, artist: splitArtistsRaw(t.artist)[0], n: 0});
+    if (!byAlb.has(k)) byAlb.set(k, {album: t.album, artist: splitArtistsRaw(t.artist)[0], n: 0, title: t.title});
     byAlb.get(k).n++;
   }
   const withPct = [], singles = [];
-  for (const [k, {album, artist, n}] of byAlb){
-    if (n === 1){ singles.push({album, artist}); continue; }
+  for (const [k, {album, artist, n, title}] of byAlb){
+    if (n === 1){ singles.push({album, artist, title}); continue; }
     const data = ALBTOTS[k]; if (!data || !data.tt) continue;
     withPct.push({album, artist, n, tt: data.tt, pctVal: Math.min(1, n / data.tt)});
   }
@@ -1774,8 +1793,13 @@ function renderAlbumCoverage(){
       sb.textContent = `${singles.length} álbu${singles.length > 1 ? "ns" : "m"} com 1 faixa`;
       sb.hidden = false;
       sb.onclick = () => {
-        const body = `<div class="cov-singles-modal">${singles.map(x => `<div class="cov-single-row"><span class="cov-s-nm">${esc(x.album)}</span><span class="cov-s-art">${esc(x.artist)}</span></div>`).join("")}</div>`;
-        openModal({title: `Álbuns com 1 faixa (${singles.length})`, sub: "Estes álbuns aparecem com apenas uma faixa na playlist", body, size: "sm"});
+        const body = `<div class="cov-singles-modal">${singles.map((x, i) => `<div class="cov-single-row"><div class="cov-s-img" data-covi="${i}"></div><div class="cov-s-left"><span class="cov-s-nm">${esc(x.album)}</span><span class="cov-s-sep">·</span><span class="cov-s-track">${esc(x.title)}</span></div><span class="cov-s-art">${esc(x.artist)}</span></div>`).join("")}</div>`;
+        const md = openModal({title: `Álbuns com 1 faixa (${singles.length})`, sub: "Estes álbuns aparecem com apenas uma faixa na playlist", body, size: "sm"});
+        singles.forEach((x, i) => getCover(x.artist, x.album, url => {
+          if (!url) return;
+          const img = md.q(`[data-covi="${i}"]`);
+          if (img) img.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
+        }));
       };
     } else if (sb) {
       sb.hidden = true;
@@ -1812,6 +1836,26 @@ function renderAlbums(){
   const items = [...g].map(([k, rs]) => ({k, value: byDur ? sum(rs, r => r.sec) : rs.length, n: rs.length, sec: sum(rs, r => r.sec)}))
     .sort((a, b) => b.value - a.value || (byDur ? b.n - a.n : b.sec - a.sec) || coll.compare(a.k, b.k));
   renderList($("#albums"), items, {kind: "album", selected: state.albums, tip: albumTip, scrollToSel: true,
+    cover: (d, el) => {
+      const rcov = el.querySelector(".row-cov"); if (!rcov) return;
+      const tile = TILES.get(d.k);
+      if (tile) {
+        const covEl = tile.querySelector(".cov"); if (!covEl) return;
+        if (covEl.style.backgroundImage) { rcov.style.backgroundImage = covEl.style.backgroundImage; return; }
+        if (!el._covObs) {
+          el._covObs = new MutationObserver(() => {
+            if (covEl.style.backgroundImage) { rcov.style.backgroundImage = covEl.style.backgroundImage; el._covObs.disconnect(); el._covObs = null; }
+          });
+          el._covObs.observe(tile, {attributes: true, attributeFilter: ["class"]});
+        }
+        return;
+      }
+      // treemap está em modo artista — tile de álbum não existe: usar getCover
+      const rs = g.get(d.k) || [], art = modeOf(rs, "artist").best; if (!art) return;
+      const covKey = art + "|" + d.k; if (el.dataset.cov === covKey) return;
+      el.dataset.cov = covKey;
+      getCover(art, d.k, url => { if (el.dataset.cov !== covKey || !url) return; rcov.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`; });
+    },
     label: d => byDur ? `${fmtDur(d.sec)}<small>${d.n} faixa${d.n > 1 ? "s" : ""}</small>` : `${d.n}<small>${fmtDur(d.sec)}</small>`,
     heart: (album, e) => { const added = toggleAlbumFav(album); renderAlbums(); if (added && window.openAlbumTagPopover) window.openAlbumTagPopover(album, e, () => renderAlbums()); else if (!added && window.maybySuggestRemoveCategories) window.maybySuggestRemoveCategories({ label: album, getTags: () => albumTagsOf(album), removeAllTags: () => [...albumTagsOf(album)].forEach(t => removeTagFromAlbum(album, t)), onDone: () => renderAlbums() }); },
     isFav: album => isFavAlbum(album)});
@@ -1847,8 +1891,20 @@ function rankTip(b){
 }
 function renderRank(){
   const base = rows(false, true);
-  const items = [...groupBy(base, "artist")].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
+  const byArt = groupBy(base, "artist");
+  const items = [...byArt].map(([k, rs]) => ({k, value: rs.length})).sort((a, b) => b.value - a.value || coll.compare(a.k, b.k));
   renderList($("#rank"), items, {kind: "band", rank: true, selected: state.bands, tip: rankTip, scrollToSel: true,
+    cover: (d, el) => {
+      const rcov = el.querySelector(".row-cov"); if (!rcov) return;
+      const tile = TILES.get(d.k); if (!tile) return;
+      const covEl = tile.querySelector(".cov"); if (!covEl) return;
+      if (covEl.style.backgroundImage) { rcov.style.backgroundImage = covEl.style.backgroundImage; return; }
+      if (el._covObs) return;
+      el._covObs = new MutationObserver(() => {
+        if (covEl.style.backgroundImage) { rcov.style.backgroundImage = covEl.style.backgroundImage; el._covObs.disconnect(); el._covObs = null; }
+      });
+      el._covObs.observe(tile, {attributes: true, attributeFilter: ["class"]});
+    },
     label: d => `${d.value}<small>${pct(d.value, base.length)}</small>`,
     heart: (band, e) => { const added = toggleBandFav(band); renderRank(); if (added && window.openBandTagPopover) window.openBandTagPopover(band, e, () => renderRank()); else if (!added && window.maybySuggestRemoveCategories) window.maybySuggestRemoveCategories({ label: band, getTags: () => bandTagsOf(band), removeAllTags: () => [...bandTagsOf(band)].forEach(t => removeTagFromBand(band, t)), onDone: () => renderRank() }); },
     isFav: band => isFavBand(band)});
@@ -1868,7 +1924,7 @@ function renderDecades(){
   const box = $("#decades"); if (!box) return;
   if (!allR.length){ box.innerHTML = '<p class="none">Sem dados</p>'; return; }
   const isDecades = decTab === 'decades';
-  const nParts = NN < 50 ? 3 : NN < 200 ? 4 : NN < 500 ? 5 : 6;
+  const nParts = (IS.journey && CHI && CHI.length) ? CHI.length : (NN < 50 ? 3 : NN < 200 ? 4 : NN < 500 ? 5 : 6);
   const byGroup = new Map();
   if (isDecades){
     for (const r of allR){
@@ -1898,7 +1954,7 @@ function renderDecades(){
   })() : null;
   const activeBand = isDecades && state.bands.size === 1 ? [...state.bands][0] : null;
   const topByGroup = new Map(groupKeys.map(k => [k,
-    [...(byGroup.get(k) || new Map()).entries()].filter(([nm]) => nm && nm !== NI).sort((a, b) => b[1] - a[1]).slice(0, 5)]));
+    [...(byGroup.get(k) || new Map()).entries()].filter(([nm]) => nm && nm !== NI).sort((a, b) => b[1] - a[1]).slice(0, 4)]));
   const DEC_MAX = 18, decStep = 19.5;
   const decSlots = Array.from({length: DEC_MAX}, (_, k) => +(k * decStep).toFixed(2));
   const allBands = [...new Set(groupKeys.flatMap(k => topByGroup.get(k).map(([nm]) => nm)))];
@@ -1924,45 +1980,66 @@ function renderDecades(){
   const bandOff = new Map(allBands.map(b => [b, decSlots[bandSlot.get(b) ?? 0]]));
   const modeEl = $("#dec-mode");
   if (modeEl) modeEl.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === decTab)));
-  box.innerHTML = `<div class="dec-list">${groupKeys.map(k => {
-    const isOn = isDecades && activeDec === k;
-    const top = topByGroup.get(k);
-    const total = [...(byGroup.get(k) || new Map()).values()].reduce((s, v) => s + v, 0);
-    const label = isDecades ? (k < 1000 ? `${k}s` : `${String(k).slice(-2)}s`) : `P${k}`;
-    const chips = top.map(([nm, cnt]) => {
-      const off = bandOff.get(nm) ?? 0;
-      const st = `background:hsl(calc(var(--h) + ${off}),62%,38%);color:hsl(0,0%,90%)`;
-      const pct = Math.round(cnt / total * 100);
-      if (isDecades){
-        const isChipOn = isOn && activeBand === nm;
-        return `<button class="dec-art${isChipOn ? ' dec-on' : ''}" type="button" title="${esc(nm)}" style="${st}" data-band="${esc(nm)}" data-dec="${k}"><b>${cnt}</b><span data-nm="${esc(nm)}">${esc(nm)}</span><em>${pct}%</em></button>`;
-      }
-      return `<span class="dec-art dec-art-ro" title="${esc(nm)}" style="${st}"><b>${cnt}</b><span data-nm="${esc(nm)}">${esc(nm)}</span><em>${pct}%</em></span>`;
-    }).join('');
-    const lbEl = isDecades
-      ? `<button class="dec-label${isOn ? ' dec-on' : ''}" type="button" data-dec="${k}">${label}</button>`
-      : `<span class="dec-label dec-label-ro">${label}</span>`;
-    return `<div class="dec-row">${lbEl}<span class="dec-artists">${chips}</span><span class="dec-total">${total} fx</span></div>`;
-  }).join('')}</div>`;
-  box.querySelectorAll('.dec-row').forEach(row => {
-    const wrap = row.querySelector('.dec-artists');
-    if (!wrap || !wrap.offsetWidth) return;
-    const spans = [...wrap.querySelectorAll('.dec-art span[data-nm]')]; if (!spans.length) return;
-    if (wrap.scrollWidth <= wrap.offsetWidth) return;
-    // passo 1: evoAbbr / primeiro termo (só se reduz)
-    spans.forEach(s => {
-      const nm = s.dataset.nm;
-      const abbr = evoAbbr(nm) || (nm.includes(' ') ? nm.split(/\s+/)[0] : null);
-      if (abbr && abbr.length < s.textContent.length) s.textContent = abbr;
-    });
-    // passo 2: corta 1 char por vez uniformemente
-    for (let i = 0; i < 40; i++) {
-      if (wrap.scrollWidth <= wrap.offsetWidth) break;
-      const maxLen = Math.max(...spans.map(s => s.textContent.length));
-      if (maxLen <= 1) break;
-      spans.forEach(s => { if (s.textContent.length >= maxLen) s.textContent = s.textContent.slice(0, -1); });
+  const nRanks = Math.max(...groupKeys.map(k => (topByGroup.get(k) || []).length));
+  const nCols = groupKeys.length;
+  const usePairs = nCols <= 6;
+  const nRows = usePairs ? Math.ceil(nRanks / 2) : nRanks;
+  const colsTpl = Array(nCols).fill('1fr').join(' ');
+  const rowsTpl = `auto ${Array(nRows).fill('auto').join(' ')}`;
+  const mkArt = (nm, cnt, pct, off, k, isDecades, isOn) => {
+    const covSt = `background-color:hsl(calc(var(--h) + ${off}),62%,38%)`;
+    if (isDecades) {
+      const isChipOn = isOn && activeBand === nm;
+      return `<button class="dec-art${isChipOn ? ' dec-on' : ''}" type="button" title="${esc(nm)}" data-band="${esc(nm)}" data-dec="${k}"><span data-nm="${esc(nm)}">${esc(nm)}</span><div class="dec-art-cov" data-nm="${esc(nm)}" data-grp="${k}" style="${covSt}"></div><em>${cnt} · ${pct}%</em></button>`;
     }
+    return `<span class="dec-art dec-art-ro" title="${esc(nm)}"><span data-nm="${esc(nm)}">${esc(nm)}</span><div class="dec-art-cov" data-nm="${esc(nm)}" data-grp="${k}" style="${covSt}"></div><em>${cnt} · ${pct}%</em></span>`;
+  };
+  const cells = [];
+  groupKeys.forEach(k => {
+    const isOn = isDecades && activeDec === k;
+    const chapName = !isDecades && CHI && CHI[k - 1] ? CHI[k - 1].name : null;
+    const label = isDecades ? (k < 1000 ? `${k}s` : `${String(k).slice(-2)}s`) : (chapName || `É${k}`);
+    cells.push(isDecades
+      ? `<button class="dec-label${isOn ? ' dec-on' : ''}" type="button" data-dec="${k}"${chapName ? ` title="${esc(chapName)}"` : ''}>${label}</button>`
+      : `<span class="dec-label dec-label-ro"${chapName ? ` title="${esc(chapName)}"` : ''}>${label}</span>`);
   });
+  for (let ri = 0; ri < nRows; ri++) {
+    const idx1 = usePairs ? ri * 2 : ri;
+    const idx2 = usePairs ? ri * 2 + 1 : -1;
+    groupKeys.forEach(k => {
+      const isOn = isDecades && activeDec === k;
+      const total = [...(byGroup.get(k) || new Map()).values()].reduce((s, v) => s + v, 0);
+      if (!usePairs) {
+        const entry = (topByGroup.get(k) || [])[idx1];
+        if (!entry) { cells.push(`<div></div>`); return; }
+        const [nm, cnt] = entry;
+        cells.push(mkArt(nm, cnt, Math.round(cnt/total*100), bandOff.get(nm)??0, k, isDecades, isOn));
+      } else {
+        const e1 = (topByGroup.get(k) || [])[idx1];
+        const e2 = (topByGroup.get(k) || [])[idx2];
+        const a1 = e1 ? mkArt(e1[0], e1[1], Math.round(e1[1]/total*100), bandOff.get(e1[0])??0, k, isDecades, isOn) : '';
+        const a2 = e2 ? mkArt(e2[0], e2[1], Math.round(e2[1]/total*100), bandOff.get(e2[0])??0, k, isDecades, isOn) : '';
+        cells.push(`<div class="dec-pair">${a1}${a2}</div>`);
+      }
+    });
+  }
+  box.innerHTML = `<div class="dec-matrix${usePairs ? ' dec-matrix-pairs' : ''}" style="grid-template-columns:${colsTpl};grid-template-rows:${rowsTpl}">${cells.join('')}</div>`;
+  // carregar fotos: album mais presente da banda no bloco (época/década)
+  if (IS.artMap) {
+    const sortedR = !isDecades ? allR.slice().sort((a, b) => +a.order - +b.order) : null;
+    box.querySelectorAll('.dec-art-cov[data-nm][data-grp]').forEach(el => {
+      const nm = el.dataset.nm;
+      const k = +el.dataset.grp;
+      const groupTracks = isDecades
+        ? allR.filter(r => Math.floor(+r.year / 10) * 10 === k && hasBand(r, nm))
+        : sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === k && hasBand(r, nm));
+      const topAlb = topAlbumOf(groupTracks);
+      if (!topAlb) return;
+      getCover(nm, topAlb, url => {
+        if (url && el) el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
+      });
+    });
+  }
   box.onclick = e => {
     if (!isDecades) return;
     const lbl = e.target.closest('.dec-label[data-dec]');
@@ -4131,10 +4208,20 @@ function renderHero(){
 function renderJourney(){
   $("#journey").style.display = IS.journey ? "" : "none";
   if (!IS.journey) return;
-  $("#chapters").innerHTML = CHI.map(c => `<div class="chap" style="--o:${(.25 + .75 * c.share / Math.max(...CHI.map(x => x.share))).toFixed(2)}" data-i="${c.i}">
+  $("#chapters").innerHTML = CHI.map(c => `<div class="chap" style="--o:${(.25 + .75 * c.share / Math.max(...CHI.map(x => x.share))).toFixed(2)}" data-i="${c.i}" data-art="${esc(c.top[0])}">
+      <div class="chap-cov"></div>
       <div class="cn">${c.i + 1}</div><div class="ct">${esc(c.name)}</div><div class="cr">#${c.seg[0].n} → #${c.seg[c.seg.length - 1].n}</div>
       <div class="cw"><b>${esc(c.top[0])}</b>${c.top[1]} de ${c.seg.length} faixas${c.g[1] ? ` · depois ${esc(c.g[1][0])} (${c.g[1][1]})` : ""}</div>
       <div class="cs"><span><b>${c.arts}</b> artistas</span><span><b>${c.fresh}</b> novos</span>${isNaN(c.yr) ? "" : `<span>lanç. mediano <b>${Math.round(c.yr)}</b></span>`}</div></div>`).join("");
+  document.querySelectorAll(".chap").forEach(el => {
+    const artist = el.dataset.art;
+    if (artist) {
+      const artObj = IS.artMap.get(artist);
+      const topAlb = artObj ? topAlbumOf(artObj.rs) : null;
+      const covEl = el.querySelector(".chap-cov");
+      if (covEl && topAlb) getCover(artist, topAlb, url => { if (url && covEl) covEl.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`; });
+    }
+  });
   document.querySelectorAll(".chap").forEach(el => bindTip(el, () => {
     const c = CHI[+el.dataset.i];
     return `<div class="eyebrow">Parte ${c.i + 1} · #${c.seg[0].n} a #${c.seg[c.seg.length - 1].n}</div><div class="t">${esc(c.name)}</div>
@@ -4156,12 +4243,19 @@ function renderJourney(){
     const mx = Math.max(1, ...grid.flat().map(x => x.length));
     let html = "";
     top.forEach((a, ai) => {
-      html += `<div class="hn">${esc(a)}</div>`;
+      html += `<div class="hn"><div class="hn-cov" id="hn-cov-${ai}"></div>${esc(a)}</div>`;
       grid[ai].forEach((rs, bi) => { const k = rs.length / mx; const bg = rs.length ? `hsla(var(--h), 70%, ${18 + 50 * k}%, ${.35 + .65 * k})` : "hsla(var(--h),60%,67%,.04)";
         html += `<div class="hc" data-a="${ai}" data-b="${bi}" data-bg="${bg}" style="background:hsla(var(--h),60%,67%,.04);color:${k > .55 ? "hsl(var(--h),90%,8%)" : "var(--ink)"}">${rs.length || ""}</div>`; });
     });
     html += `<div></div>` + BL.map((seg, i) => `<div class="hx">${i % 3 === 0 ? "#" + seg[0].n : ""}</div>`).join("");
     const heat = $("#heat"); heat.style.gridTemplateColumns = `auto repeat(${BL.length},minmax(0,1fr))`; heat.innerHTML = html;
+    top.forEach((a, ai) => {
+      const artObj = IS.artMap.get(a);
+      const topAlb = artObj ? topAlbumOf(artObj.rs) : null;
+      if (!topAlb) return;
+      const covEl = heat.querySelector(`#hn-cov-${ai}`);
+      if (covEl) getCover(a, topAlb, url => { if (url && covEl) covEl.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`; });
+    });
     $("#heat-hint").textContent = `cada coluna = ~${Math.round(NN / BL.length)} adições · passe o mouse`;
     heat.querySelectorAll(".hc").forEach(el => bindTip(el, () => {
       const a = top[+el.dataset.a], seg = BL[+el.dataset.b], rs = grid[+el.dataset.a][+el.dataset.b];
@@ -4629,7 +4723,7 @@ function openModal({title, sub = "", body, foot, size = "", headerExtra = "", on
   const mb = m.querySelector(".mb");
   if (mb) bg.addEventListener("wheel", e => {
     // Se o evento vem de um elemento interno com scroll próprio e ainda tem conteúdo para rolar, não interceptar
-    const inner = e.target.closest('.ptab, .list, .tbscroll, .cd-side');
+    const inner = e.target.closest('.ptab, .list, .tbscroll, .cd-side, .cov-singles-modal');
     if (inner && inner.scrollHeight > inner.clientHeight) {
       const atTop = inner.scrollTop <= 0 && e.deltaY < 0;
       const atBottom = inner.scrollTop + inner.clientHeight >= inner.scrollHeight - 1 && e.deltaY > 0;
