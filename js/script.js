@@ -7220,6 +7220,7 @@ function openExampleNotice(){
   if (!el || !npTrack || !npArtist || !npArt || !npProg) return;
   let lastTrackId = null;
   async function poll(){
+    console.error('[NowPlaying] poll iniciou');
     try {
       const token = await spotifyUserToken();
       if (!token){ console.error('[NowPlaying] sem token'); el.hidden = true; return; }
@@ -7249,7 +7250,7 @@ function openExampleNotice(){
       } else {
         el.hidden = false;
       }
-    } catch(e){ el.hidden = true; }
+    } catch(e){ console.error('[NowPlaying] ERRO:', e); el.hidden = true; }
   }
   setTimeout(poll, 2000);
   setInterval(poll, 10000);
