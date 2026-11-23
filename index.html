@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=1.5.79">
+<link rel="stylesheet" href="css/style.css?v=1.5.114">
 <link rel="stylesheet" href="css/scrollfx.css?v=1.5.79">
 </head>
 <body data-fx="dashboard">
@@ -231,6 +231,81 @@
 <div class="tip" id="tip" role="tooltip"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<div id="npm-bg" hidden aria-modal="true" role="dialog" aria-labelledby="npm-track">
+  <div id="npm">
+    <div id="npm-hdr">
+      <span class="npm-label"><span class="np-dot"></span>seletor de faixa</span>
+      <button id="npm-close" type="button" aria-label="Fechar"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+    </div>
+    <div id="npm-cols">
+      <!-- LEFT: faixa tocando agora -->
+      <div id="npm-left">
+        <div id="npm-art-wrap"><div id="npm-art2"></div></div>
+        <div id="npm-info2">
+          <span id="npm-track" class="npm-track-nm"></span>
+          <span id="npm-artist2" class="npm-artist-nm"></span>
+          <span id="npm-album2" class="npm-album-nm"></span>
+        </div>
+        <div id="npm-prog-row">
+          <span id="npm-t-cur">0:00</span>
+          <div id="npm-pbar"><div id="npm-pfill"></div></div>
+          <span id="npm-t-tot">0:00</span>
+        </div>
+        <div id="npm-ctrl">
+          <button id="npm-prev2" type="button" title="Anterior"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+          <button id="npm-bk15" type="button" title="-15 segundos"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8zm-1.1 11h-.85v-3.26l-1.01.31v-.69l1.77-.63h.09V16zm4.28-1.41c0 .32-.03.6-.1.82s-.17.42-.29.57-.28.26-.45.33-.37.1-.59.1-.41-.03-.59-.1-.33-.18-.46-.33-.23-.34-.3-.57-.11-.5-.11-.82v-.74c0-.32.03-.6.1-.82s.17-.42.29-.57.28-.26.45-.33.37-.1.59-.1.41.03.59.1.33.18.46.33.23.34.3.57.11.5.11.82v.74zm-.85-.86c0-.19-.01-.35-.04-.48s-.07-.23-.12-.31-.11-.14-.19-.17-.16-.05-.25-.05-.18.02-.25.05-.14.09-.19.17-.09.18-.12.31-.04.29-.04.48v.97c0 .19.01.35.04.48s.07.24.12.32.11.14.19.17.16.05.25.05.18-.02.25-.05.14-.09.19-.17.09-.19.12-.32.04-.29.04-.48v-.97z"/></svg></button>
+          <button id="npm-pp2" type="button" title="Pausar / Reproduzir"><svg id="npm-pp2-icon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg></button>
+          <button id="npm-fw15" type="button" title="+15 segundos"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12.01 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8zm-1.1 11h-.85v-3.26l-1.01.31v-.69l1.77-.63h.09V16zm4.28-1.41c0 .32-.03.6-.1.82s-.17.42-.29.57-.28.26-.45.33-.37.1-.59.1-.41-.03-.59-.1-.33-.18-.46-.33-.23-.34-.3-.57-.11-.5-.11-.82v-.74c0-.32.03-.6.1-.82s.17-.42.29-.57.28-.26.45-.33.37-.1.59-.1.41.03.59.1.33.18.46.33.23.34.3.57.11.5.11.82v.74zm-.85-.86c0-.19-.01-.35-.04-.48s-.07-.23-.12-.31-.11-.14-.19-.17-.16-.05-.25-.05-.18.02-.25.05-.14.09-.19.17-.09.18-.12.31-.04.29-.04.48v.97c0 .19.01.35.04.48s.07.24.12.32.11.14.19.17.16.05.25.05.18-.02.25-.05.14-.09.19-.17.09-.19.12-.32.04-.29.04-.48v-.97z"/></svg></button>
+          <button id="npm-next2" type="button" title="Próxima"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14 5.09 2.14L8 14.14V9.86zM16 6h2v12h-2z"/></svg></button>
+        </div>
+        <div id="npm-acts">
+          <button id="npm-save-fav" type="button" title="Salvar no catálogo"><svg id="npm-sf-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg><span id="npm-sf-label">Salvar</span></button>
+          <button id="npm-copy-nm" type="button" title="Copiar nome da música"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg><span>Copiar</span></button>
+          <button id="npm-copy-lk" type="button" title="Copiar link do Spotify"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg><span>Link</span></button>
+          <a id="npm-open-sp" href="#" target="_blank" rel="noopener noreferrer" title="Abrir no Spotify" role="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg><span>Spotify</span></a>
+        </div>
+        <div id="npm-cat"></div>
+        <div id="npm-q">
+          <div class="npm-sec-ttl">Próximas na fila</div>
+          <div id="npm-q-list"><span class="npm-q-loading">Carregando…</span></div>
+        </div>
+      </div>
+      <!-- RIGHT: navegador do catálogo -->
+      <div id="npm-right">
+        <div id="npm-browse-hdr">
+          <div id="npm-search-wrap">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input id="npm-search-inp" type="search" placeholder="Buscar faixa, artista ou álbum…" autocomplete="off" spellcheck="false">
+          </div>
+          <div id="npm-filter-row">
+            <select id="npm-filt-artist" title="Filtrar por artista"><option value="">Todos os artistas</option></select>
+            <select id="npm-filt-genre" title="Filtrar por gênero"><option value="">Todos os gêneros</option></select>
+            <button id="npm-browse-clear" hidden type="button">Limpar ×</button>
+            <span id="npm-browse-count"></span>
+          </div>
+        </div>
+        <div id="npm-browse-scroll">
+          <table id="npm-browse-table">
+            <thead>
+              <tr id="npm-browse-cols-hdr">
+                <th class="npm-col-n npm-col-sort" data-sort="n" data-dir="1" title="Ordenar por posição"># <span class="sort-arr">↑</span></th>
+                <th class="npm-col-art npm-col-sort" data-sort="cor" data-dir="1" title="Ordenar pela cor da capa"><button class="npm-col-menu-btn" data-sort-menu="cor" title="Mudar tipo de ordenação">▾</button>Álbum <span class="sort-arr">↑</span></th>
+                <th class="npm-col-nm npm-col-sort" data-sort="title" data-dir="1" title="Ordenar por título">Música <span class="sort-arr">↑</span></th>
+                <th class="npm-col-ar npm-col-sort" data-sort="artist" data-dir="1" title="Ordenar por artista"><button class="npm-col-menu-btn" data-sort-menu="artist" title="Mudar tipo de ordenação">▾</button>Artista <span class="sort-arr">↑</span></th>
+                <th class="npm-col-yr npm-col-sort" data-sort="year" data-dir="-1" title="Ordenar por ano"><button class="npm-col-menu-btn" data-sort-menu="year" title="Mudar tipo de ordenação">▾</button>Ano <span class="sort-arr">↑</span></th>
+                <th class="npm-col-dur npm-col-sort" data-sort="sec" data-dir="-1" title="Ordenar por duração">Dur <span class="sort-arr">↑</span></th>
+              </tr>
+            </thead>
+            <tbody id="npm-browse-list"></tbody>
+          </table>
+        </div>
+        <div id="npm-row-menu" hidden></div>
+        <div id="npm-sort-mode-pop" hidden></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="now-playing" hidden>
   <span id="np-label"><span class="np-dot"></span>ouvindo agora</span>
   <div id="np-top">
@@ -247,7 +322,7 @@
   </div>
   <div id="np-bar"><div id="np-prog"></div></div>
 </div>
-<script src="js/script.js?v=1.5.112"></script>
+<script src="js/script.js?v=1.5.114"></script>
 <script src="js/tags.js?v=1.5.79"></script>
 <script src="js/cartoes.js?v=1.5.79"></script>
 <script src="js/saude.js?v=1.5.79"></script>

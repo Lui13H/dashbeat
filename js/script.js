@@ -7222,6 +7222,41 @@ function openExampleNotice(){
   const npPPIcon = document.getElementById('np-pp-icon');
   const npNext = document.getElementById('np-next');
   if (!el || !npTrack || !npArtist || !npArt || !npProg) return;
+
+  /* modal refs */
+  const npmBg = document.getElementById('npm-bg');
+  const npmArt2 = document.getElementById('npm-art2');
+  const npmTrackEl = document.getElementById('npm-track');
+  const npmArtist2 = document.getElementById('npm-artist2');
+  const npmAlbum2 = document.getElementById('npm-album2');
+  const npmTCur = document.getElementById('npm-t-cur');
+  const npmTTot = document.getElementById('npm-t-tot');
+  const npmPBar = document.getElementById('npm-pbar');
+  const npmPFill = document.getElementById('npm-pfill');
+  const npmPrev2 = document.getElementById('npm-prev2');
+  const npmBk15 = document.getElementById('npm-bk15');
+  const npmPP2 = document.getElementById('npm-pp2');
+  const npmPP2Icon = document.getElementById('npm-pp2-icon');
+  const npmFw15 = document.getElementById('npm-fw15');
+  const npmNext2 = document.getElementById('npm-next2');
+  const npmSaveFav = document.getElementById('npm-save-fav');
+  const npmSfIcon = document.getElementById('npm-sf-icon');
+  const npmSfLabel = document.getElementById('npm-sf-label');
+  const npmSearchInp = document.getElementById('npm-search-inp');
+  const npmSortBtns = document.querySelectorAll('.npm-col-sort');
+  const npmFiltArtist = document.getElementById('npm-filt-artist');
+  const npmFiltGenre = document.getElementById('npm-filt-genre');
+  const npmBrowseList = document.getElementById('npm-browse-list');
+  const npmBrowseCount = document.getElementById('npm-browse-count');
+  const npmBrowseClear = document.getElementById('npm-browse-clear');
+  const npmRowMenu = document.getElementById('npm-row-menu');
+  const npmCopyNm = document.getElementById('npm-copy-nm');
+  const npmCopyLk = document.getElementById('npm-copy-lk');
+  const npmOpenSp = document.getElementById('npm-open-sp');
+  const npmCat = document.getElementById('npm-cat');
+  const npmQList = document.getElementById('npm-q-list');
+  const npmClose = document.getElementById('npm-close');
+
   const PLAY_PATH = 'M8 5v14l11-7z';
   const PAUSE_PATH = 'M6 19h4V5H6zm8-14v14h4V5z';
   let isPlaying = false;
@@ -7230,15 +7265,30 @@ function openExampleNotice(){
   let skipTimes = [];
   let ctrlLocked = false;
   let lastProgressMs = 0, lastProgressTs = 0, lastDurationMs = 0, lastVolumePercent = 50;
+  let lastTrackData = null;
+  let npmIsOpen = false;
+  let npmLiked = false;
+  let npmRafId = null;
+  let npmSortKey = 'n', npmSortDir = 1, npmSearchQ = '', npmFilterArtist = '';
+  let npmAlbumMode = 'count', npmArtistMode = 'alpha', npmYearMode = 'year';
+  const npmExpandedGroups = new Set(), npmExpandedSubgroups = new Set();
+  const npmHueCache = {}; // key: "artist|album" → hue 0-359 or null
   const SKIP_LIMIT = 5, SKIP_WINDOW = 20000, COOLDOWN = 6000;
-  function setPlaying(v){ isPlaying = v; if (npPPIcon) npPPIcon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH); }
+
+  function fmtMs(ms){ return fmtDur(Math.floor(ms / 1000)); }
+
+  function setPlaying(v){
+    isPlaying = v;
+    if (npPPIcon) npPPIcon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH);
+    if (npmPP2Icon) npmPP2Icon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH);
+  }
   function lockControls(){
     ctrlLocked = true;
-    [npPrev, npPP, npNext].forEach(b => { if (b){ b.disabled = true; b.style.opacity = '.35'; } });
+    [npPrev, npPP, npNext, npmPrev2, npmPP2, npmNext2].forEach(b => { if (b){ b.disabled = true; b.style.opacity = '.35'; } });
     toast('Muitos skips seguidos! Aguarde alguns segundos para não sobrecarregar a API do Spotify.');
     setTimeout(() => {
       ctrlLocked = false; skipTimes = [];
-      [npPrev, npPP, npNext].forEach(b => { if (b){ b.disabled = false; b.style.opacity = ''; } });
+      [npPrev, npPP, npNext, npmPrev2, npmPP2, npmNext2].forEach(b => { if (b){ b.disabled = false; b.style.opacity = ''; } });
     }, COOLDOWN);
   }
   function checkSkipRate(){
@@ -7252,21 +7302,38 @@ function openExampleNotice(){
     try { const token = await spotifyUserToken(); if (!token) return; await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {method, headers:{Authorization:`Bearer ${token}`}}); } catch(e){}
   }
   function currentProgressMs(){ return isPlaying ? Math.min(lastProgressMs + (Date.now() - lastProgressTs), lastDurationMs) : lastProgressMs; }
+
   let seekTimer = null, seekTargetPos = null;
+  function _applySeekBars(pos){
+    if (!lastDurationMs) return;
+    const pct = (pos / lastDurationMs * 100) + '%';
+    npProg.style.transition = 'none';
+    npProg.style.width = pct;
+    if (npmPFill){ npmPFill.style.width = pct; }
+    if (npmTCur) npmTCur.textContent = fmtMs(pos);
+  }
+  async function _execSeek(){
+    const pos = seekTargetPos; seekTargetPos = null;
+    try {
+      const token = await spotifyUserToken(); if (!token) return;
+      await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${pos}`, {method:'PUT', headers:{Authorization:`Bearer ${token}`}});
+      lastProgressMs = pos; lastProgressTs = Date.now();
+      requestAnimationFrame(() => { npProg.style.transition = ''; });
+    } catch(e){}
+  }
   function spSeek(deltaMs){
     seekTargetPos = Math.round(Math.max(0, Math.min((seekTargetPos ?? currentProgressMs()) + deltaMs, lastDurationMs)));
-    if (lastDurationMs > 0){ npProg.style.transition='none'; npProg.style.width=(seekTargetPos/lastDurationMs*100)+'%'; }
+    _applySeekBars(seekTargetPos);
     clearTimeout(seekTimer);
-    seekTimer = setTimeout(async () => {
-      const pos = seekTargetPos; seekTargetPos = null;
-      try {
-        const token = await spotifyUserToken(); if (!token) return;
-        await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${pos}`, {method:'PUT', headers:{Authorization:`Bearer ${token}`}});
-        lastProgressMs = pos; lastProgressTs = Date.now();
-        requestAnimationFrame(() => { npProg.style.transition = ''; });
-      } catch(e){}
-    }, 300);
+    seekTimer = setTimeout(_execSeek, 300);
   }
+  function spSeekTo(posMs){
+    seekTargetPos = Math.round(Math.max(0, Math.min(posMs, lastDurationMs)));
+    _applySeekBars(seekTargetPos);
+    clearTimeout(seekTimer);
+    seekTimer = setTimeout(_execSeek, 300);
+  }
+
   let volTimer = null, pendingVol = null;
   function spVolume(delta){
     pendingVol = Math.max(0, Math.min((pendingVol ?? lastVolumePercent) + delta, 100));
@@ -7280,14 +7347,707 @@ function openExampleNotice(){
       } catch(e){}
     }, 300);
   }
-  if (npPrev) npPrev.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'previous'); });
-  if (npNext) npNext.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'next'); });
-  if (npPP) npPP.addEventListener('click', async () => {
+
+  /* ---- mini widget controls ---- */
+  if (npPrev) npPrev.addEventListener('click', e => { e.stopPropagation(); if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'previous'); });
+  if (npNext) npNext.addEventListener('click', e => { e.stopPropagation(); if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'next'); });
+  if (npPP) npPP.addEventListener('click', async e => {
+    e.stopPropagation();
     if (ctrlLocked) return;
     await spCtrl('PUT', isPlaying ? 'pause' : 'play');
     setPlaying(!isPlaying);
     setTimeout(poll, 1000);
   });
+  el.addEventListener('click', () => { if (lastTrackId) openNpModal(); });
+
+  /* ---- progress update RAF (modal) ---- */
+  function npmTickProgress(){
+    if (!npmIsOpen || !lastDurationMs) return;
+    const prog = currentProgressMs();
+    const pct = (prog / lastDurationMs * 100) + '%';
+    if (npmPFill) npmPFill.style.width = pct;
+    if (npmTCur) npmTCur.textContent = fmtMs(prog);
+    if (npmTTot) npmTTot.textContent = fmtMs(lastDurationMs);
+    npmRafId = requestAnimationFrame(npmTickProgress);
+  }
+
+  /* ---- progress bar click to seek ---- */
+  if (npmPBar) npmPBar.addEventListener('click', e => {
+    if (!lastDurationMs) return;
+    const rect = npmPBar.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    spSeekTo(Math.round(pct * lastDurationMs));
+  });
+
+  /* ---- modal controls ---- */
+  if (npmPrev2) npmPrev2.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'previous'); });
+  if (npmNext2) npmNext2.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'next'); });
+  if (npmBk15) npmBk15.addEventListener('click', () => spSeek(-15000));
+  if (npmFw15) npmFw15.addEventListener('click', () => spSeek(15000));
+  if (npmPP2) npmPP2.addEventListener('click', async () => {
+    if (ctrlLocked) return;
+    await spCtrl('PUT', isPlaying ? 'pause' : 'play');
+    setPlaying(!isPlaying);
+    setTimeout(poll, 1000);
+  });
+
+  /* ---- save / favorite button ---- */
+  function npmUpdateSaveFav(inCatalog, exactTrack){
+    if (!npmSaveFav) return;
+    if (!STORE){ npmSaveFav.hidden = true; return; }
+    npmSaveFav.hidden = false;
+    if (npmSaveFav._prevHandler){ npmSaveFav.removeEventListener('click', npmSaveFav._prevHandler); npmSaveFav._prevHandler = null; }
+    if (inCatalog && exactTrack){
+      const faved = typeof isFavT === 'function' ? isFavT(exactTrack) : false;
+      if (npmSfIcon) npmSfIcon.querySelector('path').setAttribute('d','M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z');
+      if (npmSfLabel) npmSfLabel.textContent = faved ? 'Favoritada' : 'Favoritar';
+      npmSaveFav.classList.toggle('npm-is-fav', faved);
+      npmSaveFav.setAttribute('title', faved ? 'Remover dos favoritos' : 'Adicionar aos favoritos');
+      const handler = () => {
+        if (typeof toggleTrackFav === 'function') toggleTrackFav(exactTrack);
+        const nowFaved = typeof isFavT === 'function' ? isFavT(exactTrack) : false;
+        npmSaveFav.classList.toggle('npm-is-fav', nowFaved);
+        npmSaveFav.setAttribute('title', nowFaved ? 'Remover dos favoritos' : 'Adicionar aos favoritos');
+        if (npmSfLabel) npmSfLabel.textContent = nowFaved ? 'Favoritada' : 'Favoritar';
+        toast(nowFaved ? 'Adicionado aos favoritos ❤' : 'Removido dos favoritos');
+      };
+      npmSaveFav._prevHandler = handler;
+      npmSaveFav.addEventListener('click', handler);
+    } else {
+      if (npmSfIcon) npmSfIcon.querySelector('path').setAttribute('d','M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z');
+      if (npmSfLabel) npmSfLabel.textContent = 'Salvar';
+      npmSaveFav.classList.remove('npm-is-fav');
+      npmSaveFav.setAttribute('title', 'Salvar no catálogo');
+      const handler = () => {
+        if (!lastTrackData) return;
+        const track = lastTrackData;
+        const artist = track.artists.map(a => a.name).join(', ');
+        const sec = Math.round((track.duration_ms || 0) / 1000);
+        const year = track.album && track.album.release_date ? track.album.release_date.slice(0, 4) : '';
+        const newRow = [null, track.name, artist, track.album ? track.album.name : '', sec, year];
+        try { commitRows([...RAW0, newRow], true); toast('Faixa salva no catálogo!'); closeNpModal(); }
+        catch(e){ toast('Não foi possível salvar'); }
+      };
+      npmSaveFav._prevHandler = handler;
+      npmSaveFav.addEventListener('click', handler);
+    }
+  }
+
+  /* ---- fuzzy search helpers ---- */
+  function npmEditDist(a, b, maxD){
+    if (Math.abs(a.length - b.length) > maxD) return maxD + 1;
+    let row = Array.from({length: b.length + 1}, (_, i) => i);
+    for (let i = 1; i <= a.length; i++){
+      let prev = i, minRow = prev;
+      for (let j = 1; j <= b.length; j++){
+        const cur = a[i-1] === b[j-1] ? row[j-1] : 1 + Math.min(row[j-1], row[j], prev);
+        row[j-1] = prev; prev = cur; minRow = Math.min(minRow, cur);
+      }
+      row[b.length] = prev;
+      if (minRow > maxD) return maxD + 1;
+    }
+    return row[b.length];
+  }
+  function npmFuzzyMatch(q, text){
+    if (!q) return true;
+    if (text.includes(q)) return true;
+    const qWords = q.split(/\s+/);
+    const tWords = text.split(/[\s\-·,.()/]+/).filter(Boolean);
+    for (const qw of qWords){
+      if (qw.length < 4){ if (!text.includes(qw)) return false; continue; }
+      const maxD = qw.length <= 5 ? 1 : qw.length <= 8 ? 2 : 3;
+      let found = false;
+      for (const tw of tWords){
+        if (npmEditDist(qw, tw, maxD) <= maxD){ found = true; break; }
+      }
+      if (!found) return false;
+    }
+    return true;
+  }
+
+  /* ---- catalog browser ---- */
+  function npmBuildBrowseList(){
+    if (!npmBrowseList) return;
+    const q = npmSearchQ.toLowerCase();
+    let rows = T.filter(t => {
+      if (npmFilterArtist && !t.bands.some(b => b.toLowerCase() === npmFilterArtist.toLowerCase())) return false;
+      if (q){
+        const haystack = [t.title, t.bands.join(' '), t.album||''].join(' ').toLowerCase();
+        if (!npmFuzzyMatch(q, haystack)) return false;
+      }
+      return true;
+    });
+    // pré-calcula hue único por álbum para garantir que faixas do mesmo álbum ficam coladas
+    const _albumHueMap = {};
+    if (npmSortKey === 'cor'){
+      for (const k of Object.keys(npmHueCache)){
+        const hue = npmHueCache[k];
+        if (hue === null || hue === undefined) continue;
+        const alb = k.includes('|') ? k.slice(k.indexOf('|') + 1).toLowerCase() : k.toLowerCase();
+        if (_albumHueMap[alb] === undefined) _albumHueMap[alb] = hue;
+      }
+    }
+    const _artistCountMap = {}, _yearCountMap = {}, _albumCountMap = {};
+    T.forEach(t => {
+      const a = (t.bands[0]||'').toLowerCase();
+      _artistCountMap[a] = (_artistCountMap[a]||0) + 1;
+      const y = t.date ? t.date.slice(0,4) : '—';
+      _yearCountMap[y] = (_yearCountMap[y]||0) + 1;
+      const alb = (t.album||'').toLowerCase();
+      _albumCountMap[alb] = (_albumCountMap[alb]||0) + 1;
+    });
+    rows = rows.slice().sort((a, b) => {
+      let va, vb;
+      if (npmSortKey === 'n'){ va = a.n; vb = b.n; }
+      else if (npmSortKey === 'title'){ va = a.title.toLowerCase(); vb = b.title.toLowerCase(); }
+      else if (npmSortKey === 'artist'){
+        if (npmArtistMode === 'count'){
+          const ca = _artistCountMap[(a.bands[0]||'').toLowerCase()]||0;
+          const cb = _artistCountMap[(b.bands[0]||'').toLowerCase()]||0;
+          if (ca !== cb) return (cb - ca) * npmSortDir;
+          const ar1 = (a.bands[0]||'').toLowerCase(), ar2 = (b.bands[0]||'').toLowerCase();
+          if (ar1 !== ar2) return ar1 < ar2 ? -1 : 1;
+          const al1 = (a.album||'').toLowerCase(), al2 = (b.album||'').toLowerCase();
+          if (al1 !== al2) return al1 < al2 ? -1 : 1;
+          return ((a.m&&a.m.tn)||9999) - ((b.m&&b.m.tn)||9999) || a.n - b.n;
+        } else { va = (a.bands[0]||'').toLowerCase(); vb = (b.bands[0]||'').toLowerCase(); }
+      }
+      else if (npmSortKey === 'year'){
+        if (npmYearMode === 'count'){
+          const ya = a.date ? a.date.slice(0,4) : '—', yb = b.date ? b.date.slice(0,4) : '—';
+          const ca = _yearCountMap[ya]||0, cb = _yearCountMap[yb]||0;
+          if (ca !== cb) return (cb - ca) * npmSortDir;
+          if (ya !== yb) return ya < yb ? -npmSortDir : npmSortDir;
+          const al1 = (a.album||'').toLowerCase(), al2 = (b.album||'').toLowerCase();
+          if (al1 !== al2) return al1 < al2 ? -1 : 1;
+          return ((a.m&&a.m.tn)||9999) - ((b.m&&b.m.tn)||9999) || a.n - b.n;
+        } else { va = a.date || ''; vb = b.date || ''; }
+      }
+      else if (npmSortKey === 'sec'){ va = a.sec; vb = b.sec; }
+      else if (npmSortKey === 'cor' && npmAlbumMode === 'alpha'){
+        const al1 = (a.album||'').toLowerCase(), al2 = (b.album||'').toLowerCase();
+        if (al1 !== al2){ va = al1; vb = al2; }
+        else return ((a.m&&a.m.tn)||9999) - ((b.m&&b.m.tn)||9999) || a.n - b.n;
+      }
+      else if (npmSortKey === 'cor' && npmAlbumMode === 'count'){
+        const ca = _albumCountMap[(a.album||'').toLowerCase()]||0;
+        const cb = _albumCountMap[(b.album||'').toLowerCase()]||0;
+        if (ca !== cb) return (cb - ca) * npmSortDir;
+        const al1 = (a.album||'').toLowerCase(), al2 = (b.album||'').toLowerCase();
+        if (al1 !== al2) return al1 < al2 ? -1 : 1;
+        return ((a.m&&a.m.tn)||9999) - ((b.m&&b.m.tn)||9999) || a.n - b.n;
+      }
+      else if (npmSortKey === 'cor'){
+        // hue por álbum já pré-calculado antes do sort (ver abaixo)
+        const ha = _albumHueMap[(a.album||'').toLowerCase()];
+        const hb = _albumHueMap[(b.album||'').toLowerCase()];
+        const hasA = ha !== null && ha !== undefined;
+        const hasB = hb !== null && hb !== undefined;
+        if (!hasA && !hasB){ va = (a.album||'').toLowerCase(); vb = (b.album||'').toLowerCase(); }
+        else if (!hasA) return npmSortDir;
+        else if (!hasB) return -npmSortDir;
+        else if (ha !== hb){ va = ha; vb = hb; }
+        else {
+          // mesmo hue (álbuns diferentes com cor igual): mantém álbuns juntos por nome
+          const sameAlbum = (a.album||'') === (b.album||'');
+          if (!sameAlbum){ va = (a.album||'').toLowerCase(); vb = (b.album||'').toLowerCase(); }
+          else {
+            const ta = (a.m && a.m.tn) || 9999, tb = (b.m && b.m.tn) || 9999;
+            return ta !== tb ? ta - tb : a.n - b.n;
+          }
+        }
+      }
+      else { va = a.n; vb = b.n; }
+      if (va < vb) return -npmSortDir;
+      if (va > vb) return npmSortDir;
+      return 0;
+    });
+    if (npmBrowseCount) npmBrowseCount.textContent = rows.length < T.length ? `${rows.length} de ${T.length}` : T.length;
+    const hasFilter = !!(npmSearchQ || npmFilterArtist || (npmFiltGenre && npmFiltGenre.value));
+    if (npmBrowseClear) npmBrowseClear.hidden = !hasFilter;
+    if (!rows.length){ npmBrowseList.innerHTML = '<tr><td colspan="6" class="npm-browse-empty">Nenhuma faixa encontrada</td></tr>'; return; }
+
+    function npmMakeTrow(t, ri, hidden, sgId){
+      const playing = lastTrackData && t.m && t.m.id && t.m.id === lastTrackId;
+      const artist = t.bands[0]||''; const year = t.date ? t.date.slice(0,4) : '—';
+      const dur = typeof fmtDur==='function' ? fmtDur(t.sec) : '';
+      return `<tr class="npm-trow${playing?' npm-trow--playing':''}" data-ri="${ri}"${sgId?` data-sgid="${esc(sgId)}"`:''} ${hidden?' hidden':''}>
+        <td class="npm-trow-n">${t.n}</td>
+        <td class="npm-trow-art"><div class="npm-trow-art-bg" data-artist="${esc(artist)}" data-album="${esc(t.album||'')}"></div></td>
+        <td class="npm-col-nm"><div class="npm-trow-info"><span class="npm-trow-nm">${esc(t.title)}</span><span class="npm-trow-alb">${esc(t.album&&t.album!=='—'?t.album:'')}</span></div></td>
+        <td class="npm-trow-ar">${esc(artist)}</td>
+        <td class="npm-trow-yr">${year}</td>
+        <td class="npm-trow-dur">${dur}</td>
+      </tr>`;
+    }
+
+    const isGroupMode = ['artist','cor','year','sec'].includes(npmSortKey);
+    if (isGroupMode){
+      const getDurKey = s => s<180?'Curtas < 3min':s<300?'Normais 3–5min':s<480?'Longas 5–8min':'Épicas > 8min';
+      const getKey = t => npmSortKey==='artist'?(t.bands[0]||'—'):npmSortKey==='year'?(t.date?t.date.slice(0,4):'—'):npmSortKey==='sec'?getDurKey(t.sec||0):(t.album||'—');
+      const groups=[], groupMap=new Map();
+      for (const t of rows){ const k=getKey(t); if(!groupMap.has(k)){groupMap.set(k,[]);groups.push(k);} groupMap.get(k).push(t); }
+      const html=[];
+      groups.forEach(key => {
+        const tracks=groupMap.get(key), isOpen=npmExpandedGroups.has(key);
+        let artArtist=(tracks[0].bands[0]||'');
+        let artAlbum='', yearRange='', groupAr='', groupYr='';
+        const cnt=tracks.length, cntLbl=`${cnt}`;
+
+        if (npmSortKey==='artist'){
+          // build album map sorted by count desc
+          const albMap=new Map();
+          tracks.forEach(t=>{const a=t.album||'—';if(!albMap.has(a))albMap.set(a,[]);albMap.get(a).push(t);});
+          const albums=[...albMap.entries()].sort((a,b)=>b[1].length-a[1].length);
+          artAlbum=albums[0][0];
+          const years=tracks.map(t=>t.date?t.date.slice(0,4):'').filter(Boolean);
+          if(years.length){const mn=Math.min(...years),mx=Math.max(...years);yearRange=mn===mx?String(mn):`${mn}–${mx}`;}
+          html.push(`<tr class="npm-group-row${isOpen?' npm-group-open':''}" data-gkey="${esc(key)}">
+            <td class="npm-trow-n"><span class="npm-group-arr">▶</span></td>
+            <td class="npm-trow-art"><div class="npm-trow-art-bg" data-artist="${esc(artArtist)}" data-album="${esc(artAlbum)}"></div></td>
+            <td class="npm-col-nm"><div class="npm-trow-info"><span class="npm-group-label">${esc(key)}</span></div></td>
+            <td class="npm-trow-ar">${yearRange}</td>
+            <td class="npm-trow-yr"></td>
+            <td class="npm-trow-dur">${cntLbl}</td>
+          </tr>`);
+          const singleAlbum = albums.length===1;
+          albums.forEach(([albKey, albTracks])=>{
+            const sgId=key+'|'+albKey;
+            const isAlbOpen = isOpen && (singleAlbum || npmExpandedSubgroups.has(sgId));
+            const albAr = albTracks[0].bands[0]||'';
+            const albYr = albTracks[0].date?albTracks[0].date.slice(0,4):'';
+            if(!singleAlbum){
+              html.push(`<tr class="npm-subgroup-row${isAlbOpen?' npm-group-open':''}" data-gkey="${esc(key)}" data-sgid="${esc(sgId)}"${isOpen?'':' hidden'}>
+                <td class="npm-trow-n npm-subgroup-indent"><span class="npm-group-arr">▶</span></td>
+                <td class="npm-trow-art"><div class="npm-trow-art-bg" data-artist="${esc(albAr)}" data-album="${esc(albKey)}"></div></td>
+                <td class="npm-col-nm"><div class="npm-trow-info"><span class="npm-group-label">${esc(albKey)}</span></div></td>
+                <td class="npm-trow-ar">${esc(albAr)}</td>
+                <td class="npm-trow-yr">${albYr}</td>
+                <td class="npm-trow-dur">${albTracks.length}</td>
+              </tr>`);
+            }
+            albTracks.forEach(t=>html.push(npmMakeTrow(t,rows.indexOf(t),!isAlbOpen,sgId)));
+          });
+        } else {
+          if (npmSortKey==='cor'){
+            artAlbum=key; groupAr=esc(artArtist);
+            groupYr=tracks[0].date?tracks[0].date.slice(0,4):'';
+          }
+          if (npmSortKey==='year'){
+            const albMap=new Map();
+            tracks.forEach(t=>{const a=t.album||'—';if(!albMap.has(a))albMap.set(a,[]);albMap.get(a).push(t);});
+            const topAlb=[...albMap.entries()].sort((a,b)=>b[1].length-a[1].length)[0];
+            artAlbum=topAlb[0];
+            artArtist=topAlb[1][0].bands[0]||artArtist;
+          }
+          const hasPhoto=npmSortKey==='cor'||npmSortKey==='year';
+          const durSymMap={'Curtas < 3min':'▂','Normais 3–5min':'▄','Longas 5–8min':'▆','Épicas > 8min':'█'};
+          const artEl=hasPhoto
+            ?`<div class="npm-trow-art-bg" data-artist="${esc(artArtist)}" data-album="${esc(artAlbum)}"></div>`
+            :npmSortKey==='sec'&&durSymMap[key]
+              ?`<div class="npm-dur-symbol">${durSymMap[key]}</div>`
+              :'';
+          const tdAr=npmSortKey==='cor'?groupAr:''; const tdYr=npmSortKey==='cor'?(groupYr||''):'';
+          html.push(`<tr class="npm-group-row${isOpen?' npm-group-open':''}" data-gkey="${esc(key)}">
+            <td class="npm-trow-n"><span class="npm-group-arr">▶</span></td>
+            <td class="npm-trow-art">${artEl}</td>
+            <td class="npm-col-nm"><div class="npm-trow-info"><span class="npm-group-label">${esc(key)}</span></div></td>
+            <td class="npm-trow-ar">${tdAr}</td>
+            <td class="npm-trow-yr">${tdYr}</td>
+            <td class="npm-trow-dur">${cntLbl}</td>
+          </tr>`);
+          tracks.forEach(t=>html.push(npmMakeTrow(t,rows.indexOf(t),!isOpen)));
+        }
+      });
+      npmBrowseList.innerHTML = html.join('');
+
+      // artist group toggle → show/hide sub-groups (or tracks if single album)
+      npmBrowseList.querySelectorAll('.npm-group-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const key=row.dataset.gkey, isOpen=row.classList.toggle('npm-group-open');
+          if(isOpen) npmExpandedGroups.add(key); else npmExpandedGroups.delete(key);
+          if(npmSortKey==='artist'){
+            npmBrowseList.querySelectorAll(`.npm-subgroup-row[data-gkey="${CSS.escape(key)}"]`).forEach(tr=>{tr.hidden=!isOpen;});
+            // tracks of single-album artists
+            npmBrowseList.querySelectorAll(`.npm-trow[data-sgid]`).forEach(tr=>{
+              const sgId=tr.dataset.sgid||''; if(!sgId.startsWith(key+'|')) return;
+              const subRow=npmBrowseList.querySelector(`.npm-subgroup-row[data-sgid="${CSS.escape(sgId)}"]`);
+              if(!subRow) tr.hidden=!isOpen; // single album — no sub-row
+            });
+          } else {
+            npmBrowseList.querySelectorAll('.npm-trow[data-ri]').forEach(tr=>{
+              const ri=parseInt(tr.dataset.ri); const t=rows[ri]; if(!t||getKey(t)!==key) return;
+              tr.hidden=!isOpen;
+            });
+          }
+        });
+      });
+
+      // album sub-group toggle → show/hide tracks
+      npmBrowseList.querySelectorAll('.npm-subgroup-row').forEach(row=>{
+        row.addEventListener('click', e=>{
+          e.stopPropagation();
+          const sgId=row.dataset.sgid, isOpen=row.classList.toggle('npm-group-open');
+          if(isOpen) npmExpandedSubgroups.add(sgId); else npmExpandedSubgroups.delete(sgId);
+          npmBrowseList.querySelectorAll(`.npm-trow[data-sgid="${CSS.escape(sgId)}"]`).forEach(tr=>{tr.hidden=!isOpen;});
+        });
+      });
+
+      npmBrowseList.querySelectorAll('.npm-trow').forEach(el => {
+        el.addEventListener('click', e => { e.stopPropagation(); npmShowRowMenu(e, rows[parseInt(el.dataset.ri)]); });
+      });
+    } else {
+      npmBrowseList.innerHTML = rows.map((t,i) => npmMakeTrow(t,i,false)).join('');
+      npmBrowseList.querySelectorAll('.npm-trow').forEach((el,i) => {
+        el.addEventListener('click', e => npmShowRowMenu(e, rows[i]));
+      });
+    }
+    if (typeof getCover === 'function'){
+      npmBrowseList.querySelectorAll('.npm-trow-art-bg').forEach(el => {
+        const artist = el.dataset.artist, album = el.dataset.album;
+        if (!artist || !album) return;
+        getCover(artist, album, url => {
+          if (!url) return;
+          el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
+          const hk = artist + '|' + album;
+          if (npmHueCache[hk] !== undefined) return;
+          npmHueCache[hk] = null;
+          const img = new Image(); img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            try {
+              const c = document.createElement('canvas'); c.width = c.height = 16;
+              c.getContext('2d').drawImage(img, 0, 0, 16, 16);
+              const d = c.getContext('2d').getImageData(0, 0, 16, 16).data;
+              const hist = new Float32Array(360);
+              for (let i = 0; i < d.length; i += 4){
+                const [r,g,b,a] = [d[i],d[i+1],d[i+2],d[i+3]]; if (a < 128) continue;
+                const max = Math.max(r,g,b), min = Math.min(r,g,b), df = max - min;
+                if (df < 20 || max < 30) continue;
+                const sat = df / max; if (sat < 0.2) continue;
+                let h;
+                if (max===r) h=((g-b)/df%6)*60;
+                else if (max===g) h=((b-r)/df+2)*60;
+                else h=((r-g)/df+4)*60;
+                h=((h%360)+360)%360;
+                hist[Math.round(h)%360] += sat;
+              }
+              let best = -1, bestV = 0;
+              for (let i = 0; i < 360; i++){
+                const v = hist[(i+359)%360] + hist[i]*2 + hist[(i+1)%360];
+                if (v > bestV){ bestV = v; best = i; }
+              }
+              npmHueCache[hk] = best >= 0 ? best : null;
+            } catch(e){}
+          };
+          img.src = url;
+        });
+      });
+    }
+  }
+
+  async function npmPlayTrack(id){
+    try {
+      const token = await spotifyUserToken(); if (!token) return;
+      await fetch('https://api.spotify.com/v1/me/player/play', {method:'PUT', headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}, body:JSON.stringify({uris:[`spotify:track:${id}`]})});
+      toast('Tocando…');
+      setTimeout(poll, 1500);
+    } catch(e){ toast('Não foi possível tocar'); }
+  }
+
+  async function npmQueueTrack(id){
+    try {
+      const token = await spotifyUserToken(); if (!token) return;
+      await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent('spotify:track:' + id)}`, {method:'POST', headers:{Authorization:`Bearer ${token}`}});
+      toast('Adicionada à fila!');
+    } catch(e){ toast('Não foi possível adicionar à fila'); }
+  }
+
+  function npmHideRowMenu(){ if (npmRowMenu) npmRowMenu.hidden = true; }
+
+  function npmShowRowMenu(e, t){
+    e.stopPropagation();
+    if (!npmRowMenu) return;
+    const hasId = !!(t.m && t.m.id);
+    const icon = {
+      play: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+      queue: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9V9h4V5h2v4h4v2z"/></svg>',
+      filter: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>',
+      copy: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>'
+    };
+    const artist = t.bands[0] || '';
+    const items = [];
+    if (hasId) items.push(`<button class="npm-rmenu-btn" data-action="play">${icon.play} Tocar agora</button>`);
+    if (hasId) items.push(`<button class="npm-rmenu-btn" data-action="queue">${icon.queue} Adicionar à fila</button>`);
+    if (hasId) items.push(`<div class="npm-rmenu-sep"></div>`);
+    items.push(`<button class="npm-rmenu-btn" data-action="copy-name">${icon.copy} Copiar nome</button>`);
+    if (artist) items.push(`<button class="npm-rmenu-btn" data-action="filter-artist">${icon.filter} Ver só ${esc(artist)}</button>`);
+    npmRowMenu.innerHTML = items.join('');
+    npmRowMenu.hidden = false;
+
+    // position near click, keep inside viewport
+    const W = window.innerWidth, H = window.innerHeight;
+    const mw = 180, mh = npmRowMenu.offsetHeight || 160;
+    const x = Math.min(e.clientX, W - mw - 8);
+    const y = e.clientY + mh > H - 8 ? e.clientY - mh : e.clientY + 4;
+    npmRowMenu.style.left = x + 'px';
+    npmRowMenu.style.top = y + 'px';
+
+    npmRowMenu.querySelectorAll('.npm-rmenu-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        npmHideRowMenu();
+        const act = btn.dataset.action;
+        if (act === 'play') npmPlayTrack(t.m.id);
+        else if (act === 'queue') npmQueueTrack(t.m.id);
+        else if (act === 'copy-name'){
+          const txt = `${t.title} — ${t.bands.join(', ')}`;
+          navigator.clipboard && navigator.clipboard.writeText(txt).then(() => toast('Nome copiado!')).catch(() => toast('Não foi possível copiar'));
+        } else if (act === 'filter-artist'){
+          npmFilterArtist = artist;
+          if (npmFiltArtist) npmFiltArtist.value = artist;
+          npmBuildBrowseList();
+        }
+      });
+    });
+  }
+
+  document.addEventListener('click', e => {
+    if (npmRowMenu && !npmRowMenu.hidden && !npmRowMenu.contains(e.target)) npmHideRowMenu();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && npmRowMenu && !npmRowMenu.hidden){ npmHideRowMenu(); } });
+
+  function npmUpdateSortUI(){
+    npmSortBtns.forEach(b => {
+      const active = b.dataset.sort === npmSortKey;
+      b.classList.toggle('npm-sort-active', active);
+      b.classList.toggle('npm-sort-desc', active && npmSortDir === -1);
+    });
+    const tbl = document.getElementById('npm-browse-table');
+    if (tbl) tbl.classList.toggle('npm-sort-sec', npmSortKey === 'sec');
+  }
+  const npmSortModePop = document.getElementById('npm-sort-mode-pop');
+  const npmSortModesCfg = {
+    cor:    { title: 'Ordenação — Álbum',   get: ()=>npmAlbumMode,  set: v=>{npmAlbumMode=v;},  opts: [{ key:'cor',   lbl:'Por cor da capa'},{ key:'alpha', lbl:'Alfabética'},{ key:'count', lbl:'Por quantidade'}] },
+    artist: { title: 'Ordenação — Artista', get: ()=>npmArtistMode, set: v=>{npmArtistMode=v;}, opts: [{ key:'alpha', lbl:'Alfabética'},     { key:'count', lbl:'Por quantidade'}] },
+    year:   { title: 'Ordenação — Ano',     get: ()=>npmYearMode,   set: v=>{npmYearMode=v;},   opts: [{ key:'year',  lbl:'Cronológica'},     { key:'count', lbl:'Por quantidade'}] }
+  };
+  function npmShowSortModePop(e, sortKey){
+    const cfg = npmSortModesCfg[sortKey];
+    if (!cfg || !npmSortModePop) return;
+    npmSortModePop.innerHTML =
+      `<div class="npm-smp-title">${cfg.title}</div>` +
+      cfg.opts.map(o => `<button class="npm-smp-btn${cfg.get()===o.key?' npm-smp-active':''}" data-mode="${o.key}"><span class="npm-smp-dot"></span>${o.lbl}</button>`).join('');
+    npmSortModePop.hidden = false;
+    const pw = npmSortModePop.offsetWidth, ph = npmSortModePop.offsetHeight;
+    npmSortModePop.style.left = Math.min(e.clientX, innerWidth - pw - 8) + 'px';
+    npmSortModePop.style.top  = Math.min(e.clientY + 8, innerHeight - ph - 8) + 'px';
+    npmSortModePop.querySelectorAll('.npm-smp-btn').forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        cfg.set(btn.dataset.mode);
+        npmSortModePop.hidden = true;
+        npmBuildBrowseList();
+      });
+    });
+  }
+  npmSortBtns.forEach(btn => {
+    btn.addEventListener('mousemove', e => {
+      const rect = btn.getBoundingClientRect();
+      const left = e.clientX < rect.left + rect.width / 2;
+      btn.classList.toggle('npm-hover-left', left);
+      btn.classList.toggle('npm-hover-right', !left);
+    });
+    btn.addEventListener('mouseleave', () => {
+      btn.classList.remove('npm-hover-left', 'npm-hover-right');
+    });
+    btn.addEventListener('click', e => {
+      const rect = btn.getBoundingClientRect();
+      const isLeftHalf = e.clientX < rect.left + rect.width / 2;
+      if (isLeftHalf && npmSortModesCfg[btn.dataset.sort]) {
+        e.stopPropagation();
+        npmShowSortModePop(e, btn.dataset.sort);
+        return;
+      }
+      if (btn.dataset.sort === npmSortKey){
+        npmSortDir *= -1;
+      } else {
+        npmSortKey = btn.dataset.sort;
+        npmSortDir = parseInt(btn.dataset.dir) || 1;
+      }
+      npmUpdateSortUI();
+      npmBuildBrowseList();
+    });
+  });
+  document.querySelectorAll('.npm-col-menu-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); npmShowSortModePop(e, btn.dataset.sortMenu); });
+  });
+  document.addEventListener('click', e => {
+    if (npmSortModePop && !npmSortModePop.hidden && !npmSortModePop.contains(e.target)) npmSortModePop.hidden = true;
+  });
+  document.addEventListener('keydown', e => { if (e.key==='Escape' && npmSortModePop && !npmSortModePop.hidden) npmSortModePop.hidden = true; });
+  if (npmBrowseClear) npmBrowseClear.addEventListener('click', () => {
+    npmSearchQ = ''; npmFilterArtist = '';
+    if (npmSearchInp) npmSearchInp.value = '';
+    if (npmFiltArtist) npmFiltArtist.value = '';
+    if (npmFiltGenre) npmFiltGenre.value = '';
+    npmBuildBrowseList();
+  });
+  if (npmSearchInp) npmSearchInp.addEventListener('input', () => { npmSearchQ = npmSearchInp.value.trim(); npmBuildBrowseList(); });
+  if (npmFiltArtist) npmFiltArtist.addEventListener('change', () => { npmFilterArtist = npmFiltArtist.value; npmBuildBrowseList(); npmFiltArtist.blur(); });
+  if (npmFiltGenre) npmFiltGenre.addEventListener('change', () => { npmBuildBrowseList(); npmFiltGenre.blur(); });
+
+  /* ---- copy / open ---- */
+  if (npmCopyNm) npmCopyNm.addEventListener('click', () => {
+    const txt = lastTrackData ? `${lastTrackData.name} — ${lastTrackData.artists.map(a=>a.name).join(', ')}` : npTrack.textContent;
+    navigator.clipboard && navigator.clipboard.writeText(txt).then(() => toast('Nome copiado!')).catch(() => toast('Não foi possível copiar'));
+  });
+  if (npmCopyLk) npmCopyLk.addEventListener('click', () => {
+    const url = lastTrackData && lastTrackData.external_urls && lastTrackData.external_urls.spotify;
+    if (!url){ toast('Link não disponível'); return; }
+    navigator.clipboard && navigator.clipboard.writeText(url).then(() => toast('Link copiado!')).catch(() => toast('Não foi possível copiar'));
+  });
+
+  /* ---- queue fetch ---- */
+  async function npmFetchQueue(){
+    if (!npmQList) return;
+    npmQList.innerHTML = '<span class="npm-q-loading">Carregando…</span>';
+    try {
+      const token = await spotifyUserToken(); if (!token){ npmQList.innerHTML = '<span class="npm-q-empty">Sem autenticação</span>'; return; }
+      const r = await fetch('https://api.spotify.com/v1/me/player/queue', {headers:{Authorization:`Bearer ${token}`}});
+      if (!r.ok){ npmQList.innerHTML = '<span class="npm-q-empty">Fila indisponível</span>'; return; }
+      const d = await r.json();
+      const next5 = (d.queue || []).slice(0, 5);
+      if (!next5.length){ npmQList.innerHTML = '<span class="npm-q-empty">Fila vazia</span>'; return; }
+      npmQList.innerHTML = next5.map((t, i) => {
+        const img = t.album && t.album.images && t.album.images.length ? t.album.images[t.album.images.length - 1].url : '';
+        const artists = t.artists.map(a => a.name).join(', ');
+        return `<div class="npm-q-item">
+          <span class="npm-q-num">${i + 1}</span>
+          <div class="npm-q-art"${img ? ` style="background-image:url('${img}')"` : ''}></div>
+          <div class="npm-q-info">
+            <span class="npm-q-track">${esc(t.name)}</span>
+            <span class="npm-q-artist">${esc(artists)}</span>
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e){ npmQList.innerHTML = '<span class="npm-q-empty">Erro ao carregar fila</span>'; }
+  }
+
+  /* ---- catalog section ---- */
+  function npmCleanTitle(name){
+    if (!name) return name;
+    return name
+      .replace(/\s*\([^)]*(?:remaster|deluxe|edition|box\s*set|bonus|single\s+version|radio\s+edit|anniversary|expanded|special)[^)]*\)/gi, '')
+      .replace(/\s*[-–—]\s*(?:remaster|deluxe|edition|bonus|single\s+version|radio\s+edit|anniversary|expanded|special).*/gi, '')
+      .trim();
+  }
+
+  function npmUpdateCatalog(track){
+    if (!npmCat || !track) return;
+    const artistName = track.artists[0].name;
+    const artistLower = artistName.toLowerCase();
+    const artistTracks = T.filter(t => t.bands.some(b => b.toLowerCase() === artistLower));
+    const cleanedName = npmCleanTitle(track.name || '').toLowerCase();
+    const exactTrack =
+      (track.id ? T.find(t => t.m && t.m.id && t.m.id === track.id) : null) ||
+      T.find(t =>
+        t.bands.some(b => b.toLowerCase() === artistLower) &&
+        npmCleanTitle(t.title).toLowerCase() === cleanedName
+      );
+    const displayArtist = artistTracks.length > 0
+      ? (artistTracks[0].bands.find(b => b.toLowerCase() === artistLower) || artistName)
+      : artistName;
+    const nTracks = artistTracks.length;
+    const inCatalog = !!exactTrack;
+    const hasArtist = nTracks > 0;
+
+    let html = `<div class="npm-cat-ttl">No catálogo</div><div class="npm-cat-row">`;
+    if (inCatalog){
+      html += `<div class="npm-cat-item npm-cat-yes"><svg class="npm-cat-ic" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg><span>Faixa #${exactTrack.n} do catálogo</span></div>`;
+    } else {
+      html += `<div class="npm-cat-item npm-cat-no"><svg class="npm-cat-ic" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg><span>Faixa fora do catálogo</span></div>`;
+    }
+    if (hasArtist){
+      html += `<div class="npm-cat-item"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="opacity:.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg><span>${nTracks} ${nTracks === 1 ? 'faixa' : 'faixas'} de ${esc(displayArtist)} no catálogo</span></div>`;
+      html += `<button class="npm-cat-filter-btn" data-artist="${esc(displayArtist)}">Filtrar por artista →</button>`;
+    } else {
+      html += `<div class="npm-cat-item npm-cat-no"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="opacity:.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span>${esc(displayArtist)} não está no catálogo</span></div>`;
+    }
+    html += `</div>`;
+    npmCat.innerHTML = html;
+
+    const filterBtn = npmCat.querySelector('.npm-cat-filter-btn');
+    if (filterBtn){
+      filterBtn.addEventListener('click', () => {
+        closeNpModal();
+        if (typeof showTab === 'function') showTab('painel');
+        if (typeof clearFilters === 'function') clearFilters();
+        if (typeof toggle === 'function') toggle('band', displayArtist);
+      });
+    }
+    if (exactTrack && npmAlbum2){
+      const catYear = exactTrack.date ? exactTrack.date.slice(0, 4) : '';
+      const catAlbum = exactTrack.album && exactTrack.album !== '—' ? exactTrack.album : (track.album ? npmCleanTitle(track.album.name) : '');
+      npmAlbum2.textContent = catAlbum + (catYear ? ' · ' + catYear : '');
+    }
+    npmUpdateSaveFav(inCatalog, exactTrack || null);
+  }
+
+  /* ---- open / close modal ---- */
+  function openNpModal(){
+    if (!npmBg || !lastTrackData) return;
+    npmIsOpen = true;
+    /* populate from stored data */
+    const track = lastTrackData;
+    if (npmArt2) npmArt2.style.backgroundImage = npArt.style.backgroundImage;
+    if (npmTrackEl) npmTrackEl.textContent = npmCleanTitle(track.name);
+    if (npmArtist2) npmArtist2.textContent = track.artists.map(a => a.name).join(', ');
+    const year = track.album && track.album.release_date ? track.album.release_date.slice(0, 4) : '';
+    if (npmAlbum2) npmAlbum2.textContent = (track.album ? npmCleanTitle(track.album.name) : '') + (year ? ' · ' + year : '');
+    if (npmOpenSp) npmOpenSp.href = track.external_urls && track.external_urls.spotify ? track.external_urls.spotify : '#';
+    npmUpdateCatalog(track);
+    if (npmTTot) npmTTot.textContent = fmtMs(lastDurationMs);
+    /* populate artist filter (once) */
+    if (npmFiltArtist && npmFiltArtist.options.length <= 1){
+      const names = typeof ALL_BANDS !== 'undefined' ? ALL_BANDS : [...new Set(T.flatMap(t => t.bands))].sort((a,b) => a.localeCompare(b));
+      names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; npmFiltArtist.appendChild(o); });
+    }
+    /* show */
+    npmBg.hidden = false;
+    requestAnimationFrame(() => npmBg.classList.add('npm-on'));
+    document.body.style.overflow = 'hidden';
+    /* async + browse */
+    npmFetchQueue();
+    npmBuildBrowseList();
+    /* start RAF loop */
+    if (npmRafId) cancelAnimationFrame(npmRafId);
+    npmTickProgress();
+  }
+  function closeNpModal(){
+    if (!npmBg) return;
+    npmIsOpen = false;
+    npmBg.classList.remove('npm-on');
+    if (npmRafId){ cancelAnimationFrame(npmRafId); npmRafId = null; }
+    document.body.style.overflow = '';
+    setTimeout(() => { if (!npmIsOpen) npmBg.hidden = true; }, 300);
+  }
+  if (npmClose) npmClose.addEventListener('click', closeNpModal);
+  if (npmBg) npmBg.addEventListener('click', e => { if (e.target === npmBg) closeNpModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && npmIsOpen){ e.stopPropagation(); closeNpModal(); } }, true);
+  document.addEventListener('keydown', e => {
+    if (!npmIsOpen || e.key !== 'Backspace') return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    const hasFilter = npmSearchQ || npmFilterArtist || (npmFiltGenre && npmFiltGenre.value);
+    if (!hasFilter) return;
+    e.preventDefault();
+    npmSearchQ = ''; npmFilterArtist = '';
+    if (npmSearchInp) npmSearchInp.value = '';
+    if (npmFiltArtist) npmFiltArtist.value = '';
+    if (npmFiltGenre) npmFiltGenre.value = '';
+    npmBuildBrowseList();
+  });
+
+  /* ---- poll ---- */
   async function poll(){
     try {
       const token = await spotifyUserToken();
@@ -7301,6 +8061,7 @@ function openExampleNotice(){
       lastProgressTs = Date.now();
       const track = d.item;
       lastDurationMs = track.duration_ms;
+      lastTrackData = track;
       if (d.device) lastVolumePercent = d.device.volume_percent ?? lastVolumePercent;
       npTrack.textContent = track.name;
       npArtist.textContent = track.artists.map(a => a.name).join(', ');
@@ -7320,6 +8081,8 @@ function openExampleNotice(){
         el.classList.add('np-fade');
         el.hidden = false;
         requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
+        /* update modal if open */
+        if (npmIsOpen){ openNpModal(); }
       } else {
         npProg.style.width = pct;
         el.hidden = false;
@@ -7327,6 +8090,7 @@ function openExampleNotice(){
       npReposition();
     } catch(e){ el.hidden = true; }
   }
+
   const NP_GAP = 8;
   let npLastWidth = '';
   const npFooter = document.querySelector('footer');

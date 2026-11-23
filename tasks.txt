@@ -307,3 +307,5 @@ na playlist (lista embutida no JS, sem API). Ex: "Anos 90: 7 de 15 clássicos �
 Rust in Peace, Scenes from a Memory...". Exige curadoria manual da lista de referência.
 
 footer do site mais transparente
+
+diminuir a altura do card 5 perfil e diminuir para apenas 3 musicas e artistas nos negocios que mostram 4
