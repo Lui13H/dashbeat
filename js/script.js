@@ -7319,7 +7319,7 @@ function openExampleNotice(){
     if (npWrap){
       const sideGap = window.innerWidth - npWrap.getBoundingClientRect().right;
       const innerPad = parseFloat(getComputedStyle(npWrap).paddingRight) || 0;
-      el.style.width = Math.max(sideGap + innerPad - 20, 160) + 'px';
+      el.style.width = Math.max(sideGap + innerPad - 8, 160) + 'px';
     }
   }
   window.addEventListener('scroll', npReposition, {passive: true});
