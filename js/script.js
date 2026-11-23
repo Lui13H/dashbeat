@@ -7309,17 +7309,18 @@ function openExampleNotice(){
   }
   const npFooter = document.querySelector('footer');
   const npWrap = document.querySelector('.wrap');
+  const NP_GAP = 8;
   function npReposition(){
     if (el.hidden) return;
     if (npFooter){
       const fTop = npFooter.getBoundingClientRect().top;
-      const gap = window.innerHeight - fTop;
-      el.style.bottom = gap > 0 ? (gap + 6) + 'px' : '';
+      const overlap = window.innerHeight - fTop;
+      el.style.bottom = overlap > 0 ? (overlap + NP_GAP) + 'px' : '';
     }
     if (npWrap){
       const sideGap = window.innerWidth - npWrap.getBoundingClientRect().right;
       const innerPad = parseFloat(getComputedStyle(npWrap).paddingRight) || 0;
-      el.style.width = Math.max(sideGap + innerPad - 8, 160) + 'px';
+      el.style.width = Math.max(sideGap + innerPad - 2 * NP_GAP, 160) + 'px';
     }
   }
   window.addEventListener('scroll', npReposition, {passive: true});
