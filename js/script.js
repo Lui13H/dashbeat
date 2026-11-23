@@ -7303,10 +7303,12 @@ function openExampleNotice(){
       const overlap = window.innerHeight - fTop;
       el.style.bottom = overlap > 0 ? (overlap + NP_GAP) + 'px' : '';
     }
-    const npGrid = document.querySelector('#painel .grid') || npWrap;
+    const npGrid = document.querySelector('#painel .grid');
     if (npGrid){
       const available = window.innerWidth - npGrid.getBoundingClientRect().right - 2 * NP_GAP;
       el.style.width = available > 80 ? available + 'px' : '';
+    } else {
+      el.style.width = '';
     }
   }
   window.addEventListener('scroll', npReposition, {passive: true});
