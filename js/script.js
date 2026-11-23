@@ -1869,9 +1869,11 @@ $("#alb-mode").addEventListener("click", e => {
   albMode = b.dataset.m; try { localStorage.setItem(ALB_KEY, albMode); } catch (err) {}
   cardRender("albums");
 });
+const _decSyncTitle = () => { const t = $("#dec-title"); if (t) t.textContent = decTab === "decades" ? "Artistas por década" : "Artistas por época"; };
 $("#dec-mode").addEventListener("click", e => {
   const b = e.target.closest("button[data-m]"); if (!b || b.dataset.m === decTab) return;
-  decTab = b.dataset.m; decDrillKey = null; decDrillBand = null; decDrillTab = null; decDrillAlbum = null; cardRender("decades");
+  decTab = b.dataset.m; decDrillKey = null; decDrillBand = null; decDrillTab = null; decDrillAlbum = null;
+  _decSyncTitle(); cardRender("decades");
 });
 function rankTip(b){
   const base = rows(false, true);
@@ -1923,9 +1925,11 @@ function renderDecades(){
   const allR = rows(false, true, true, true, false, true);
   const box = $("#decades"); if (!box) return;
   if (!allR.length){ box.innerHTML = '<p class="none">Sem dados</p>'; return; }
+  if (allR.length < 3 && state.upTo != null){ box.innerHTML = '<p class="none">…</p>'; return; }
   const isDecades = decTab === 'decades';
   const nParts = (IS.journey && CHI && CHI.length) ? CHI.length : (NN < 50 ? 3 : NN < 200 ? 4 : NN < 500 ? 5 : 6);
   const byGroup = new Map();
+  const grpTrackN = new Map();
   if (isDecades){
     for (const r of allR){
       if (!r.year || r.year === NI) continue;
@@ -1933,16 +1937,19 @@ function renderDecades(){
       if (!byGroup.has(dec)) byGroup.set(dec, new Map());
       const m = byGroup.get(dec);
       for (const b of bandsOfRow(r)) m.set(b, (m.get(b) || 0) + 1);
+      grpTrackN.set(dec, (grpTrackN.get(dec) || 0) + 1);
     }
   } else {
     const sorted = [...allR].sort((a, b) => a.n - b.n);
-    sorted.forEach((r, i) => {
-      const part = Math.floor(i * nParts / sorted.length) + 1;
+    sorted.forEach(r => {
+      const part = Math.min(nParts, Math.floor((r.n - 1) * nParts / NN) + 1);
       if (!byGroup.has(part)) byGroup.set(part, new Map());
       const m = byGroup.get(part);
       for (const b of bandsOfRow(r)) m.set(b, (m.get(b) || 0) + 1);
+      grpTrackN.set(part, (grpTrackN.get(part) || 0) + 1);
     });
   }
+  const grpTotal = [...grpTrackN.values()].reduce((s, v) => s + v, 0);
   const groupKeys = isDecades
     ? [...byGroup.keys()].sort((a, b) => a - b)
     : Array.from({length: nParts}, (_, i) => i + 1);
@@ -1951,7 +1958,7 @@ function renderDecades(){
   const sortedR = !isDecades ? allR.slice().sort((a, b) => +a.order - +b.order) : null;
   const blockYears = k => isDecades
     ? ALL_YEARS.filter(y => y !== NI && Math.floor(+y / 10) * 10 === k)
-    : [...new Set(sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === k).map(r => r.year).filter(y => y !== NI))];
+    : [...new Set(sortedR.filter(r => Math.min(nParts, Math.floor((r.n - 1) * nParts / NN) + 1) === k).map(r => r.year).filter(y => y !== NI))];
   const blockLabel = k => isDecades
     ? (k < 1000 ? `${k}s` : `${String(k).slice(-2)}s`)
     : (CHI && CHI[k - 1] ? CHI[k - 1].name : `É${k}`);
@@ -2085,7 +2092,7 @@ function renderDecades(){
       const nm = decDrillBand;
       const blockTracks = isDecades
         ? allR.filter(r => Math.floor(+r.year / 10) * 10 === k && hasBand(r, nm))
-        : sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === k && hasBand(r, nm));
+        : sortedR.filter(r => Math.min(nParts, Math.floor((r.n - 1) * nParts / NN) + 1) === k && hasBand(r, nm));
       const albumCounts = new Map();
       for (const r of blockTracks) if (r.album && r.album !== NI && r.ty !== "single" && r.ty !== "compilation" && !/\s*-\s*(single|ep)$/i.test(r.album)) albumCounts.set(r.album, (albumCounts.get(r.album) || 0) + 1);
       const albYearMap = new Map();
@@ -2168,7 +2175,10 @@ function renderDecades(){
   groupKeys.forEach(k => {
     const isOn = activeDec === k;
     const chapName = !isDecades && CHI && CHI[k - 1] ? CHI[k - 1].name : null;
-    cells.push(`<button class="dec-label${isOn ? ' dec-on' : ''}" type="button" data-dec="${k}"${chapName ? ` title="${esc(chapName)}"` : ''}>${blockLabel(k)}</button>`);
+    const cnt = grpTrackN.get(k) || 0;
+    const pct = grpTotal > 0 ? Math.round(cnt / grpTotal * 100) : 0;
+    const stat = isDecades && cnt > 0 ? `<span class="dec-lbl-stat">${cnt} · ${pct}%</span>` : '';
+    cells.push(`<button class="dec-label${isOn ? ' dec-on' : ''}" type="button" data-dec="${k}"${chapName ? ` title="${esc(chapName)}"` : ''}>${blockLabel(k)}${stat}</button>`);
   });
   for (let ri = 0; ri < nRows; ri++) {
     const idx1 = usePairs ? ri * 2 : ri;
@@ -2195,7 +2205,7 @@ function renderDecades(){
     const nm = el.dataset.nm, k = +el.dataset.grp;
     const groupTracks = isDecades
       ? allR.filter(r => Math.floor(+r.year / 10) * 10 === k && hasBand(r, nm))
-      : sortedR.filter((r, i) => Math.floor(i * nParts / sortedR.length) + 1 === k && hasBand(r, nm));
+      : sortedR.filter(r => Math.min(nParts, Math.floor((r.n - 1) * nParts / NN) + 1) === k && hasBand(r, nm));
     const topAlb = topAlbumOf(groupTracks);
     if (!topAlb) return;
     getCover(nm, topAlb, url => { if (url && el) el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`; });
@@ -2390,6 +2400,98 @@ document.querySelector("#genres")?.addEventListener("click", e => {
     toggle("genre", subRow.dataset.genre);
   }
 });
+/* ---- DNA Musical: radar de 6 dimensões, dividido por metade das épocas ---- */
+function _dnaDims(R){
+  const N = R.length;
+  if (!N) return [0, 0, null, null, 0, 0];
+  const artCounts = new Map();
+  for (const t of R) artCounts.set(t.bands[0], (artCounts.get(t.bands[0]) || 0) + 1);
+  let hhi = 0;
+  for (const c of artCounts.values()) hhi += (c / N) ** 2;
+  const nArt = artCounts.size;
+  const hhiMin = nArt > 1 ? 1 / nArt : 1;
+  const conc = nArt > 1 ? Math.max(0, Math.min(1, (hhi - hhiMin) / (1 - hhiMin))) : 1;
+  const decSet = new Set(R.filter(t => t.year && t.year !== NI && +t.year > 1900).map(t => Math.floor(+t.year / 10) * 10));
+  const deci = Math.min(1, Math.max(0, (decSet.size - 1) / 5));
+  const withEx = R.filter(t => t.ex !== null && t.ex !== undefined);
+  const expliVal = withEx.length ? withEx.filter(t => t.ex).length / withEx.length : null;
+  const withTy = R.filter(t => t.ty);
+  const albVal = withTy.length ? withTy.filter(t => t.ty === 'album').length / withTy.length : null;
+  const withSec = R.filter(t => t.sec > 0);
+  const epicVal = withSec.length ? Math.min(1, (withSec.reduce((s, t) => s + t.sec, 0) / withSec.length) / 480) : 0;
+  const W = Math.max(10, Math.round(N * 0.15));
+  const topArts = [...artCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).filter(([, c]) => c >= 3);
+  let burst = 0;
+  if (topArts.length){
+    let sum = 0;
+    for (const [art] of topArts){
+      const pos = R.filter(t => t.bands[0] === art).map(t => t.n).sort((a, b) => a - b);
+      let best = 1, j = 0;
+      for (let i = 0; i < pos.length; i++){ while (pos[i] - pos[j] > W) j++; best = Math.max(best, i - j + 1); }
+      sum += best / pos.length;
+    }
+    burst = Math.min(1, sum / topArts.length);
+  }
+  return [conc, deci, expliVal, albVal, epicVal, burst];
+}
+function _dnaDecLabel(d){ return d >= 2000 ? String(d) : String(d % 100); }
+function _dnaDecName(decSet){
+  const s = [...decSet].sort((a, b) => a - b);
+  return s.length === 1 ? `Anos ${_dnaDecLabel(s[0])}` : `Anos ${_dnaDecLabel(s[0])}–${_dnaDecLabel(s[s.length - 1])}`;
+}
+function _dnaSvg(R, h, hChart, title){
+  const vals = _dnaDims(R);
+  const labels = ['Foco', 'Épocas', 'Explícita', 'Álbuns', 'Duração', 'Fases'];
+  const SVG_N = 6, CX = 115, CY = 104, RADIUS = 56;
+  const ang = i => -Math.PI / 2 + (2 * Math.PI / SVG_N) * i;
+  const pt  = (v, i) => { const a = ang(i); return [CX + v * RADIUS * Math.cos(a), CY + v * RADIUS * Math.sin(a)]; };
+  let rings = '';
+  for (const r of [0.25, 0.5, 0.75, 1]){
+    const pts = Array.from({length: SVG_N}, (_, i) => pt(r, i)).map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+    rings += `<polygon points="${pts}" fill="${r === 1 ? `hsla(${h},55%,67%,.06)` : 'none'}" stroke="hsla(${h},60%,67%,${r === 1 ? .2 : .09})" stroke-width="${r === 1 ? 1.5 : 1}"/>`;
+  }
+  const axes = Array.from({length: SVG_N}, (_, i) => { const [x, y] = pt(1, i); return `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="hsla(${h},60%,67%,.12)" stroke-width="1"/>`; }).join('');
+  const fillPts = vals.map((v, i) => pt(v === null ? 0 : v, i));
+  const fill = `<polygon points="${fillPts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}" fill="hsla(${hChart},78%,38%,.30)" stroke="hsl(${hChart},72%,55%)" stroke-width="2" stroke-linejoin="round"/>`;
+  const dots = fillPts.map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${vals[i] === null ? `hsla(${h},14%,50%,1)` : `hsl(${hChart},62%,66%)`}" stroke="hsla(${hChart},50%,22%,1)" stroke-width="1.5"/>`).join('');
+  const LOFF = 20;
+  const lbls = vals.map((v, i) => {
+    const a = ang(i);
+    const lx = CX + (RADIUS + LOFF) * Math.cos(a), ly = CY + (RADIUS + LOFF) * Math.sin(a);
+    const anch = Math.abs(Math.cos(a)) < 0.2 ? 'middle' : (Math.cos(a) > 0 ? 'start' : 'end');
+    const pct = v === null ? '—' : Math.round(v * 100) + '%';
+    const vc = v === null ? `hsla(${h},14%,50%,1)` : `hsl(${hChart},62%,66%)`;
+    return `<text x="${lx.toFixed(1)}" y="${(ly - 4).toFixed(1)}" text-anchor="${anch}" font-size="9" fill="hsla(${h},18%,72%,1)" font-family="Manrope,sans-serif" font-weight="600">${labels[i]}</text><text x="${lx.toFixed(1)}" y="${(ly + 7).toFixed(1)}" text-anchor="${anch}" font-size="9" fill="${vc}" font-family="Manrope,sans-serif" font-weight="700">${pct}</text>`;
+  }).join('');
+  return `<div class="dna-panel"><div class="dna-title" style="color:hsl(${hChart},65%,68%)">${esc(title)}</div><svg viewBox="0 0 230 208" xmlns="http://www.w3.org/2000/svg" class="dna-svg" role="img" aria-label="DNA – ${esc(title)}">${rings}${axes}${fill}${dots}${lbls}</svg></div>`;
+}
+function renderDNA(){
+  const R = rows(false, false, false, true, false, false);
+  const el = $('#dna-wrap'); if (!el) return;
+  const h = +(getComputedStyle(document.documentElement).getPropertyValue('--h').trim()) || 153;
+  const cardEl = document.getElementById('card-dna');
+  if (!R.length){ el.innerHTML = ''; if (cardEl) cardEl.classList.remove('dna-single'); return; }
+  if (!CHI || CHI.length < 2 || R.length < 25){
+    if (cardEl) cardEl.classList.add('dna-single');
+    el.innerHTML = _dnaSvg(R, h, h, 'Toda a playlist');
+    return;
+  }
+  if (cardEl) cardEl.classList.remove('dna-single');
+  // 2 grupos: primeira metade e segunda metade das épocas
+  const half = Math.ceil(CHI.length / 2);
+  const groups = [CHI.slice(0, half), CHI.slice(half)];
+  const spread = 28;
+  const panels = groups.map((chapGroup, idx) => {
+    const hc = ((h + (idx === 0 ? -spread / 2 : spread / 2)) % 360 + 360) % 360;
+    const firstN = chapGroup[0].seg[0].n;
+    const lastSeg = chapGroup[chapGroup.length - 1].seg;
+    const lastN = lastSeg[lastSeg.length - 1].n;
+    const subset = R.filter(t => t.n >= firstN && t.n <= lastN);
+    const name = idx === 0 ? '1ª metade' : '2ª metade';
+    return _dnaSvg(subset, h, hc, name);
+  });
+  el.innerHTML = `<div class="dna-halves">${panels.join('<div class="dna-sep"></div>')}</div>`;
+}
 function profStack(title, big, segs, total){
   const on = segs.filter(s => s[0] > 0);
   return `<div class="pf"><div class="pf-h"><span>${title}</span><b>${big}</b></div>
@@ -2419,7 +2521,7 @@ function renderProfile(R){
                      `${pct(dur.epic, dTotal, 0)} são épicas`;
     html += profStack("Duração das faixas", domLabel,
       [[dur.short, "hsl(calc(var(--h) - 54),62%,62%)", "Curtas < 3min"], [dur.normal, "hsl(calc(var(--h) - 54),65%,50%)", "Normais 3–5min"], [dur.long, "hsl(calc(var(--h) - 54),68%,38%)", "Longas 5–8min"], [dur.epic, "hsl(calc(var(--h) - 54),70%,28%)", "Épicas > 8min"]], dTotal);
-    const longest = [...withSec].sort((a, b) => b.sec - a.sec).slice(0, 3);
+    const longest = [...withSec].sort((a, b) => b.sec - a.sec).slice(0, 4);
     if (longest.length) html += `<div class="pf"><div class="pf-h"><span>Músicas mais longas</span><b>Duração</b></div>
       ${longest.map(t => `<div class="hrow"><div class="hl"><span>${esc(t.title)} <em>${esc(t.artist)}</em></span><b>${durTxt(t.sec)}</b></div><div class="ht"><i style="width:${Math.max(2, t.sec / longest[0].sec * 100)}%;background:linear-gradient(90deg,hsl(calc(var(--h) - 27),65%,38%),hsl(calc(var(--h) - 27),60%,62%))"></i></div></div>`).join("")}</div>`;
   }
@@ -2532,7 +2634,7 @@ function render(){
   $("#empty").classList.toggle("on", empty);
   if (empty){ hideTip(); return; }
   renderKPIs(R);
-  for (const k of ["wave", "years", "tree", "albums", "rank", "genres", "decades", "profile"]) cardRender(k);   // cada card com o seu tempo (animação por card)
+  for (const k of ["wave", "years", "tree", "albums", "rank", "genres", "dna", "decades", "profile"]) cardRender(k);   // cada card com o seu tempo (animação por card)
   // o gráfico de evolução compara bandas/gêneros entre si: com banda, álbum ou gênero filtrado ele não faz sentido, então some (a máquina do tempo não esconde)
   const evoOff = state.bands.size + state.albums.size + state.genres.size + state.years.size > 0;
   $("#evo-card").style.display = evoOff ? "none" : "";
@@ -2574,7 +2676,7 @@ function tmSync(){
 const CARD_DEF = {
   wave: () => { const R = rows(); renderHeroTotal(R); renderWave(R); },
   years: () => renderYears(rows(true, true, true, true, false)), tree: () => renderTree(), albums: () => renderAlbums(), rank: () => renderRank(),
-  genres: () => renderGenres(), decades: () => renderDecades(), profile: () => renderProfile(rows()), evo: () => renderEvolution(rows()), disc: () => renderDisc()
+  genres: () => renderGenres(), dna: () => renderDNA(), decades: () => renderDecades(), profile: () => renderProfile(rows()), evo: () => renderEvolution(rows()), disc: () => renderDisc()
 };
 const CARDS = {};
 for (const k in CARD_DEF) CARDS[k] = {name: k, playing: false, n: null, raf: 0, t0: 0, pos: 1, last: 0, uis: []};   // uis: conjuntos de botões (no card e, no gráfico de quadrados, também na tela cheia)
@@ -2700,12 +2802,12 @@ function cardStart(name, from){
 function cardToolsHost(host){
   if (host.classList.contains("wave-cap")) return host;
   const own = host.querySelector(".tree-tools"); if (own) return own;
-  let tools = host.querySelector(":scope > .card-tools");
+  let tools = host.querySelector(".card-tools");
   if (!tools){ tools = document.createElement("div"); tools.className = "card-tools"; host.appendChild(tools); }
   return tools;
 }
 (function addClearButtons(){
-  for (const art of document.querySelectorAll("article.chart:not(#filtered-list-card):not(#evo-card)")){
+  for (const art of document.querySelectorAll("article.chart:not(#filtered-list-card):not(#evo-card):not(#card-dna)")){
     const h = art.querySelector(":scope > header"); if (!h) continue;
     const b = document.createElement("button");
     b.type = "button"; b.className = "gbtn clr-btn"; b.hidden = true; b.textContent = "Limpar filtros";
