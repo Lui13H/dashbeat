@@ -7308,11 +7308,18 @@ function openExampleNotice(){
     } catch(e){ el.hidden = true; }
   }
   const npFooter = document.querySelector('footer');
+  const npWrap = document.querySelector('.wrap');
   function npReposition(){
-    if (el.hidden || !npFooter) return;
-    const fTop = npFooter.getBoundingClientRect().top;
-    const gap = window.innerHeight - fTop;
-    el.style.bottom = gap > 0 ? (gap + 6) + 'px' : '';
+    if (el.hidden) return;
+    if (npFooter){
+      const fTop = npFooter.getBoundingClientRect().top;
+      const gap = window.innerHeight - fTop;
+      el.style.bottom = gap > 0 ? (gap + 6) + 'px' : '';
+    }
+    if (npWrap){
+      const sideGap = window.innerWidth - npWrap.getBoundingClientRect().right;
+      el.style.width = Math.max(sideGap - 20, 160) + 'px';
+    }
   }
   window.addEventListener('scroll', npReposition, {passive: true});
   window.addEventListener('resize', npReposition, {passive: true});
