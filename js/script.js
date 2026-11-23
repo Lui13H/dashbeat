@@ -7251,13 +7251,19 @@ function openExampleNotice(){
       npArtist.textContent = track.artists.map(a => a.name).join(', ');
       const imgs = track.album && track.album.images;
       if (imgs && imgs.length) npArt.style.backgroundImage = `url("${imgs[imgs.length - 1].url}")`;
-      npProg.style.width = (d.progress_ms / track.duration_ms * 100) + '%';
+      const pct = (d.progress_ms / track.duration_ms * 100) + '%';
       if (track.id !== lastTrackId){
         lastTrackId = track.id;
+        npProg.style.transition = 'none';
+        npProg.style.width = pct;
+        requestAnimationFrame(() => { npProg.style.transition = ''; });
         el.classList.add('np-fade');
         el.hidden = false;
         requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
-      } else { el.hidden = false; }
+      } else {
+        npProg.style.width = pct;
+        el.hidden = false;
+      }
     } catch(e){ el.hidden = true; }
   }
   setTimeout(poll, 2000);
