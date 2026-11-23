@@ -4957,8 +4957,8 @@ const ICON = {
   tag: '<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h6l6 6-6 6-6-6V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/><circle cx="5.5" cy="5.5" r="1" fill="currentColor"/></svg>',
   tools: '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" fill="none"><line x1="2" y1="4" x2="14" y2="4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="2" y1="12" x2="14" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="4" r="2" fill="currentColor"/><circle cx="10" cy="8" r="2" fill="currentColor"/><circle cx="6" cy="12" r="2" fill="currentColor"/></svg>'
 };
-const pad2 = n => String(n).padStart(2, "0");
-const durTxt = s => !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
+function pad2(n){ return String(n).padStart(2, "0"); }
+function durTxt(s){ return !s ? "" : `${Math.floor(s / 60)}:${pad2(s % 60)}`; }
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
 const currentRows = (useCorrected = false) => BY_PLAYLIST.map(t => { const alb = useCorrected ? (t.album === NI ? "" : t.album) : (t.albumRaw === NI ? "" : t.albumRaw); const r = [t.n, t.title, t.artistRaw, alb, t.sec, useCorrected ? t.date : t.dateRaw]; if (t.m){ const {p, ...rest} = t.m; r.push(rest); } return r; });
 
@@ -5236,9 +5236,15 @@ function spotifyChipHtml(profile){
 }
 function renderSpAccountBar(){
   const bar = $("#sp-account-bar");
+  const loginBtn = $("#sp-login-btn");
   if (!bar) return;
   const oauth = loadSpotifyOAuth();
-  if (!oauth || !oauth.profile){ bar.style.display = "none"; bar.innerHTML = ""; return; }
+  if (!oauth || !oauth.profile){
+    bar.style.display = "none"; bar.innerHTML = "";
+    if (loginBtn) loginBtn.style.display = "";
+    return;
+  }
+  if (loginBtn) loginBtn.style.display = "none";
   bar.innerHTML = spotifyChipHtml(oauth.profile);
   bar.style.display = "";
   const btn = bar.querySelector(".sp-logout-x");
@@ -5258,7 +5264,7 @@ async function spotifyLogin(clientId, pendingText, pendingMode){
   const challenge = await spotifyPkceChallenge(verifier);
   try { sessionStorage.setItem(SPOTIFY_PKCE_KEY, JSON.stringify({verifier, state, clientId})); } catch (e) {}
   try { sessionStorage.setItem(SPOTIFY_PENDING_KEY, JSON.stringify({text: pendingText || "", mode: pendingMode || "add"})); } catch (e) {}
-  const p = new URLSearchParams({client_id: clientId, response_type: "code", redirect_uri: spotifyRedirectUri(), code_challenge_method: "S256", code_challenge: challenge, scope: "playlist-read-private playlist-read-collaborative user-read-private", state});
+  const p = new URLSearchParams({client_id: clientId, response_type: "code", redirect_uri: spotifyRedirectUri(), code_challenge_method: "S256", code_challenge: challenge, scope: "playlist-read-private playlist-read-collaborative user-read-private user-read-currently-playing user-read-playback-state", state});
   location.href = "https://accounts.spotify.com/authorize?" + p.toString();
 }
 async function spotifyExchangeCode(code, verifier, clientId){
@@ -7124,6 +7130,12 @@ function boot(){
   placePill();
   render();
   renderSpAccountBar();
+  const _spLoginBtn = $("#sp-login-btn");
+  if (_spLoginBtn) _spLoginBtn.addEventListener("click", () => {
+    const creds = loadSpotifyCreds();
+    if (creds && creds.id) spotifyLogin(creds.id, "", "");
+    else openPlaylistAuthModal();
+  });
   queueAppleGenres();
   queueMBGenres();
   queueTADBGenres();
@@ -7198,3 +7210,47 @@ function openExampleNotice(){
   foot.querySelector("[data-mine]").onclick = () => { md.close(); openImport(); };
 }
 (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(boot).then(handleSpotifyRedirectAndResume);
+
+(function initNowPlaying(){
+  const el = document.getElementById('now-playing');
+  const npTrack = document.getElementById('np-track');
+  const npArtist = document.getElementById('np-artist');
+  const npArt = document.getElementById('np-art');
+  const npProg = document.getElementById('np-prog');
+  if (!el || !npTrack || !npArtist || !npArt || !npProg) return;
+  let lastTrackId = null;
+  async function poll(){
+    try {
+      const token = await spotifyUserToken();
+      if (!token){ console.warn('[NowPlaying] sem token'); el.hidden = true; return; }
+      const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {headers: {Authorization: `Bearer ${token}`}});
+      if (r.status === 204){ console.warn('[NowPlaying] 204 nada tocando'); el.hidden = true; return; }
+      if (!r.ok){ console.warn('[NowPlaying] API error', r.status, await r.text().catch(()=>'')); el.hidden = true; return; }
+      const d = await r.json();
+      console.log('[NowPlaying]', d && d.is_playing, d && d.item && d.item.name);
+      if (!d){ el.hidden = true; return; }
+      if (!d.is_playing){ el.hidden = true; return; }
+      if (!d.item){ el.hidden = true; return; }
+      const track = d.item;
+      npTrack.textContent = track.name;
+      npArtist.textContent = track.artists.map(a => a.name).join(', ');
+      const imgs = track.album && track.album.images;
+      if (imgs && imgs.length){
+        const img = imgs[imgs.length - 1];
+        npArt.style.backgroundImage = `url("${img.url}")`;
+      }
+      const pct = d.progress_ms / track.duration_ms * 100;
+      npProg.style.width = pct + '%';
+      if (track.id !== lastTrackId){
+        lastTrackId = track.id;
+        el.classList.add('np-fade');
+        el.hidden = false;
+        requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
+      } else {
+        el.hidden = false;
+      }
+    } catch(e){ el.hidden = true; }
+  }
+  setTimeout(poll, 2000);
+  setInterval(poll, 10000);
+})();
