@@ -7221,12 +7221,15 @@ function openExampleNotice(){
   const npPP = document.getElementById('np-playpause');
   const npPPIcon = document.getElementById('np-pp-icon');
   const npNext = document.getElementById('np-next');
+  const npLike = document.getElementById('np-like');
   if (!el || !npTrack || !npArtist || !npArt || !npProg) return;
   const PLAY_PATH = 'M8 5v14l11-7z';
   const PAUSE_PATH = 'M6 19h4V5H6zm8-14v14h4V5z';
   let isPlaying = false;
   let lastTrackId = null;
   let endTimer = null;
+  let currentSiteTrack = null;
+  function syncLike(){ if (npLike) npLike.classList.toggle('liked', !!(currentSiteTrack && isFavTrack(currentSiteTrack))); }
   let skipTimes = [];
   let ctrlLocked = false;
   const SKIP_LIMIT = 5, SKIP_WINDOW = 20000, COOLDOWN = 6000;
@@ -7258,6 +7261,12 @@ function openExampleNotice(){
     setPlaying(!isPlaying);
     setTimeout(poll, 1000);
   });
+  if (npLike) npLike.addEventListener('click', () => {
+    if (!currentSiteTrack) return;
+    toggleFavTrack(currentSiteTrack);
+    syncLike();
+    dispatchEvent(new Event('fx:refresh'));
+  });
   async function poll(){
     try {
       const token = await spotifyUserToken();
@@ -7280,6 +7289,11 @@ function openExampleNotice(){
       }
       if (track.id !== lastTrackId){
         lastTrackId = track.id;
+        currentSiteTrack = (typeof BY_PLAYLIST !== 'undefined' && BY_PLAYLIST)
+          ? BY_PLAYLIST.find(t => t.m && t.m.id === track.id) || null
+          : null;
+        if (npLike) npLike.style.display = currentSiteTrack ? '' : 'none';
+        syncLike();
         npProg.style.transition = 'none';
         npProg.style.width = pct;
         requestAnimationFrame(() => { npProg.style.transition = ''; });
