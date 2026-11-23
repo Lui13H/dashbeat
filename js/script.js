@@ -7312,7 +7312,7 @@ function openExampleNotice(){
     if (!npFooter || el.hidden) return;
     const fTop = npFooter.getBoundingClientRect().top;
     const gap = window.innerHeight - fTop;
-    el.style.bottom = gap > 0 ? (20 + gap + 8) + 'px' : '';
+    el.style.bottom = gap > 0 ? (gap + 6) + 'px' : '';
   }
   window.addEventListener('scroll', npReposition, {passive: true});
   window.addEventListener('resize', npReposition, {passive: true});
