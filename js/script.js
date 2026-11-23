@@ -5264,7 +5264,7 @@ async function spotifyLogin(clientId, pendingText, pendingMode){
   const challenge = await spotifyPkceChallenge(verifier);
   try { sessionStorage.setItem(SPOTIFY_PKCE_KEY, JSON.stringify({verifier, state, clientId})); } catch (e) {}
   try { sessionStorage.setItem(SPOTIFY_PENDING_KEY, JSON.stringify({text: pendingText || "", mode: pendingMode || "add"})); } catch (e) {}
-  const p = new URLSearchParams({client_id: clientId, response_type: "code", redirect_uri: spotifyRedirectUri(), code_challenge_method: "S256", code_challenge: challenge, scope: "playlist-read-private playlist-read-collaborative user-read-private user-read-currently-playing user-read-playback-state", state});
+  const p = new URLSearchParams({client_id: clientId, response_type: "code", redirect_uri: spotifyRedirectUri(), code_challenge_method: "S256", code_challenge: challenge, scope: "playlist-read-private playlist-read-collaborative user-read-private user-read-currently-playing user-read-playback-state user-modify-playback-state", state});
   location.href = "https://accounts.spotify.com/authorize?" + p.toString();
 }
 async function spotifyExchangeCode(code, verifier, clientId){
@@ -7217,41 +7217,49 @@ function openExampleNotice(){
   const npArtist = document.getElementById('np-artist');
   const npArt = document.getElementById('np-art');
   const npProg = document.getElementById('np-prog');
-  console.error('[NowPlaying] init', {el:!!el, npTrack:!!npTrack, npArtist:!!npArtist, npArt:!!npArt, npProg:!!npProg});
-  if (!el || !npTrack || !npArtist || !npArt || !npProg) { console.error('[NowPlaying] elemento(s) ausentes, abortando'); return; }
+  const npPrev = document.getElementById('np-prev');
+  const npPP = document.getElementById('np-playpause');
+  const npPPIcon = document.getElementById('np-pp-icon');
+  const npNext = document.getElementById('np-next');
+  if (!el || !npTrack || !npArtist || !npArt || !npProg) return;
+  const PLAY_PATH = 'M8 5v14l11-7z';
+  const PAUSE_PATH = 'M6 19h4V5H6zm8-14v14h4V5z';
+  let isPlaying = false;
   let lastTrackId = null;
+  function setPlaying(v){ isPlaying = v; if (npPPIcon) npPPIcon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH); }
+  async function spCtrl(method, endpoint){
+    try { const token = await spotifyUserToken(); if (!token) return; await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {method, headers:{Authorization:`Bearer ${token}`}}); } catch(e){}
+  }
+  if (npPrev) npPrev.addEventListener('click', () => spCtrl('POST', 'previous'));
+  if (npNext) npNext.addEventListener('click', () => spCtrl('POST', 'next'));
+  if (npPP) npPP.addEventListener('click', async () => {
+    await spCtrl('PUT', isPlaying ? 'pause' : 'play');
+    setPlaying(!isPlaying);
+    setTimeout(poll, 1000);
+  });
   async function poll(){
-    console.error('[NowPlaying] poll iniciou');
     try {
       const token = await spotifyUserToken();
-      if (!token){ console.error('[NowPlaying] sem token'); el.hidden = true; return; }
+      if (!token){ el.hidden = true; return; }
       const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {headers: {Authorization: `Bearer ${token}`}});
-      if (r.status === 204){ console.error('[NowPlaying] 204 nada tocando'); el.hidden = true; return; }
-      if (!r.ok){ console.error('[NowPlaying] API error', r.status, await r.text().catch(()=>'')); el.hidden = true; return; }
+      if (r.status === 204 || !r.ok){ el.hidden = true; return; }
       const d = await r.json();
-      console.error('[NowPlaying] ok:', d && d.is_playing, d && d.item && d.item.name);
-      if (!d){ el.hidden = true; return; }
-      if (!d.is_playing){ el.hidden = true; return; }
-      if (!d.item){ el.hidden = true; return; }
+      if (!d || !d.item){ el.hidden = true; return; }
+      if (!d.is_playing){ setPlaying(false); el.hidden = true; return; }
+      setPlaying(true);
       const track = d.item;
       npTrack.textContent = track.name;
       npArtist.textContent = track.artists.map(a => a.name).join(', ');
       const imgs = track.album && track.album.images;
-      if (imgs && imgs.length){
-        const img = imgs[imgs.length - 1];
-        npArt.style.backgroundImage = `url("${img.url}")`;
-      }
-      const pct = d.progress_ms / track.duration_ms * 100;
-      npProg.style.width = pct + '%';
+      if (imgs && imgs.length) npArt.style.backgroundImage = `url("${imgs[imgs.length - 1].url}")`;
+      npProg.style.width = (d.progress_ms / track.duration_ms * 100) + '%';
       if (track.id !== lastTrackId){
         lastTrackId = track.id;
         el.classList.add('np-fade');
         el.hidden = false;
         requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
-      } else {
-        el.hidden = false;
-      }
-    } catch(e){ console.error('[NowPlaying] ERRO:', e); el.hidden = true; }
+      } else { el.hidden = false; }
+    } catch(e){ el.hidden = true; }
   }
   setTimeout(poll, 2000);
   setInterval(poll, 10000);
