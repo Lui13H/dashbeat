@@ -7317,10 +7317,10 @@ function openExampleNotice(){
       const overlap = window.innerHeight - fTop;
       el.style.bottom = overlap > 0 ? (overlap + NP_GAP) + 'px' : '';
     }
-    if (npWrap){
-      const sideGap = window.innerWidth - npWrap.getBoundingClientRect().right;
-      const innerPad = parseFloat(getComputedStyle(npWrap).paddingRight) || 0;
-      el.style.width = Math.max(sideGap + innerPad - 2 * NP_GAP, 160) + 'px';
+    const npGrid = document.querySelector('#painel .grid') || npWrap;
+    if (npGrid){
+      const available = window.innerWidth - npGrid.getBoundingClientRect().right - 2 * NP_GAP;
+      el.style.width = available > 80 ? available + 'px' : '';
     }
   }
   window.addEventListener('scroll', npReposition, {passive: true});
