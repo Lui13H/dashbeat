@@ -7229,6 +7229,7 @@ function openExampleNotice(){
   let endTimer = null;
   let skipTimes = [];
   let ctrlLocked = false;
+  let lastProgressMs = 0, lastProgressTs = 0, lastDurationMs = 0, lastVolumePercent = 50;
   const SKIP_LIMIT = 5, SKIP_WINDOW = 20000, COOLDOWN = 6000;
   function setPlaying(v){ isPlaying = v; if (npPPIcon) npPPIcon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH); }
   function lockControls(){
@@ -7250,6 +7251,35 @@ function openExampleNotice(){
   async function spCtrl(method, endpoint){
     try { const token = await spotifyUserToken(); if (!token) return; await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {method, headers:{Authorization:`Bearer ${token}`}}); } catch(e){}
   }
+  function currentProgressMs(){ return isPlaying ? Math.min(lastProgressMs + (Date.now() - lastProgressTs), lastDurationMs) : lastProgressMs; }
+  let seekTimer = null, seekTargetPos = null;
+  function spSeek(deltaMs){
+    seekTargetPos = Math.round(Math.max(0, Math.min((seekTargetPos ?? currentProgressMs()) + deltaMs, lastDurationMs)));
+    if (lastDurationMs > 0){ npProg.style.transition='none'; npProg.style.width=(seekTargetPos/lastDurationMs*100)+'%'; }
+    clearTimeout(seekTimer);
+    seekTimer = setTimeout(async () => {
+      const pos = seekTargetPos; seekTargetPos = null;
+      try {
+        const token = await spotifyUserToken(); if (!token) return;
+        await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${pos}`, {method:'PUT', headers:{Authorization:`Bearer ${token}`}});
+        lastProgressMs = pos; lastProgressTs = Date.now();
+        requestAnimationFrame(() => { npProg.style.transition = ''; });
+      } catch(e){}
+    }, 300);
+  }
+  let volTimer = null, pendingVol = null;
+  function spVolume(delta){
+    pendingVol = Math.max(0, Math.min((pendingVol ?? lastVolumePercent) + delta, 100));
+    clearTimeout(volTimer);
+    volTimer = setTimeout(async () => {
+      const vol = pendingVol; pendingVol = null;
+      try {
+        const token = await spotifyUserToken(); if (!token) return;
+        await fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${vol}`, {method:'PUT', headers:{Authorization:`Bearer ${token}`}});
+        lastVolumePercent = vol;
+      } catch(e){}
+    }, 300);
+  }
   if (npPrev) npPrev.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'previous'); });
   if (npNext) npNext.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'next'); });
   if (npPP) npPP.addEventListener('click', async () => {
@@ -7262,12 +7292,16 @@ function openExampleNotice(){
     try {
       const token = await spotifyUserToken();
       if (!token){ el.hidden = true; return; }
-      const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {headers: {Authorization: `Bearer ${token}`}});
+      const r = await fetch('https://api.spotify.com/v1/me/player', {headers: {Authorization: `Bearer ${token}`}});
       if (r.status === 204 || !r.ok){ el.hidden = true; return; }
       const d = await r.json();
       if (!d || !d.item){ el.hidden = true; return; }
       setPlaying(d.is_playing);
+      lastProgressMs = d.progress_ms;
+      lastProgressTs = Date.now();
       const track = d.item;
+      lastDurationMs = track.duration_ms;
+      if (d.device) lastVolumePercent = d.device.volume_percent ?? lastVolumePercent;
       npTrack.textContent = track.name;
       npArtist.textContent = track.artists.map(a => a.name).join(', ');
       const imgs = track.album && track.album.images;
@@ -7293,9 +7327,9 @@ function openExampleNotice(){
       npReposition();
     } catch(e){ el.hidden = true; }
   }
-  const npFooter = document.querySelector('footer');
   const NP_GAP = 8;
   let npLastWidth = '';
+  const npFooter = document.querySelector('footer');
   function npReposition(){
     if (el.hidden) return;
     if (npFooter){
@@ -7305,13 +7339,37 @@ function openExampleNotice(){
     }
     const npGrid = document.querySelector('#painel .grid');
     if (npGrid && npGrid.offsetParent !== null){
-      const available = document.documentElement.clientWidth - npGrid.getBoundingClientRect().right - 2 * NP_GAP;
+      const available = npGrid.getBoundingClientRect().left - 2 * NP_GAP;
       npLastWidth = available > 80 ? available + 'px' : '';
     }
     el.style.width = npLastWidth;
   }
   window.addEventListener('scroll', npReposition, {passive: true});
   window.addEventListener('resize', npReposition, {passive: true});
+  document.addEventListener('keydown', e => {
+    if (!lastTrackId) return;
+    if (e.target.closest('input,textarea,select,[contenteditable]')) return;
+    const ctrl = e.ctrlKey || e.metaKey, shift = e.shiftKey;
+    if (e.key === ' ' && !ctrl && !shift){
+      e.preventDefault();
+      spCtrl('PUT', isPlaying ? 'pause' : 'play'); setPlaying(!isPlaying); setTimeout(poll, 1000);
+      toast(isPlaying ? 'Pausado' : 'Reproduzindo');
+    } else if (e.key === 'ArrowRight' && ctrl && !shift){
+      e.preventDefault();
+      if (!ctrlLocked && checkSkipRate()){ spCtrl('POST', 'next'); toast('Próxima faixa'); }
+    } else if (e.key === 'ArrowLeft' && ctrl && !shift){
+      e.preventDefault();
+      if (!ctrlLocked && checkSkipRate()){ spCtrl('POST', 'previous'); toast('Faixa anterior'); }
+    } else if (e.key === 'ArrowRight' && shift && !ctrl){
+      e.preventDefault(); spSeek(15000); toast('+15 segundos');
+    } else if (e.key === 'ArrowLeft' && shift && !ctrl){
+      e.preventDefault(); spSeek(-15000); toast('-15 segundos');
+    } else if (e.key === 'ArrowUp' && ctrl && !shift){
+      e.preventDefault(); spVolume(10); toast(`Volume: ${Math.min(lastVolumePercent+10,100)}%`);
+    } else if (e.key === 'ArrowDown' && ctrl && !shift){
+      e.preventDefault(); spVolume(-10); toast(`Volume: ${Math.max(lastVolumePercent-10,0)}%`);
+    }
+  });
 
   setTimeout(poll, 2000);
   setInterval(poll, 10000);
