@@ -7222,12 +7222,12 @@ function openExampleNotice(){
   async function poll(){
     try {
       const token = await spotifyUserToken();
-      if (!token){ console.warn('[NowPlaying] sem token'); el.hidden = true; return; }
+      if (!token){ console.error('[NowPlaying] sem token'); el.hidden = true; return; }
       const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {headers: {Authorization: `Bearer ${token}`}});
-      if (r.status === 204){ console.warn('[NowPlaying] 204 nada tocando'); el.hidden = true; return; }
-      if (!r.ok){ console.warn('[NowPlaying] API error', r.status, await r.text().catch(()=>'')); el.hidden = true; return; }
+      if (r.status === 204){ console.error('[NowPlaying] 204 nada tocando'); el.hidden = true; return; }
+      if (!r.ok){ console.error('[NowPlaying] API error', r.status, await r.text().catch(()=>'')); el.hidden = true; return; }
       const d = await r.json();
-      console.log('[NowPlaying]', d && d.is_playing, d && d.item && d.item.name);
+      console.error('[NowPlaying] ok:', d && d.is_playing, d && d.item && d.item.name);
       if (!d){ el.hidden = true; return; }
       if (!d.is_playing){ el.hidden = true; return; }
       if (!d.item){ el.hidden = true; return; }
