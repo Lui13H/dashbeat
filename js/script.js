@@ -7245,8 +7245,7 @@ function openExampleNotice(){
       if (r.status === 204 || !r.ok){ el.hidden = true; return; }
       const d = await r.json();
       if (!d || !d.item){ el.hidden = true; return; }
-      if (!d.is_playing){ setPlaying(false); el.hidden = true; return; }
-      setPlaying(true);
+      setPlaying(d.is_playing);
       const track = d.item;
       npTrack.textContent = track.name;
       npArtist.textContent = track.artists.map(a => a.name).join(', ');
