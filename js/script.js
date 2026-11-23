@@ -7304,8 +7304,19 @@ function openExampleNotice(){
         npProg.style.width = pct;
         el.hidden = false;
       }
+      npReposition();
     } catch(e){ el.hidden = true; }
   }
+  const npFooter = document.querySelector('footer');
+  function npReposition(){
+    if (!npFooter || el.hidden) return;
+    const fTop = npFooter.getBoundingClientRect().top;
+    const gap = window.innerHeight - fTop;
+    el.style.bottom = gap > 0 ? (20 + gap + 8) + 'px' : '';
+  }
+  window.addEventListener('scroll', npReposition, {passive: true});
+  window.addEventListener('resize', npReposition, {passive: true});
+
   setTimeout(poll, 2000);
   setInterval(poll, 10000);
 })();
