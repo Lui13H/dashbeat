@@ -589,7 +589,7 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 #now-playing[hidden]{display:none}
 #now-playing.np-fade{opacity:0;transform:translateY(10px)}
 #np-top{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
-#np-art{width:90px;height:90px;border-radius:12px;background:hsla(var(--h),30%,18%,.8);flex-shrink:0;background-size:cover;background-position:center;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+#np-art{width:100%;aspect-ratio:1/1;border-radius:12px;background:hsla(var(--h),30%,18%,.8);flex-shrink:0;background-size:cover;background-position:center;box-shadow:0 4px 16px rgba(0,0,0,.5)}
 #np-info{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;min-width:0}
 #np-label{display:flex;align-items:center;gap:5px;font:600 9px var(--body);color:hsl(var(--h),65%,65%);letter-spacing:.06em;text-transform:uppercase}
 .np-dot{width:6px;height:6px;border-radius:50%;background:hsl(var(--h),65%,65%);flex-shrink:0;animation:np-pulse 1.8s ease-in-out infinite}
