@@ -7284,18 +7284,19 @@ function openExampleNotice(){
         npProg.style.width = pct;
         requestAnimationFrame(() => { npProg.style.transition = ''; });
         el.classList.add('np-fade');
-        el.hidden = false;
+        el.hidden = npOnInsights();
         requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
       } else {
         npProg.style.width = pct;
-        el.hidden = false;
+        el.hidden = npOnInsights();
       }
       npReposition();
     } catch(e){ el.hidden = true; }
   }
   const npFooter = document.querySelector('footer');
-  const npWrap = document.querySelector('.wrap');
   const NP_GAP = 8;
+  const npInsights = document.getElementById('insights');
+  function npOnInsights(){ return !!(npInsights && npInsights.classList.contains('on')); }
   function npReposition(){
     if (el.hidden) return;
     if (npFooter){
@@ -7311,6 +7312,11 @@ function openExampleNotice(){
       el.style.width = '';
     }
   }
+  function npSyncTab(){
+    if (npOnInsights()) { el.hidden = true; }
+    else if (lastTrackId) { el.hidden = false; npReposition(); }
+  }
+  window.addEventListener('hashchange', npSyncTab);
   window.addEventListener('scroll', npReposition, {passive: true});
   window.addEventListener('resize', npReposition, {passive: true});
 
