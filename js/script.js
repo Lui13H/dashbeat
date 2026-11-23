@@ -7271,7 +7271,7 @@ function openExampleNotice(){
       npTrack.textContent = track.name;
       npArtist.textContent = track.artists.map(a => a.name).join(', ');
       const imgs = track.album && track.album.images;
-      if (imgs && imgs.length) npArt.style.backgroundImage = `url("${imgs[imgs.length - 1].url}")`;
+      if (imgs && imgs.length) npArt.style.backgroundImage = `url("${imgs[0].url}")`;
       const pct = (d.progress_ms / track.duration_ms * 100) + '%';
       if (d.is_playing){
         const remaining = track.duration_ms - d.progress_ms;
