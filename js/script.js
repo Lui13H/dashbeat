@@ -7217,7 +7217,8 @@ function openExampleNotice(){
   const npArtist = document.getElementById('np-artist');
   const npArt = document.getElementById('np-art');
   const npProg = document.getElementById('np-prog');
-  if (!el || !npTrack || !npArtist || !npArt || !npProg) return;
+  console.error('[NowPlaying] init', {el:!!el, npTrack:!!npTrack, npArtist:!!npArtist, npArt:!!npArt, npProg:!!npProg});
+  if (!el || !npTrack || !npArtist || !npArt || !npProg) { console.error('[NowPlaying] elemento(s) ausentes, abortando'); return; }
   let lastTrackId = null;
   async function poll(){
     console.error('[NowPlaying] poll iniciou');
