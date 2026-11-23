@@ -7305,7 +7305,7 @@ function openExampleNotice(){
     }
     const npGrid = document.querySelector('#painel .grid');
     if (npGrid && npGrid.offsetParent !== null){
-      const available = window.innerWidth - npGrid.getBoundingClientRect().right - 2 * NP_GAP;
+      const available = document.documentElement.clientWidth - npGrid.getBoundingClientRect().right - 2 * NP_GAP;
       npLastWidth = available > 80 ? available + 'px' : '';
     }
     el.style.width = npLastWidth;
