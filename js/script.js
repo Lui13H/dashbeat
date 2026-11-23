@@ -7227,13 +7227,33 @@ function openExampleNotice(){
   let isPlaying = false;
   let lastTrackId = null;
   let endTimer = null;
+  let skipTimes = [];
+  let ctrlLocked = false;
+  const SKIP_LIMIT = 5, SKIP_WINDOW = 20000, COOLDOWN = 6000;
   function setPlaying(v){ isPlaying = v; if (npPPIcon) npPPIcon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH); }
+  function lockControls(){
+    ctrlLocked = true;
+    [npPrev, npPP, npNext].forEach(b => { if (b){ b.disabled = true; b.style.opacity = '.35'; } });
+    toast('Muitos skips seguidos! Aguarde alguns segundos para não sobrecarregar a API do Spotify.');
+    setTimeout(() => {
+      ctrlLocked = false; skipTimes = [];
+      [npPrev, npPP, npNext].forEach(b => { if (b){ b.disabled = false; b.style.opacity = ''; } });
+    }, COOLDOWN);
+  }
+  function checkSkipRate(){
+    const now = Date.now();
+    skipTimes = skipTimes.filter(t => now - t < SKIP_WINDOW);
+    skipTimes.push(now);
+    if (skipTimes.length >= SKIP_LIMIT){ lockControls(); return false; }
+    return true;
+  }
   async function spCtrl(method, endpoint){
     try { const token = await spotifyUserToken(); if (!token) return; await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {method, headers:{Authorization:`Bearer ${token}`}}); } catch(e){}
   }
-  if (npPrev) npPrev.addEventListener('click', () => spCtrl('POST', 'previous'));
-  if (npNext) npNext.addEventListener('click', () => spCtrl('POST', 'next'));
+  if (npPrev) npPrev.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'previous'); });
+  if (npNext) npNext.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'next'); });
   if (npPP) npPP.addEventListener('click', async () => {
+    if (ctrlLocked) return;
     await spCtrl('PUT', isPlaying ? 'pause' : 'play');
     setPlaying(!isPlaying);
     setTimeout(poll, 1000);
