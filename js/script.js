@@ -7226,6 +7226,7 @@ function openExampleNotice(){
   const PAUSE_PATH = 'M6 19h4V5H6zm8-14v14h4V5z';
   let isPlaying = false;
   let lastTrackId = null;
+  let endTimer = null;
   function setPlaying(v){ isPlaying = v; if (npPPIcon) npPPIcon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH); }
   async function spCtrl(method, endpoint){
     try { const token = await spotifyUserToken(); if (!token) return; await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {method, headers:{Authorization:`Bearer ${token}`}}); } catch(e){}
@@ -7252,6 +7253,11 @@ function openExampleNotice(){
       const imgs = track.album && track.album.images;
       if (imgs && imgs.length) npArt.style.backgroundImage = `url("${imgs[imgs.length - 1].url}")`;
       const pct = (d.progress_ms / track.duration_ms * 100) + '%';
+      if (d.is_playing){
+        const remaining = track.duration_ms - d.progress_ms;
+        clearTimeout(endTimer);
+        endTimer = setTimeout(poll, Math.max(remaining + 1200, 1000));
+      }
       if (track.id !== lastTrackId){
         lastTrackId = track.id;
         npProg.style.transition = 'none';
