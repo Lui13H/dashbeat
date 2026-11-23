@@ -7295,6 +7295,7 @@ function openExampleNotice(){
   }
   const npFooter = document.querySelector('footer');
   const NP_GAP = 8;
+  let npLastWidth = '';
   function npReposition(){
     if (el.hidden) return;
     if (npFooter){
@@ -7305,10 +7306,9 @@ function openExampleNotice(){
     const npGrid = document.querySelector('#painel .grid');
     if (npGrid && npGrid.offsetParent !== null){
       const available = window.innerWidth - npGrid.getBoundingClientRect().right - 2 * NP_GAP;
-      el.style.width = available > 80 ? available + 'px' : '';
-    } else {
-      el.style.width = '';
+      npLastWidth = available > 80 ? available + 'px' : '';
     }
+    el.style.width = npLastWidth;
   }
   window.addEventListener('scroll', npReposition, {passive: true});
   window.addEventListener('resize', npReposition, {passive: true});
