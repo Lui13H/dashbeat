@@ -7284,19 +7284,17 @@ function openExampleNotice(){
         npProg.style.width = pct;
         requestAnimationFrame(() => { npProg.style.transition = ''; });
         el.classList.add('np-fade');
-        el.hidden = npOnInsights();
+        el.hidden = false;
         requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
       } else {
         npProg.style.width = pct;
-        el.hidden = npOnInsights();
+        el.hidden = false;
       }
       npReposition();
     } catch(e){ el.hidden = true; }
   }
   const npFooter = document.querySelector('footer');
   const NP_GAP = 8;
-  const npInsights = document.getElementById('insights');
-  function npOnInsights(){ return !!(npInsights && npInsights.classList.contains('on')); }
   function npReposition(){
     if (el.hidden) return;
     if (npFooter){
@@ -7305,18 +7303,13 @@ function openExampleNotice(){
       el.style.bottom = overlap > 0 ? (overlap + NP_GAP) + 'px' : '';
     }
     const npGrid = document.querySelector('#painel .grid');
-    if (npGrid){
+    if (npGrid && npGrid.offsetParent !== null){
       const available = window.innerWidth - npGrid.getBoundingClientRect().right - 2 * NP_GAP;
       el.style.width = available > 80 ? available + 'px' : '';
     } else {
       el.style.width = '';
     }
   }
-  function npSyncTab(){
-    if (npOnInsights()) { el.hidden = true; }
-    else if (lastTrackId) { el.hidden = false; npReposition(); }
-  }
-  window.addEventListener('hashchange', npSyncTab);
   window.addEventListener('scroll', npReposition, {passive: true});
   window.addEventListener('resize', npReposition, {passive: true});
 
