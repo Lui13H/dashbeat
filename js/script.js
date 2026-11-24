@@ -2852,6 +2852,13 @@ function timeChip(){
   if (showHdr && hdr._html !== html){ hdr._html = html; hdr.innerHTML = html; }
 }
 addEventListener("scroll", () => { if (state.upTo != null) requestAnimationFrame(timeChip); requestAnimationFrame(tbPlayVis); }, {passive: true});
+/* toolbar sticky: fundo só aparece quando o header com logo sai de vista */
+(function(){
+  const tb = document.querySelector('.toolbar'), hd = document.querySelector('header.top'), wr = document.querySelector('.wrap');
+  if (!tb || !hd || innerWidth < 900) return;
+  new IntersectionObserver(([e]) => tb.classList.toggle('bar-on', !e.isIntersecting),
+    {threshold:0, rootMargin:'18px 0px 0px 0px'}).observe(hd);
+})();
 addEventListener("resize", () => { if (state.upTo != null) timeChip(); tbPlayVis(); });
 /* botão de tocar/pausar da máquina do tempo no cabeçalho: aparece quando a barra da máquina do tempo saiu de vista (tela desceu) e só no Painel */
 function tbPlayVis(){

@@ -32,7 +32,7 @@ body{
     radial-gradient(1200px 900px at 50% 120%, hsla(var(--h),85%,16%,.35), transparent 60%),
     linear-gradient(180deg, hsl(var(--h),60%,4%) 0%, var(--bg) 55%, hsl(var(--h),50%,2%) 100%);
   background-attachment:fixed;
-  overflow-x:hidden;
+  overflow-x:clip;
   -webkit-font-smoothing:antialiased;
   word-break:normal; overflow-wrap:normal; hyphens:manual;
 }
@@ -524,6 +524,15 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:20p
 
 /* ---------- data tools (header) ---------- */
 .toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px 20px;flex-wrap:wrap;padding-top:16px;margin-bottom:14px}
+@media (min-width:900px){
+  .toolbar{position:sticky;top:0;z-index:10;animation:none !important;transform:none !important;filter:none !important;transition:background .25s,backdrop-filter .25s,-webkit-backdrop-filter .25s,padding .25s,margin .25s}
+  .toolbar.bar-on{
+    background:hsla(var(--h),40%,5%,.88);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+    padding-top:10px;padding-bottom:10px;margin-bottom:6px;
+    margin-left:calc(-1 * clamp(12px,2.8vw,40px));margin-right:calc(-1 * clamp(12px,2.8vw,40px));
+    padding-left:clamp(12px,2.8vw,40px);padding-right:clamp(12px,2.8vw,40px);
+  }
+}
 .sp-login-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid #1db95444;background:hsla(var(--h),54%,5%,.6);color:#1db954;font:600 12.5px var(--body);padding:9px 13px;border-radius:12px;cursor:pointer;transition:all .25s;flex:none;white-space:nowrap}
 .sp-login-btn:hover{color:#2ed462;border-color:#1db95477;background:hsla(var(--h),52%,10%,.85)}
 .sp-chip{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:hsla(var(--h),54%,5%,.6);padding:6px 13px 6px 10px;border-radius:999px;font:600 12.5px var(--body);color:var(--ink-2);flex:none}
