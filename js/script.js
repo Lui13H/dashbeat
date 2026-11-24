@@ -2647,7 +2647,7 @@ function render(){
 const TM_N = BY_PLAYLIST.length;
 const tm = {playing: false, paused: false, raf: 0, t0: 0, lastRender: 0, pos: TM_N, speed: 1, shown: TM_N};
 const TM_REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const TM_ICON = {play: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.8v10.4a.6.6 0 0 0 .9.5l8.3-5.2a.6.6 0 0 0 0-1L5.4 2.3a.6.6 0 0 0-.9.5z" fill="currentColor"/></svg>',
+const TM_ICON = {play: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2 L2 14 L8 8 Z M8 2 L8 14 L14 8 Z" fill="currentColor"/></svg>',
   pause: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1" fill="currentColor"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1" fill="currentColor"/></svg>'};
 function tmSync(){
   const n = state.upTo == null ? TM_N : state.upTo, r = $("#tm-range");
@@ -7128,7 +7128,6 @@ $("#dt-export").hidden = !STORE;
 $("#dt-export-pl").hidden = !STORE;
 $("#dt-update").hidden = !STORE || !BY_PLAYLIST.some(needsUpdate) && !genreTargets(BY_PLAYLIST.map(t => ({artist: t.artist, meta: t.m}))).length;
 $("#foot-src").textContent = STORE ? `Lista editada neste navegador · ${faixas(NN)} · ${new Date(STORE.updated || Date.now()).toLocaleDateString("pt-BR")}` : `Fonte: lista de ${faixas(NN)} fornecida · sem dados externos`;
-if (STORE) $("#srcline").textContent += " · lista editada";
 
 /* ---------------- boot ---------------- */
 let rz;
@@ -7278,6 +7277,11 @@ function openExampleNotice(){
   let npWasDragging = false;
   let npFollowMode = false;
   let npAbsMode = false;
+  let npDocked = false;
+  let npJustUndocked = false;
+  let npAutoDockedByScroll = false;
+  let npPreAutoDocPos = null;
+  let _npManuallyUndocked = false;
   let npmRafId = null;
   let npmSortKey = 'n', npmSortDir = 1, npmSearchQ = '', npmFilterArtist = '';
   let npmAlbumMode = 'count', npmArtistMode = 'alpha', npmYearMode = 'year';
@@ -7287,10 +7291,19 @@ function openExampleNotice(){
 
   function fmtMs(ms){ return fmtDur(Math.floor(ms / 1000)); }
 
+  let npProgRafId = null;
+  function _npPillTick(){
+    if (!lastDurationMs) return;
+    npProg.style.width = (currentProgressMs() / lastDurationMs * 100) + '%';
+    if (isPlaying) npProgRafId = requestAnimationFrame(_npPillTick);
+  }
   function setPlaying(v){
     isPlaying = v;
     if (npPPIcon) npPPIcon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH);
     if (npmPP2Icon) npmPP2Icon.querySelector('path').setAttribute('d', v ? PAUSE_PATH : PLAY_PATH);
+    cancelAnimationFrame(npProgRafId);
+    if (v) npProgRafId = requestAnimationFrame(_npPillTick);
+    else npProgRafId = null;
   }
   function lockControls(){
     ctrlLocked = true;
@@ -7313,6 +7326,32 @@ function openExampleNotice(){
   }
   function currentProgressMs(){ return isPlaying ? Math.min(lastProgressMs + (Date.now() - lastProgressTs), lastDurationMs) : lastProgressMs; }
 
+  let nextQueuedTrack = null, prevTrackData = null, _npSkipPending = false;
+  async function fetchQueue(){
+    try {
+      const token = await spotifyUserToken(); if (!token) return;
+      const r = await fetch('https://api.spotify.com/v1/me/player/queue', {headers:{Authorization:`Bearer ${token}`}});
+      if (!r.ok) return;
+      const d = await r.json();
+      nextQueuedTrack = d.queue && d.queue[0] ? d.queue[0] : null;
+    } catch(e){}
+  }
+  function _npOptimisticTrack(track){
+    _npSkipPending = true;
+    prevTrackData = lastTrackData;
+    npTrack.textContent = track.name;
+    npArtist.textContent = track.artists.map(a => a.name).join(', ');
+    const imgs = track.album && track.album.images;
+    if (imgs && imgs.length) npArt.style.backgroundImage = `url("${imgs[0].url}")`;
+    lastTrackId = track.id;
+    lastDurationMs = track.duration_ms;
+    lastProgressMs = 0; lastProgressTs = Date.now();
+    npProg.style.width = '0%';
+    el.classList.add('np-fade');
+    el.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
+    if (npmIsOpen) openNpModal();
+  }
   let seekTimer = null, seekTargetPos = null;
   function _applySeekBars(pos){
     if (!lastDurationMs) return;
@@ -7359,8 +7398,20 @@ function openExampleNotice(){
   }
 
   /* ---- mini widget controls ---- */
-  if (npPrev) npPrev.addEventListener('click', e => { e.stopPropagation(); if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'previous'); });
-  if (npNext) npNext.addEventListener('click', e => { e.stopPropagation(); if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'next'); });
+  if (npPrev) npPrev.addEventListener('click', e => {
+    e.stopPropagation(); if (ctrlLocked || !checkSkipRate()) return;
+    if (currentProgressMs() >= 3000){
+      spSeekTo(0);
+    } else {
+      if (!_npSkipPending && prevTrackData) _npOptimisticTrack(prevTrackData);
+      spCtrl('POST', 'previous'); setTimeout(poll, 1300);
+    }
+  });
+  if (npNext) npNext.addEventListener('click', e => {
+    e.stopPropagation(); if (ctrlLocked || !checkSkipRate()) return;
+    if (!_npSkipPending && nextQueuedTrack) _npOptimisticTrack(nextQueuedTrack);
+    spCtrl('POST', 'next'); setTimeout(poll, 1300);
+  });
   if (npPP) npPP.addEventListener('click', async e => {
     e.stopPropagation();
     if (ctrlLocked) return;
@@ -8070,6 +8121,8 @@ function openExampleNotice(){
       lastProgressMs = d.progress_ms;
       lastProgressTs = Date.now();
       const track = d.item;
+      const isNewTrack = track.id !== lastTrackId;
+      if (isNewTrack) prevTrackData = lastTrackData;
       lastDurationMs = track.duration_ms;
       lastTrackData = track;
       if (d.device) lastVolumePercent = d.device.volume_percent ?? lastVolumePercent;
@@ -8083,7 +8136,8 @@ function openExampleNotice(){
         clearTimeout(endTimer);
         endTimer = setTimeout(poll, Math.max(remaining + 1200, 1000));
       }
-      if (track.id !== lastTrackId){
+      _npSkipPending = false;
+      if (isNewTrack){
         lastTrackId = track.id;
         npProg.style.transition = 'none';
         npProg.style.width = pct;
@@ -8091,11 +8145,14 @@ function openExampleNotice(){
         el.classList.add('np-fade');
         el.hidden = false;
         requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
+        if (el.dataset.npRestoreDocked){ const _sk = el.dataset.npRestoreDocked; delete el.dataset.npRestoreDocked; setTimeout(() => npDock(_sk === 'header' ? npDockSlotHd : npDockSlot), 0); }
         /* update modal if open */
         if (npmIsOpen){ openNpModal(); }
+        fetchQueue();
       } else {
         npProg.style.width = pct;
         el.hidden = false;
+        if (el.dataset.npRestoreDocked){ const _sk = el.dataset.npRestoreDocked; delete el.dataset.npRestoreDocked; setTimeout(() => npDock(_sk === 'header' ? npDockSlotHd : npDockSlot), 0); }
       }
     } catch(e){ el.hidden = true; }
   }
@@ -8105,6 +8162,16 @@ function openExampleNotice(){
   const NP_SNAP_PX = 80;
   const NP_DRAG_THRESHOLD = 5;
   const npPillHandle = document.getElementById('np-pill');
+  const npDockSlot = document.getElementById('np-dock-slot');
+  const npDockSlotHd = document.getElementById('np-dock-slot-hd');
+  const npDockSlotBand = document.getElementById('np-dock-slot-band');
+  const npDockSlotTabs = document.getElementById('np-dock-slot-tabs');
+  const npToolbarEl = document.querySelector('.toolbar');
+  const npHeaderEl = document.querySelector('header.top');
+  const npFiltersEl = document.querySelector('.filters');
+  const npTabsEl = document.querySelector('.tabs-play');
+  const npDtoolsEl = document.querySelector('.dtools');
+  let npCurrentDockSlot = null;
   function npPillClamp(x, y){
     const w = el.offsetWidth || 220, h = el.offsetHeight || 50;
     return {x: Math.round(Math.max(0, Math.min(window.innerWidth - w, x))), y: Math.round(Math.max(0, Math.min(window.innerHeight - h, y)))};
@@ -8126,10 +8193,9 @@ function openExampleNotice(){
   }
   function npPillSetPos(x, y){ // x/y = coordenadas de viewport
     if (npAbsMode){
-      // dentro de .wrap (position:relative), converte viewport → relativo ao .wrap
-      const wr = (document.querySelector('.wrap') || document.body).getBoundingClientRect();
-      el.style.left = (x - wr.left) + 'px';
-      el.style.top  = (y - wr.top)  + 'px';
+      // position:absolute em body — converte viewport → coords de página via scroll
+      el.style.left = (x + window.scrollX) + 'px';
+      el.style.top  = (y + window.scrollY) + 'px';
     } else {
       el.style.left = x + 'px';
       el.style.top  = y + 'px';
@@ -8141,18 +8207,64 @@ function openExampleNotice(){
     try {
       const s = JSON.parse(localStorage.getItem(NP_PILL_KEY));
       if (s){
+        if (s.docked){ el.dataset.npRestoreDocked = s.docked === 'header' ? 'header' : 'toolbar'; return; }
         if (s.abs){
           npAbsMode = true; el.classList.add('np-absolute');
-          const wrap = document.querySelector('.wrap');
-          if (wrap) wrap.appendChild(el);
+          document.body.appendChild(el);
         }
         const c = npPillClamp(s.x, s.y); npPillSetPos(c.x, c.y);
+      } else {
+        el.dataset.npRestoreDocked = '1'; // padrão: encaixado na toolbar
       }
-    } catch{}
+    } catch{ el.dataset.npRestoreDocked = '1'; }
   })();
   function npSavePos(){
+    if (npAutoDockedByScroll) return;
+    if (npDocked){
+      const slotKey = npCurrentDockSlot === npDockSlotHd ? 'header' : 'toolbar';
+      try { localStorage.setItem(NP_PILL_KEY, JSON.stringify({docked:slotKey})); } catch{}
+      return;
+    }
     const r = el.getBoundingClientRect();
     try { localStorage.setItem(NP_PILL_KEY, JSON.stringify({x: r.left, y: r.top, abs: npAbsMode})); } catch{}
+  }
+  function npDock(slot, isAutoScroll){
+    slot = slot || npDockSlot;
+    if (npDocked || !slot) return;
+    if (npFollowMode) _npFollowDrop();
+    npDocked = true; npCurrentDockSlot = slot;
+    npAutoDockedByScroll = !!isAutoScroll;
+    el.classList.remove('np-dragging','np-follow');
+    el.style.left = el.style.top = el.style.bottom = el.style.right = el.style.borderRadius = '';
+    el.classList.add('np-docked');
+    slot.appendChild(el);
+    el.hidden = false;
+    if (slot === npDockSlotHd && npHeaderEl){
+      const npBarEl = el.querySelector('#np-bar');
+      if (npBarEl) npHeaderEl.appendChild(npBarEl);
+      npHeaderEl.classList.add('np-hd-active');
+    }
+    npSavePos();
+  }
+  function npUndock(){
+    if (!npDocked || !npCurrentDockSlot) return;
+    if (npCurrentDockSlot === npDockSlotHd){
+      const npBarEl = document.getElementById('np-bar');
+      if (npBarEl && npBarEl.parentNode !== el) el.appendChild(npBarEl);
+      if (npHeaderEl) npHeaderEl.classList.remove('np-hd-active');
+    }
+    const pr = el.getBoundingClientRect();
+    npDocked = false; npCurrentDockSlot = null;
+    if (!npAutoDockedByScroll) _npManuallyUndocked = true;
+    npAutoDockedByScroll = false; npPreAutoDocPos = null;
+    el.classList.remove('np-docked');
+    el.classList.add('np-dragging');
+    document.body.appendChild(el);
+    void el.offsetLeft;
+    npPillSetPos(pr.left, pr.top);
+    void el.offsetLeft;
+    el.classList.remove('np-dragging');
+    npSavePos();
   }
   let npDragOn = false, npDragOX = 0, npDragOY = 0, npDragStartX = 0, npDragStartY = 0, npDragMoved = false;
   if (npPillHandle){
@@ -8171,19 +8283,48 @@ function openExampleNotice(){
       _npDS(e.touches[0].clientX, e.touches[0].clientY);
     }, {passive: true});
   }
+  function _npSlotRect(slot){
+    // slot tem width:0 quando vazio — expande temporariamente para medir posição real
+    const had = slot.style.width;
+    slot.style.width = '1px';
+    const r = slot.getBoundingClientRect();
+    slot.style.width = had;
+    return r;
+  }
+  function _npDist2(cx, cy, r){ return Math.hypot(cx - (r.left + r.width/2), cy - (r.top + r.height/2)); }
+  function _npUpdateDockHints(cx, cy){
+    let winner = null, bestDist = Infinity;
+    const allSlots = [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand];
+    for (const slot of allSlots){
+      if (!slot) continue;
+      const r = _npSlotRect(slot);
+      if (r.bottom <= 0 || r.top >= window.innerHeight) continue;
+      if (cy < r.top - 40 || cy > r.bottom + 40) continue;
+      const d = _npDist2(cx, cy, r);
+      if (d < bestDist){ bestDist = d; winner = slot; }
+    }
+    for (const slot of allSlots) if (slot) slot.classList.toggle('np-dock-ready', slot === winner);
+  }
   document.addEventListener('mousemove', e => {
     if (npFollowMode){
       const w = el.offsetWidth || 220, h = el.offsetHeight || 50;
       npPillSetPos(...Object.values(npPillClamp(e.clientX - w / 2, e.clientY - h / 2)));
+      if (window.innerWidth >= 900) _npUpdateDockHints(e.clientX, e.clientY);
       return;
     }
     if (!npDragOn) return;
     if (!npDragMoved){
       const dx = e.clientX - npDragStartX, dy = e.clientY - npDragStartY;
       if (dx*dx + dy*dy < NP_DRAG_THRESHOLD * NP_DRAG_THRESHOLD) return;
-      npDragMoved = true; el.classList.add('np-dragging');
+      npDragMoved = true;
+      if (npDocked){ npUndock(); npJustUndocked = true; const r2 = el.getBoundingClientRect(); npDragOX = e.clientX - r2.left; npDragOY = e.clientY - r2.top; }
+      el.classList.add('np-dragging');
     }
     npPillSetPos(...Object.values(npPillClamp(e.clientX - npDragOX, e.clientY - npDragOY)));
+    if (window.innerWidth >= 900){
+      const r = el.getBoundingClientRect();
+      _npUpdateDockHints(r.left + r.width / 2, r.top + r.height / 2);
+    }
   });
   document.addEventListener('touchmove', e => {
     if (npFollowMode){
@@ -8198,7 +8339,9 @@ function openExampleNotice(){
       const t = e.touches[0];
       const dx = t.clientX - npDragStartX, dy = t.clientY - npDragStartY;
       if (dx*dx + dy*dy < NP_DRAG_THRESHOLD * NP_DRAG_THRESHOLD) return;
-      npDragMoved = true; el.classList.add('np-dragging');
+      npDragMoved = true;
+      if (npDocked){ npUndock(); npJustUndocked = true; const r2 = el.getBoundingClientRect(); npDragOX = t.clientX - r2.left; npDragOY = t.clientY - r2.top; }
+      el.classList.add('np-dragging');
     }
     e.preventDefault();
     npPillSetPos(...Object.values(npPillClamp(e.touches[0].clientX - npDragOX, e.touches[0].clientY - npDragOY)));
@@ -8209,6 +8352,24 @@ function openExampleNotice(){
     if (npDragMoved){
       npWasDragging = true; setTimeout(() => { npWasDragging = false; }, 60);
       el.classList.remove('np-dragging');
+      npJustUndocked = false;
+      if (npDockSlot) npDockSlot.classList.remove('np-dock-ready');
+      if (npDockSlotHd) npDockSlotHd.classList.remove('np-dock-ready');
+      if (npDockSlotBand) npDockSlotBand.classList.remove('np-dock-ready');
+      if (npDockSlotTabs) npDockSlotTabs.classList.remove('np-dock-ready');
+      if (window.innerWidth >= 900){
+        const r = el.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
+        let dockTarget = null, dockDist = Infinity;
+        for (const slot of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand]){
+          if (!slot) continue;
+          const sr = _npSlotRect(slot);
+          if (sr.bottom <= 0 || sr.top >= window.innerHeight) continue;
+          if (cy < sr.top - 40 || cy > sr.bottom + 40) continue;
+          const d = _npDist2(cx, cy, sr);
+          if (d < dockDist){ dockDist = d; dockTarget = slot; }
+        }
+        if (dockTarget){ npDragMoved = false; npDock(dockTarget); return; }
+      }
       if (!npAbsMode){
         const r = el.getBoundingClientRect(), s = npPillSnap(r.left, r.top);
         void el.offsetLeft;
@@ -8217,13 +8378,17 @@ function openExampleNotice(){
       npSavePos();
     } else {
       el.classList.remove('np-dragging');
+      if (npDockSlot) npDockSlot.classList.remove('np-dock-ready');
+      if (npDockSlotHd) npDockSlotHd.classList.remove('np-dock-ready');
+      if (npDockSlotBand) npDockSlotBand.classList.remove('np-dock-ready');
+      if (npDockSlotTabs) npDockSlotTabs.classList.remove('np-dock-ready');
     }
     npDragMoved = false;
   }
   document.addEventListener('mouseup', _npDE);
   document.addEventListener('touchend', _npDE);
   window.addEventListener('resize', () => {
-    if (el.hidden || npAbsMode) return;
+    if (el.hidden || npAbsMode || npDocked) return;
     const r = el.getBoundingClientRect(), c = npPillClamp(r.left, r.top);
     npPillSetPos(c.x, c.y);
     npSavePos();
@@ -8234,6 +8399,20 @@ function openExampleNotice(){
   function _npFollowDrop(){
     npFollowMode = false;
     el.classList.remove('np-follow', 'np-dragging');
+    for (const s of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand]) if (s) s.classList.remove('np-dock-ready');
+    if (window.innerWidth >= 900){
+      const r = el.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
+      let dockTarget = null, dockDist = Infinity;
+      for (const slot of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand]){
+        if (!slot) continue;
+        const sr = _npSlotRect(slot);
+        if (sr.bottom <= 0 || sr.top >= window.innerHeight) continue;
+        if (cy < sr.top - 40 || cy > sr.bottom + 40) continue;
+        const d = _npDist2(cx, cy, sr);
+        if (d < dockDist){ dockDist = d; dockTarget = slot; }
+      }
+      if (dockTarget){ npDock(dockTarget); return; }
+    }
     if (!npAbsMode){
       const r = el.getBoundingClientRect(), s = npPillSnap(r.left, r.top);
       void el.offsetLeft;
@@ -8243,13 +8422,12 @@ function openExampleNotice(){
     npSavePos();
   }
   function _npToggleAbsMode(){
+    if (npDocked){ npAbsMode = !npAbsMode; el.classList.toggle('np-absolute', npAbsMode); npSavePos(); return; }
     const r = el.getBoundingClientRect();
     el.classList.add('np-dragging');
     npAbsMode = !npAbsMode;
     el.classList.toggle('np-absolute', npAbsMode);
-    const wrap = document.querySelector('.wrap');
-    if (npAbsMode && wrap) wrap.appendChild(el);
-    else document.body.appendChild(el);
+    document.body.appendChild(el); // sempre em body para evitar stacking context do .wrap
     void el.offsetLeft;
     npPillSetPos(r.left, r.top);
     void el.offsetLeft;
@@ -8257,15 +8435,21 @@ function openExampleNotice(){
     npSavePos();
   }
   if (npDotBtn){
+    let _npDotTimer = null;
     npDotBtn.addEventListener('click', e => {
       e.stopPropagation();
       if (npFollowMode){ _npFollowDrop(); return; }
-      npFollowMode = true;
-      el.classList.add('np-follow', 'np-dragging');
+      clearTimeout(_npDotTimer);
+      _npDotTimer = setTimeout(() => {
+        _npDotTimer = null;
+        if (npDocked) npUndock();
+        npFollowMode = true;
+        el.classList.add('np-follow', 'np-dragging');
+      }, 220);
     });
     npDotBtn.addEventListener('dblclick', e => {
       e.stopPropagation();
-      // o primeiro click já ativou o follow; cancela e troca o modo de fixação
+      clearTimeout(_npDotTimer); _npDotTimer = null;
       if (npFollowMode) _npFollowDrop();
       _npToggleAbsMode();
     });
@@ -8303,6 +8487,23 @@ function openExampleNotice(){
       e.preventDefault(); spVolume(-10); toast(`Volume: ${Math.max(lastVolumePercent-10,0)}%`);
     }
   });
+
+  if (npHeaderEl){
+    new IntersectionObserver(([e]) => {
+      if (el.hidden || npAbsMode) return;
+      const gone = e.intersectionRatio < 0.5;
+      if (!gone) _npManuallyUndocked = false;
+      if (gone && !npDocked && !_npManuallyUndocked){
+        const r = el.getBoundingClientRect();
+        npPreAutoDocPos = {x: r.left, y: r.top};
+        npDock(npDockSlotTabs, true);
+      } else if (!gone && npDocked && npAutoDockedByScroll && npCurrentDockSlot === npDockSlotTabs){
+        const savedPos = npPreAutoDocPos;
+        npUndock();
+        if (savedPos){ void el.offsetLeft; npPillSetPos(savedPos.x, savedPos.y); npSavePos(); }
+      }
+    }, {threshold: [0, 0.5, 1]}).observe(npHeaderEl);
+  }
 
   setTimeout(poll, 2000);
   setInterval(poll, 10000);

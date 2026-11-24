@@ -312,4 +312,4 @@ diminuir a altura do card 5 perfil e diminuir para apenas 3 musicas e artistas n
 
 Na busca automática das APIs terminar de buscar a foto de todos os álbuns antes de começar a buscar os gêneros musicais
 
-resolver o problema do header nao encostar no teto do site
+concertar
