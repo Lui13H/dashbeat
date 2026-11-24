@@ -309,3 +309,7 @@ Rust in Peace, Scenes from a Memory...". Exige curadoria manual da lista de refe
 footer do site mais transparente
 
 diminuir a altura do card 5 perfil e diminuir para apenas 3 musicas e artistas nos negocios que mostram 4
+
+Na busca automática das APIs terminar de buscar a foto de todos os álbuns antes de começar a buscar os gêneros musicais
+
+resolver o problema do header nao encostar no teto do site

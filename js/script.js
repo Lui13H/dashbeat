@@ -7268,6 +7268,9 @@ function openExampleNotice(){
   let lastTrackData = null;
   let npmIsOpen = false;
   let npmLiked = false;
+  let npWasDragging = false;
+  let npFollowMode = false;
+  let npAbsMode = false;
   let npmRafId = null;
   let npmSortKey = 'n', npmSortDir = 1, npmSearchQ = '', npmFilterArtist = '';
   let npmAlbumMode = 'count', npmArtistMode = 'alpha', npmYearMode = 'year';
@@ -7358,7 +7361,7 @@ function openExampleNotice(){
     setPlaying(!isPlaying);
     setTimeout(poll, 1000);
   });
-  el.addEventListener('click', () => { if (lastTrackId) openNpModal(); });
+  el.addEventListener('click', () => { if (lastTrackId && !npWasDragging) openNpModal(); });
 
   /* ---- progress update RAF (modal) ---- */
   function npmTickProgress(){
@@ -8087,29 +8090,188 @@ function openExampleNotice(){
         npProg.style.width = pct;
         el.hidden = false;
       }
-      npReposition();
     } catch(e){ el.hidden = true; }
   }
 
-  const NP_GAP = 8;
-  let npLastWidth = '';
-  const npFooter = document.querySelector('footer');
-  function npReposition(){
-    if (el.hidden) return;
-    if (npFooter){
-      const fTop = npFooter.getBoundingClientRect().top;
-      const overlap = window.innerHeight - fTop;
-      el.style.bottom = overlap > 0 ? (overlap + NP_GAP) + 'px' : '';
-    }
-    const npGrid = document.querySelector('#painel .grid');
-    if (npGrid && npGrid.offsetParent !== null){
-      const available = npGrid.getBoundingClientRect().left - 2 * NP_GAP;
-      npLastWidth = available > 80 ? available + 'px' : '';
-    }
-    el.style.width = npLastWidth;
+  /* ---- draggable pill ---- */
+  const NP_PILL_KEY = 'np_pill_pos';
+  const NP_SNAP_PX = 80;
+  const NP_DRAG_THRESHOLD = 5;
+  const npPillHandle = document.getElementById('np-pill');
+  function npPillClamp(x, y){
+    const w = el.offsetWidth || 220, h = el.offsetHeight || 50;
+    return {x: Math.round(Math.max(0, Math.min(window.innerWidth - w, x))), y: Math.round(Math.max(0, Math.min(window.innerHeight - h, y)))};
   }
-  window.addEventListener('scroll', npReposition, {passive: true});
-  window.addEventListener('resize', npReposition, {passive: true});
+  function npPillSnap(x, y){
+    const w = el.offsetWidth || 220, h = el.offsetHeight || 50;
+    return {
+      x: x < NP_SNAP_PX ? 0 : window.innerWidth  - x - w < NP_SNAP_PX ? window.innerWidth  - w : x,
+      y: y < NP_SNAP_PX ? 0 : window.innerHeight - y - h < NP_SNAP_PX ? window.innerHeight - h : y
+    };
+  }
+  function npPillUpdateShape(x, y){
+    const w = el.offsetWidth || 220, h = el.offsetHeight || 50, R = 18;
+    const onL = x < 10;
+    const onR = window.innerWidth  - x - w < 10;
+    const onT = y < 10;
+    const onB = window.innerHeight - y - h < 10;
+    el.style.borderRadius = `${onT||onL?0:R}px ${onT||onR?0:R}px ${onB||onR?0:R}px ${onB||onL?0:R}px`;
+  }
+  function npPillSetPos(x, y){ // x/y = coordenadas de viewport
+    if (npAbsMode){
+      // dentro de .wrap (position:relative), converte viewport → relativo ao .wrap
+      const wr = (document.querySelector('.wrap') || document.body).getBoundingClientRect();
+      el.style.left = (x - wr.left) + 'px';
+      el.style.top  = (y - wr.top)  + 'px';
+    } else {
+      el.style.left = x + 'px';
+      el.style.top  = y + 'px';
+    }
+    el.style.bottom = 'auto'; el.style.right = 'auto';
+    npPillUpdateShape(x, y);
+  }
+  (function(){
+    try {
+      const s = JSON.parse(localStorage.getItem(NP_PILL_KEY));
+      if (s){
+        if (s.abs){
+          npAbsMode = true; el.classList.add('np-absolute');
+          const wrap = document.querySelector('.wrap');
+          if (wrap) wrap.appendChild(el);
+        }
+        const c = npPillClamp(s.x, s.y); npPillSetPos(c.x, c.y);
+      }
+    } catch{}
+  })();
+  function npSavePos(){
+    const r = el.getBoundingClientRect();
+    try { localStorage.setItem(NP_PILL_KEY, JSON.stringify({x: r.left, y: r.top, abs: npAbsMode})); } catch{}
+  }
+  let npDragOn = false, npDragOX = 0, npDragOY = 0, npDragStartX = 0, npDragStartY = 0, npDragMoved = false;
+  if (npPillHandle){
+    function _npDS(cx, cy){
+      npDragOn = true; npDragMoved = false;
+      const r = el.getBoundingClientRect();
+      npDragOX = cx - r.left; npDragOY = cy - r.top;
+      npDragStartX = cx; npDragStartY = cy;
+    }
+    npPillHandle.addEventListener('mousedown', e => {
+      if (e.button !== 0 || e.target.closest('button')) return;
+      e.preventDefault(); _npDS(e.clientX, e.clientY);
+    });
+    npPillHandle.addEventListener('touchstart', e => {
+      if (e.target.closest('button')) return;
+      _npDS(e.touches[0].clientX, e.touches[0].clientY);
+    }, {passive: true});
+  }
+  document.addEventListener('mousemove', e => {
+    if (npFollowMode){
+      const w = el.offsetWidth || 220, h = el.offsetHeight || 50;
+      npPillSetPos(...Object.values(npPillClamp(e.clientX - w / 2, e.clientY - h / 2)));
+      return;
+    }
+    if (!npDragOn) return;
+    if (!npDragMoved){
+      const dx = e.clientX - npDragStartX, dy = e.clientY - npDragStartY;
+      if (dx*dx + dy*dy < NP_DRAG_THRESHOLD * NP_DRAG_THRESHOLD) return;
+      npDragMoved = true; el.classList.add('np-dragging');
+    }
+    npPillSetPos(...Object.values(npPillClamp(e.clientX - npDragOX, e.clientY - npDragOY)));
+  });
+  document.addEventListener('touchmove', e => {
+    if (npFollowMode){
+      const t = e.touches[0];
+      e.preventDefault();
+      const w = el.offsetWidth || 220, h = el.offsetHeight || 50;
+      npPillSetPos(...Object.values(npPillClamp(t.clientX - w / 2, t.clientY - h / 2)));
+      return;
+    }
+    if (!npDragOn) return;
+    if (!npDragMoved){
+      const t = e.touches[0];
+      const dx = t.clientX - npDragStartX, dy = t.clientY - npDragStartY;
+      if (dx*dx + dy*dy < NP_DRAG_THRESHOLD * NP_DRAG_THRESHOLD) return;
+      npDragMoved = true; el.classList.add('np-dragging');
+    }
+    e.preventDefault();
+    npPillSetPos(...Object.values(npPillClamp(e.touches[0].clientX - npDragOX, e.touches[0].clientY - npDragOY)));
+  }, {passive: false});
+  function _npDE(){
+    if (!npDragOn) return;
+    npDragOn = false;
+    if (npDragMoved){
+      npWasDragging = true; setTimeout(() => { npWasDragging = false; }, 60);
+      el.classList.remove('np-dragging');
+      if (!npAbsMode){
+        const r = el.getBoundingClientRect(), s = npPillSnap(r.left, r.top);
+        void el.offsetLeft;
+        npPillSetPos(s.x, s.y);
+      }
+      npSavePos();
+    } else {
+      el.classList.remove('np-dragging');
+    }
+    npDragMoved = false;
+  }
+  document.addEventListener('mouseup', _npDE);
+  document.addEventListener('touchend', _npDE);
+  window.addEventListener('resize', () => {
+    if (el.hidden || npAbsMode) return;
+    const r = el.getBoundingClientRect(), c = npPillClamp(r.left, r.top);
+    npPillSetPos(c.x, c.y);
+    npSavePos();
+  }, {passive: true});
+
+  /* ---- follow mode (bolinha) ---- */
+  const npDotBtn = document.getElementById('np-dot-btn');
+  function _npFollowDrop(){
+    npFollowMode = false;
+    el.classList.remove('np-follow', 'np-dragging');
+    if (!npAbsMode){
+      const r = el.getBoundingClientRect(), s = npPillSnap(r.left, r.top);
+      void el.offsetLeft;
+      npPillSetPos(s.x, s.y);
+      npPillUpdateShape(s.x, s.y);
+    }
+    npSavePos();
+  }
+  function _npToggleAbsMode(){
+    const r = el.getBoundingClientRect();
+    el.classList.add('np-dragging');
+    npAbsMode = !npAbsMode;
+    el.classList.toggle('np-absolute', npAbsMode);
+    const wrap = document.querySelector('.wrap');
+    if (npAbsMode && wrap) wrap.appendChild(el);
+    else document.body.appendChild(el);
+    void el.offsetLeft;
+    npPillSetPos(r.left, r.top);
+    void el.offsetLeft;
+    el.classList.remove('np-dragging');
+    npSavePos();
+  }
+  if (npDotBtn){
+    npDotBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (npFollowMode){ _npFollowDrop(); return; }
+      npFollowMode = true;
+      el.classList.add('np-follow', 'np-dragging');
+    });
+    npDotBtn.addEventListener('dblclick', e => {
+      e.stopPropagation();
+      // o primeiro click já ativou o follow; cancela e troca o modo de fixação
+      if (npFollowMode) _npFollowDrop();
+      _npToggleAbsMode();
+    });
+    npDotBtn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); npDotBtn.click(); }
+    });
+  }
+  document.addEventListener('click', e => {
+    if (!npFollowMode || e.target === npDotBtn) return;
+    npWasDragging = true; setTimeout(() => { npWasDragging = false; }, 60);
+    _npFollowDrop();
+  }, true);
+
   document.addEventListener('keydown', e => {
     if (!lastTrackId) return;
     if (e.target.closest('input,textarea,select,[contenteditable]')) return;
