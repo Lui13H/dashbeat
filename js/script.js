@@ -7315,6 +7315,7 @@ function openExampleNotice(){
   let npJustUndocked = false;
   let npAutoDockedByScroll = false;
   let npPreAutoDocPos = null;
+  let npPreScrollDock = null;
   let _npManuallyUndocked = false;
   let npmRafId = null;
   let npmSortKey = 'n', npmSortDir = 1, npmSearchQ = '', npmFilterArtist = '';
@@ -8200,6 +8201,8 @@ function openExampleNotice(){
   const npDockSlotHd = document.getElementById('np-dock-slot-hd');
   const npDockSlotBand = document.getElementById('np-dock-slot-band');
   const npDockSlotTabs = document.getElementById('np-dock-slot-tabs');
+  const npDockSlotMid = document.getElementById('np-dock-slot-mid');
+  const npDockSlotFiltR = document.getElementById('np-dock-slot-filt-r');
   const npToolbarEl = document.querySelector('.toolbar');
   const npHeaderEl = document.querySelector('header.top');
   const npFiltersEl = document.querySelector('.filters');
@@ -8347,7 +8350,7 @@ function openExampleNotice(){
   function _npDist2(cx, cy, r){ return Math.hypot(cx - (r.left + r.width/2), cy - (r.top + r.height/2)); }
   function _npUpdateDockHints(cx, cy){
     let winner = null, bestDist = Infinity;
-    const allSlots = [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand];
+    const allSlots = [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand, npDockSlotMid, npDockSlotFiltR];
     for (const slot of allSlots){
       if (!slot) continue;
       const r = _npSlotRect(slot);
@@ -8410,10 +8413,12 @@ function openExampleNotice(){
       if (npDockSlotHd) npDockSlotHd.classList.remove('np-dock-ready');
       if (npDockSlotBand) npDockSlotBand.classList.remove('np-dock-ready');
       if (npDockSlotTabs) npDockSlotTabs.classList.remove('np-dock-ready');
+      if (npDockSlotMid) npDockSlotMid.classList.remove('np-dock-ready');
+      if (npDockSlotFiltR) npDockSlotFiltR.classList.remove('np-dock-ready');
       if (window.innerWidth >= 900){
         const r = el.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
         let dockTarget = null, dockDist = Infinity;
-        for (const slot of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand]){
+        for (const slot of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand, npDockSlotMid, npDockSlotFiltR]){
           if (!slot) continue;
           const sr = _npSlotRect(slot);
           if (sr.bottom <= 0 || sr.top >= window.innerHeight) continue;
@@ -8435,6 +8440,8 @@ function openExampleNotice(){
       if (npDockSlotHd) npDockSlotHd.classList.remove('np-dock-ready');
       if (npDockSlotBand) npDockSlotBand.classList.remove('np-dock-ready');
       if (npDockSlotTabs) npDockSlotTabs.classList.remove('np-dock-ready');
+      if (npDockSlotMid) npDockSlotMid.classList.remove('np-dock-ready');
+      if (npDockSlotFiltR) npDockSlotFiltR.classList.remove('np-dock-ready');
     }
     npDragMoved = false;
   }
@@ -8452,11 +8459,11 @@ function openExampleNotice(){
   function _npFollowDrop(){
     npFollowMode = false;
     el.classList.remove('np-follow', 'np-dragging');
-    for (const s of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand]) if (s) s.classList.remove('np-dock-ready');
+    for (const s of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand, npDockSlotMid, npDockSlotFiltR]) if (s) s.classList.remove('np-dock-ready');
     if (window.innerWidth >= 900){
       const r = el.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
       let dockTarget = null, dockDist = Infinity;
-      for (const slot of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand]){
+      for (const slot of [npDockSlot, npDockSlotTabs, npDockSlotHd, npDockSlotBand, npDockSlotMid, npDockSlotFiltR]){
         if (!slot) continue;
         const sr = _npSlotRect(slot);
         if (sr.bottom <= 0 || sr.top >= window.innerHeight) continue;
@@ -8546,16 +8553,56 @@ function openExampleNotice(){
       if (el.hidden || npAbsMode) return;
       const gone = e.intersectionRatio < 0.5;
       if (!gone) _npManuallyUndocked = false;
-      if (gone && !npDocked && !_npManuallyUndocked){
+      if (gone && npDocked && npCurrentDockSlot === npDockSlotHd){
+        npPreScrollDock = 'header';
+        npAutoDockedByScroll = true;
+        npUndock();
+        npDock(npDockSlotMid, true);
+      } else if (gone && !npDocked && !_npManuallyUndocked && npAbsMode){
         const r = el.getBoundingClientRect();
         npPreAutoDocPos = {x: r.left, y: r.top};
         npDock(npDockSlotTabs, true);
-      } else if (!gone && npDocked && npAutoDockedByScroll && npCurrentDockSlot === npDockSlotTabs){
-        const savedPos = npPreAutoDocPos;
-        npUndock();
-        if (savedPos){ void el.offsetLeft; npPillSetPos(savedPos.x, savedPos.y); npSavePos(); }
+      } else if (!gone && npDocked && npAutoDockedByScroll && (npCurrentDockSlot === npDockSlotTabs || npCurrentDockSlot === npDockSlotMid)){
+        if (npPreScrollDock === 'header'){
+          npPreScrollDock = null;
+          npUndock();
+          npDock(npDockSlotHd);
+        } else {
+          const savedPos = npPreAutoDocPos;
+          npPreScrollDock = null;
+          npUndock();
+          if (savedPos){ void el.offsetLeft; npPillSetPos(savedPos.x, savedPos.y); npSavePos(); }
+        }
       }
     }, {threshold: [0, 0.5, 1]}).observe(npHeaderEl);
+  }
+
+  if (npFiltersEl){
+    new IntersectionObserver(([e]) => {
+      if (el.hidden || npAbsMode) return;
+      const gone = e.intersectionRatio < 0.5;
+      if (gone && npDocked && npCurrentDockSlot === npDockSlotBand){
+        npPreScrollDock = 'filt-l';
+        npAutoDockedByScroll = true;
+        npUndock();
+        npDock(npDockSlot, true);
+      } else if (gone && npDocked && npCurrentDockSlot === npDockSlotFiltR){
+        npPreScrollDock = 'filt-r';
+        npAutoDockedByScroll = true;
+        npUndock();
+        npDock(npDockSlot, true);
+      } else if (!gone && npDocked && npAutoDockedByScroll && npCurrentDockSlot === npDockSlot){
+        if (npPreScrollDock === 'filt-l'){
+          npPreScrollDock = null;
+          npUndock();
+          npDock(npDockSlotBand);
+        } else if (npPreScrollDock === 'filt-r'){
+          npPreScrollDock = null;
+          npUndock();
+          npDock(npDockSlotFiltR);
+        }
+      }
+    }, {threshold: [0, 0.5, 1]}).observe(npFiltersEl);
   }
 
   setTimeout(poll, 2000);
