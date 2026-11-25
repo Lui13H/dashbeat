@@ -128,6 +128,10 @@ Pronto quando: marcar, filtrar, remover, recarregar a página e conferir que per
 ✅ Extensão v1.5.67: cobertura de álbuns — álbuns com 1 faixa não são buscados na Apple e aparecem como chips; busca prioriza os álbuns com mais faixas primeiro.
 ✅ Extensão v1.5.68: cobertura de álbuns — barras verticais (gráfico de colunas) com scroll horizontal; % acima, barra com gradiente e cor por nível (100%/50%+/abaixo), nome em 2 linhas, n/tt menor; animação de entrada; álbuns de 1 faixa e pendentes em painel lateral.
 ✅ Extensão v1.5.69: cobertura de álbuns — álbuns com 1 faixa agora ficam atrás de um botão que abre modal com a lista; barras crescem até o teto do card (layout flex, fill em %); barras mais largas (46px); footer abaixo das barras.
+✅ Pill now-playing — scroll-dock automático: IntersectionObserver detecta quando o header sai da tela (threshold 0.5) e teletransporta o pill para o slot das abas; ao rolar de volta, retorna à posição original salva.
+✅ Pill now-playing — header slot completo: barra de progresso full-width no header (elemento #np-bar movido via DOM para header.top); controles (prev/pause/next) centralizados absolutamente no header; info da faixa ancorada à esquerda dos controles, crescendo para a esquerda com max-width; arte do álbum no mesmo tamanho da logo (44px); "lista editada" removido do srcline.
+✅ Pill now-playing — barra de progresso preditiva: requestAnimationFrame com currentProgressMs = lastProgressMs + (Date.now() − lastProgressTs); elimina o efeito de parar/andar entre polls; sem CSS transition no #np-prog.
+✅ Pill now-playing — updates otimistas: ao clicar próxima/anterior mostra instantaneamente a faixa da fila do Spotify (/v1/me/player/queue); guarda a faixa anterior (prevTrackData) para o botão voltar; botão voltar usa spSeekTo(0) se ≥ 3 s tocados (reinicia) e POST previous só se < 3 s (vai para a faixa anterior); _npSkipPending evita cascata de updates otimistas.
 
 ---------------------------------------------------------------------
 TASK 6 — COMPARAR DOIS RECORTES
@@ -312,4 +316,4 @@ diminuir a altura do card 5 perfil e diminuir para apenas 3 musicas e artistas n
 
 Na busca automática das APIs terminar de buscar a foto de todos os álbuns antes de começar a buscar os gêneros musicais
 
-concertar
+concertar o pill que não ta dando mais pra tirar do header kkkk, parou de funcionar as funções do dot e de puxar normal... 

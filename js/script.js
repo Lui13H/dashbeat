@@ -417,8 +417,13 @@ const ALBTOTS = (() => { try { return JSON.parse(localStorage.getItem(ALBTOT_KEY
 const saveAlbTots = () => { try { localStorage.setItem(ALBTOT_KEY, JSON.stringify(ALBTOTS)); } catch (e) {} };
 const albtotKey = (artist, album) => `${albArtKey(artist)}|${String(album || "").trim().toLowerCase()}`;
 const singleKey = t => `${(splitArtistsRaw(t.artist)[0] || "").toLowerCase()}|${normC(cleanTitle(t.title))}`;
+/* memo evita recalcular genresOf/shownGenres N vezes para o mesmo artista numa playlist grande */
+const _mGS = new Map(), _mGE = new Map();
 const T = RAW.map(([n, title, artist, album, sec, date, meta], ri) => {
-  const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null, gs = genresOf(a), ge = shownGenres(a);
+  const a = (artist || "").trim() || NI, m = meta && typeof meta === "object" ? meta : null;
+  if (!_mGS.has(a)) _mGS.set(a, genresOf(a));
+  if (!_mGE.has(a)) _mGE.set(a, shownGenres(a));
+  const gs = _mGS.get(a), ge = _mGE.get(a);
   const od = ALBUM_INFO.dates.get(albArtKey(artist) + "|" + String(album || "").trim()), dfx = DFIX[adateKey(artist, album)], dateUse = dfx && (yearOnly(date) || dfx.force) ? dfx.d : adateFor(artist, album, od || date || "");   // álbum unificado: vale a data mais antiga
   // gs = gênero do Spotify (null = falta buscar) · ge = gênero exibido/calculado (Spotify ou, na falta, Apple)
   return {n, title, artist: a, dfix: !!(dfx && dfx.review && yearOnly(date)), artistRaw: String(RAW0[ri][2] || "").trim(), bands: bandsOf(a), album: albumCanon(artist, album), albumRaw: (album || "").trim() || NI,
@@ -1443,7 +1448,7 @@ function startFullRescan(priorityKeys = new Set(), {onProgress, onNoDate, onSour
 let rgT;
 function refreshShownGenres(){
   clearTimeout(rgT);
-  rgT = setTimeout(() => { for (const t of T){ t.ge = shownGenres(t.artist); t.genre = t.ge && t.ge.length ? t.ge.join(", ") : ""; } render(); }, 1500);
+  rgT = setTimeout(() => { const _rc = new Map(); for (const t of T){ if (!_rc.has(t.artist)) _rc.set(t.artist, shownGenres(t.artist)); t.ge = _rc.get(t.artist); t.genre = t.ge && t.ge.length ? t.ge.join(", ") : ""; } render(); }, 1500);
 }
 async function pumpCovers(){
   if (coverBusy) return;
@@ -2626,7 +2631,9 @@ $("#filtered-list-body").addEventListener("click", e => {
 let decTab = 'decades';
 let decAlbSort = 'year-asc';
 let decDrillKey = null, decDrillBand = null, decDrillTab = null, decDrillAlbum = null;
+let _bootDefer = 0;   // incrementado a cada render() para cancelar renderização progressiva do boot pendente
 function render(){
+  _bootDefer++;
   renderFilters();
   const R = rows();
   const empty = !R.length;
@@ -7134,7 +7141,6 @@ let rz;
 addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { placePill(); if ($("#insights").classList.contains("on")) drawScatter(); if ($("#painel").classList.contains("on") && rows().length){ renderTree(); renderYears(rows()); renderKPIs(rows()); drawEvo(); } }, 120); });
 function boot(){
   placePill();
-  render();
   renderSpAccountBar();
   const _spLoginBtn = $("#sp-login-btn");
   if (_spLoginBtn) _spLoginBtn.addEventListener("click", () => {
@@ -7153,6 +7159,30 @@ function boot(){
     const verify = ssGet("verify") === "1"; ssDel("fresh"); ssDel("verify");
     if (fresh && fresh.ids && fresh.ids.length) setTimeout(() => askFetchFresh(fresh), 1400);
     else if (verify) setTimeout(askVerifyOrder, 1400);
+  }
+  /* renderização progressiva: mostra KPIs + onda imediatamente e adia os cards pesados
+     um por vez, cedendo ao browser entre cada um para não travar a UI com 2300+ músicas */
+  renderFilters();
+  const _bootR = rows();
+  const _bootEmpty = !_bootR.length;
+  $("#content").style.display = _bootEmpty ? "none" : "";
+  $("#empty").classList.toggle("on", _bootEmpty);
+  if (!_bootEmpty){
+    renderKPIs(_bootR);
+    cardRender("wave");
+    renderFilteredList(_bootR);
+    const _deferCards = ["years", "tree", "albums", "rank", "genres", "dna", "decades", "profile"];
+    let _di = 0;
+    const _bootGen = ++_bootDefer;
+    function _nextCard(){
+      if (_bootDefer !== _bootGen) return;   // render() foi chamado no meio, abandona
+      if (_di < _deferCards.length){ cardRender(_deferCards[_di++]); setTimeout(_nextCard, 0); return; }
+      const _evoOff = state.bands.size + state.albums.size + state.genres.size + state.years.size > 0;
+      $("#evo-card").style.display = _evoOff ? "none" : "";
+      if (!_evoOff) cardRender("evo");
+      $("#tm-note").textContent = state.upTo != null ? `Máquina do tempo ligada no Painel (até a #${state.upTo}): os insights usam a playlist inteira.` : "";
+    }
+    setTimeout(_nextCard, 0);
   }
   if (location.hash === "#insights") showTab("insights");
   // botões "Ver insight" nos cards do painel
