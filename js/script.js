@@ -3691,7 +3691,7 @@ const V = {
     return `<div class="ins-donut"><div class="ins-donut-ring"><svg viewBox="0 0 152 152" aria-hidden="true">${paths}</svg><div class="ins-donut-ctr"><b>${pct}</b><small>${sub}</small></div></div><div class="ins-donut-side"><div class="ins-donut-lbl">${label}</div><div class="ins-donut-leg">${leg}</div></div></div>`;
   }
 };
-const cleanTitle = s => s.replace(/\s+-\s+(\d{4}\s+)?(remaster(ed)?|remix|live|ao vivo|demo|bonus track|single version|radio edit|mono|stereo).*$/i, "").replace(/\s+\((\d{4}\s+)?(remaster(ed)?|live|ao vivo)[^)]*\)$/i, "").replace(/\s+[-–—]\s*from\s+[""“”].+$/i, "").trim();
+const cleanTitle = s => s.replace(/\s+-\s+(\d{4}\s+)?(remaster(ed)?|remix|live|ao vivo|demo|bonus track|single version|radio edit|mono|stereo).*$/i, "").replace(/\s+\((\d{4}\s+)?(remaster(ed)?|live|ao vivo|bonus\s*track)[^)]*\)$/i, "").replace(/\s+[-–—]\s*from\s+["””"].+$/i, "").trim();
 
 /* ---------- rules ---------- */
 /* (definidos aqui em cima porque as regras de insights abaixo já usam coverIgnored ao carregar a página) */
@@ -3703,7 +3703,7 @@ const saveDupIgn = () => { try { localStorage.setItem(DUPIGN_KEY, JSON.stringify
 const VERS_KEY = "catalogo-musical:dups-versions";
 const VERS = (() => { try { return JSON.parse(localStorage.getItem(VERS_KEY) || "null") || {}; } catch (e) { return {}; } })();
 const saveVers = () => { try { localStorage.setItem(VERS_KEY, JSON.stringify(VERS)); } catch (e) {} };
-const VERS_LABEL = {live: "versão ao vivo", remaster: "remasterizada", deluxe: "edição deluxe/especial", other: "outra versão (remix, acústica…)"};
+const VERS_LABEL = {live: "versão ao vivo", remaster: "remasterizada", deluxe: "edição deluxe/especial", bonus: "bonus track", other: "outra versão (remix, acústica…)"};
 /* "é um cover" confirmado pela pessoa: sai da lista de pendências (vai pra "Tratados") mas NÃO é ignorado, então continua contando como cover nos insights */
 const CONF_KEY = "catalogo-musical:dups-confirmed";
 const CONF = (() => { try { return new Set(JSON.parse(localStorage.getItem(CONF_KEY) || "[]")); } catch (e) { return new Set(); } })();
@@ -6910,7 +6910,8 @@ function openDups(opt = {}){
     const text = item.rs.map(r => r.title || "").join(" ").toLowerCase();
     if (/\b(live|ao\s+vivo|concerto?)\b/.test(text)) return {type: "live", label: "Ao vivo"};
     if (/\bremaster(?:ed|izada?|ized)?|\d{4}\s+remaster/.test(text)) return {type: "remaster", label: "Remaster"};
-    if (/\b(deluxe|super\s+deluxe|expanded|anniversary|special\s+edition|limited\s+edition|platinum|collector|bonus\s+track)/.test(text)) return {type: "deluxe", label: "Deluxe"};
+    if (/\b(deluxe|super\s+deluxe|expanded|anniversary|special\s+edition|limited\s+edition|platinum|collector)/.test(text)) return {type: "deluxe", label: "Deluxe"};
+    if (/\bbonus\s+track/.test(text)) return {type: "bonus", label: "Bonus track"};
     if (/\bdemos?\b/.test(text)) return {type: "other", label: "Demo"};
     if (/\b(acoustic|acústic[ao])\b/.test(text)) return {type: "other", label: "Acústica"};
     if (/\bremix\b/.test(text)) return {type: "other", label: "Remix"};
@@ -8542,9 +8543,9 @@ function openExampleNotice(){
     } else if (e.key === 'ArrowLeft' && shift && !ctrl){
       e.preventDefault(); spSeek(-15000); toast('-15 segundos');
     } else if (e.key === 'ArrowUp' && ctrl && !shift){
-      e.preventDefault(); spVolume(10); toast(`Volume: ${Math.min(lastVolumePercent+10,100)}%`);
+      e.preventDefault(); spVolume(5); toast(`Volume: ${Math.min(lastVolumePercent+5,100)}%`);
     } else if (e.key === 'ArrowDown' && ctrl && !shift){
-      e.preventDefault(); spVolume(-10); toast(`Volume: ${Math.max(lastVolumePercent-10,0)}%`);
+      e.preventDefault(); spVolume(-5); toast(`Volume: ${Math.max(lastVolumePercent-5,0)}%`);
     }
   });
 

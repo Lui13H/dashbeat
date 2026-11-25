@@ -659,6 +659,73 @@ Pronto quando: números batem com contagens feitas à mão em dados de teste, tr
 sobreposição é avisada, e testado por CDP em 1300px e 420px.
 
 ---------------------------------------------------------------------
+TASK 51 — CARREGAMENTO PROGRESSIVO DO CATÁLOGO NA PÁGINA "OUVINDO AGORA"
+---------------------------------------------------------------------
+Prompt de implementação: https://claude.ai/artifact/FjWTibaPh2NHRif9tT3nfT  (seção TASK 51)
+Objetivo: o browse do catálogo (coluna direita / aba "Catálogo" no celular) dentro do Ouvindo Agora
+não pode renderizar todas as músicas de uma vez — com playlists grandes isso trava o site inteiro.
+A solução é renderizar só as linhas visíveis e ir adicionando mais conforme a pessoa desce.
+
+Comportamento:
+- Na abertura da página, renderizar apenas as primeiras 40 linhas da lista filtrada.
+- Um IntersectionObserver observa um elemento-sentinela invisível no fim da lista; quando esse
+  sentinela aparece na tela, as próximas 40 linhas são adicionadas ao DOM (append, não substituir).
+- Resultado: o DOM nunca tem mais do que ~80 linhas a mais do que o visível, sem reimplementar
+  toda a lógica de scroll virtual.
+- Cada linha exibe só o que a coluna precisa mostrar: número, capa pequena (20px), título,
+  artista, duração e indicador de etiqueta (coração/estrela se houver). Sem popularidade, sem
+  gênero, sem explícita, sem álbum — esses dados não são usados nessa view.
+- Quando qualquer coisa muda a ordem ou o conteúdo da lista — campo de busca, select de
+  artista/gênero, clique em cabeçalho de coluna pra reordenar — a lista é zerada, as primeiras
+  40 linhas da nova seleção/ordem são renderizadas, o scroll da lista volta ao topo e o sentinela
+  é re-observado. Nunca reordenar as linhas já no DOM: sempre descartar e reconstruir do zero.
+- Contador "X de Y músicas" no topo da lista já mostra o total filtrado desde o início (calculado
+  sem renderizar as linhas).
+- Funciona igual ao comportamento de hoje para playlists pequenas (< 40 músicas) sem nenhum
+  salto visual.
+Casos de borda: filtro que retorna 0 músicas (mensagem "Nenhuma faixa encontrada");
+scroll rápido até o fim antes do append terminar (sentinela sai e volta → não duplicar linhas,
+usar flag `isAppending`); redimensionar a janela no meio do scroll (re-checar se o sentinela
+ainda está visível e completar o batch se necessário).
+Pronto quando: abrir com playlist de 1 000+ músicas não trava nem pisca, scroll suave até o fim
+sem saltos, busca e filtro resetam a lista instantaneamente, testado por CDP com 1 300 músicas
+e throttle de CPU 4× desligado.
+
+---------------------------------------------------------------------
+TASK 50 — TRANSFORMAR O MODAL "OUVINDO AGORA" EM PÁGINA PRÓPRIA
+---------------------------------------------------------------------
+Prompt de implementação: https://claude.ai/artifact/FjWTibaPh2NHRif9tT3nfT  (seção TASK 50)
+Objetivo: o modal "Ouvindo Agora" (que abre ao clicar no pill) vira uma página dedicada dentro do
+Dashbeat, em vez de um overlay modal. Isso dá mais espaço pra respirar e uma base sólida pra todas
+as funções novas que virão (pré-visualização de áudio, fila editável, letras, etc.).
+
+Comportamento:
+- A "página" funciona como uma view SPA: ao clicar no pill (ou em qualquer gatilho do modal atual),
+  o conteúdo principal (painel, insights) some e a página Ouvindo Agora ocupa toda a tela — sem overlay,
+  sem scroll bloqueado, sem backdrop. URL ganha hash #ouvindo-agora (window.location.hash) pra
+  permitir voltar com o botão Voltar do browser.
+- Botão "← Voltar ao painel" no canto superior esquerdo; pressionar Escape ou o botão Voltar do
+  browser retorna à view anterior (preservando filtros, posição de scroll e aba ativa do painel).
+- Layout da página: coluna esquerda (capa grande, info, barra de progresso, controles, ações,
+  fila de reprodução) e coluna direita (browse completo do catálogo com busca e filtros) — mesmo
+  conteúdo de hoje, mas sem as limitações de altura de um modal.
+- O pill continua visível sobre a página Ouvindo Agora (como hoje sobre o modal): serve de âncora
+  visual de que a música ainda está tocando.
+- Em celular: layout de coluna única, coluna direita (browse) vira aba "Catálogo" na mesma página,
+  alternando com a view principal via tabs no topo.
+- Toda a lógica de `openNpModal` / `closeNpModal` vira `openNpPage` / `closeNpPage`;
+  `npmBg.hidden` vira `npPageEl.hidden`; body.overflow não é mais alterado.
+- O estado `npmIsOpen` continua existindo (renomear para `npPageOpen`) pra que o pill e outros
+  gatilhos saibam que a página está visível.
+- Animação de entrada: a página desliza de baixo pra cima (transform translateY) em 250ms;
+  saída desliza de volta. Mesmo efeito do modal atual, sem o backdrop escuro.
+Casos de borda: pill clicado quando já está na página (não faz nada); hash mudado manualmente
+(só reagir se for #ouvindo-agora); botão Voltar do browser depois de navegar pra outra aba pelo
+browse (voltar vai pra página Ouvindo Agora, não direto pro painel).
+Pronto quando: clicar no pill abre a página, Voltar fecha e restaura o painel exatamente como
+estava, Escape funciona, hash muda e volta corretamente, testado por CDP em 1300px e 420px.
+
+---------------------------------------------------------------------
 TASK 49 — BUG: Concertar o pill "Now Playing"
 ---------------------------------------------------------------------
 O pill de "Now Playing" parou de funcionar corretamente: as funções do dot (indicador de progresso)
