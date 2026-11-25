@@ -1455,10 +1455,14 @@ async function pumpCovers(){
   coverBusy = true;
   let fails = 0;
   while (coverQueue.length){
-    const item = coverQueue[0];
+    /* capas têm prioridade sobre jobs de fundo (gênero, datas, etc.):
+       procura o primeiro item de capa (array) na fila; só cai em job quando não há nenhum */
+    const fgIdx = coverQueue.findIndex(x => Array.isArray(x));
+    const idx = fgIdx >= 0 ? fgIdx : 0;
+    const item = coverQueue[idx];
     if (item.job){
       try { await item.job(); } catch (e){ fails++; await coverSleep(Math.min(120000, 20000 * fails)); continue; }
-      fails = 0; coverQueue.shift(); await coverSleep(3200); continue;
+      fails = 0; coverQueue.splice(idx, 1); await coverSleep(3200); continue;
     }
     const [key, artist, album] = item;
     let url = null;
@@ -1470,7 +1474,7 @@ async function pumpCovers(){
       continue;
     }
     fails = 0;
-    coverQueue.shift();
+    coverQueue.splice(idx, 1);
     if (!coverOf(key)){ COVERS[key] = url || {miss: Date.now()}; saveCovers(); }   // não sobrescreve uma capa do Spotify que chegou enquanto buscava
     (coverWaiting.get(key) || []).forEach(cb => cb(url));
     coverWaiting.delete(key);
@@ -8201,7 +8205,15 @@ function openExampleNotice(){
   const npFiltersEl = document.querySelector('.filters');
   const npTabsEl = document.querySelector('.tabs-play');
   const npDtoolsEl = document.querySelector('.dtools');
+  const npBrandEl = npHeaderEl ? npHeaderEl.querySelector('.brand') : null;
   let npCurrentDockSlot = null;
+  let _npBrandObs = null;
+  function _npUpdatePillLeft(){
+    if (!npHeaderEl || !npBrandEl) return;
+    const br = npBrandEl.getBoundingClientRect();
+    const hr = npHeaderEl.getBoundingClientRect();
+    npHeaderEl.style.setProperty('--np-pill-l', (br.right - hr.left + 8) + 'px');
+  }
   function npPillClamp(x, y){
     const w = el.offsetWidth || 220, h = el.offsetHeight || 50;
     return {x: Math.round(Math.max(0, Math.min(window.innerWidth - w, x))), y: Math.round(Math.max(0, Math.min(window.innerHeight - h, y)))};
@@ -8273,17 +8285,28 @@ function openExampleNotice(){
       const npBarEl = el.querySelector('#np-bar');
       if (npBarEl) npHeaderEl.appendChild(npBarEl);
       npHeaderEl.classList.add('np-hd-active');
+      _npUpdatePillLeft();
+      if (npBrandEl && window.ResizeObserver && !_npBrandObs){
+        _npBrandObs = new ResizeObserver(_npUpdatePillLeft);
+        _npBrandObs.observe(npBrandEl);
+      }
     }
     npSavePos();
   }
   function npUndock(){
     if (!npDocked || !npCurrentDockSlot) return;
-    if (npCurrentDockSlot === npDockSlotHd){
+    // captura posição visual ANTES de mudar DOM/CSS
+    const isHd = npCurrentDockSlot === npDockSlotHd;
+    const pr = isHd && npPillHandle ? npPillHandle.getBoundingClientRect() : el.getBoundingClientRect();
+    if (isHd){
       const npBarEl = document.getElementById('np-bar');
       if (npBarEl && npBarEl.parentNode !== el) el.appendChild(npBarEl);
-      if (npHeaderEl) npHeaderEl.classList.remove('np-hd-active');
+      if (npHeaderEl){
+        npHeaderEl.classList.remove('np-hd-active');
+        npHeaderEl.style.removeProperty('--np-pill-l');
+      }
+      if (_npBrandObs){ _npBrandObs.disconnect(); _npBrandObs = null; }
     }
-    const pr = el.getBoundingClientRect();
     npDocked = false; npCurrentDockSlot = null;
     if (!npAutoDockedByScroll) _npManuallyUndocked = true;
     npAutoDockedByScroll = false; npPreAutoDocPos = null;
@@ -8347,7 +8370,7 @@ function openExampleNotice(){
       const dx = e.clientX - npDragStartX, dy = e.clientY - npDragStartY;
       if (dx*dx + dy*dy < NP_DRAG_THRESHOLD * NP_DRAG_THRESHOLD) return;
       npDragMoved = true;
-      if (npDocked){ npUndock(); npJustUndocked = true; const r2 = el.getBoundingClientRect(); npDragOX = e.clientX - r2.left; npDragOY = e.clientY - r2.top; }
+      if (npDocked){ const _wasHd = npCurrentDockSlot === npDockSlotHd; npUndock(); npJustUndocked = true; const w = el.offsetWidth || 220, h = el.offsetHeight || 50; if (_wasHd){ npDragOX = w / 2; npDragOY = h / 2; } else { const r2 = el.getBoundingClientRect(); npDragOX = e.clientX - r2.left; npDragOY = e.clientY - r2.top; } }
       el.classList.add('np-dragging');
     }
     npPillSetPos(...Object.values(npPillClamp(e.clientX - npDragOX, e.clientY - npDragOY)));
@@ -8370,7 +8393,7 @@ function openExampleNotice(){
       const dx = t.clientX - npDragStartX, dy = t.clientY - npDragStartY;
       if (dx*dx + dy*dy < NP_DRAG_THRESHOLD * NP_DRAG_THRESHOLD) return;
       npDragMoved = true;
-      if (npDocked){ npUndock(); npJustUndocked = true; const r2 = el.getBoundingClientRect(); npDragOX = t.clientX - r2.left; npDragOY = t.clientY - r2.top; }
+      if (npDocked){ const _wasHd = npCurrentDockSlot === npDockSlotHd; npUndock(); npJustUndocked = true; const w = el.offsetWidth || 220, h = el.offsetHeight || 50; if (_wasHd){ npDragOX = w / 2; npDragOY = h / 2; } else { const r2 = el.getBoundingClientRect(); npDragOX = t.clientX - r2.left; npDragOY = t.clientY - r2.top; } }
       el.classList.add('np-dragging');
     }
     e.preventDefault();

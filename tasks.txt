@@ -36,28 +36,31 @@ CONCLUÍDO
 ✅ Animação POR CARD: cada gráfico tem o seu botão "Animar" e só ele roda a playlist crescendo (o resto do painel fica como está); o botão da máquina do tempo (barra de cima) anima todos os cards. O botão principal fica SEMPRE no mesmo lugar (Animar → Pausar → Retomar) ao lado ficam as velocidades 0,12x (= 0,125) / 0,25x / 0,5x / 1x / 2x / 4x (nos cards que couberem, não no celular; a velocidade é UNIVERSAL: escolher em qualquer card, na tela cheia ou na barra de cima muda todas), e o "Cancelar" nos cards (a barra de cima não tem Cancelar: ela tem "Voltar ao presente" e o chip "Tempo" cancela) (para a animação e manda direto pro final, a playlist inteira, sem recomeçar; o ajuste final sai na velocidade lenta da animação) aparece ao lado dele; o chip "Tempo · Até a #n ×" da máquina do tempo fica na linha de filtros (em cima do player) enquanto ela está na tela e sobe para o cabeçalho colado quando a tela desce (e não pisca mais: os chips de filtro só são reconstruídos quando os filtros mudam); o indicador "Até a #n ×" aparece uma vez só no cabeçalho do site (barra fixa; no celular, uma etiqueta flutuante no topo) em vez de em cada card (só a tela cheia do quadrado mantém o dela); nos cards eles ficam numa fileira de controles embaixo do título, como qualquer outro botão do card (quebra de linha normal, funciona no celular); só um card anima por vez; pausar termina o desenho sem animações e os quadrados param em ~0,35 s. No gráfico de quadrados o card fica só com "Esconder nomes", "Esconder sombra", "Tela cheia" e os botões de animação (números e bordas ficam só na tela cheia), e a tela cheia tem Animar/Pausar, Retomar e Reiniciar ligados à mesma animação (na "tela super cheia" a barra de espaço pausa/continua). A velocidade da troca dos quadrados acompanha a velocidade da animação (0,125x ≈ 3,1 s; 0,25x ≈ 2,2 s; 0,5x ≈ 1,5 s; 1x ≈ 1,1 s; 2x ≈ 0,77 s; 4x ≈ 0,54 s; referência 1,25 s em 0,75x); blocos que estavam saindo e voltam (inclusive na tela cheia) nascem de novo no canto de baixo à direita e, quando a animação acaba e o gráfico se ajusta pro melhor layout, o ajuste usa essa mesma duração lenta (volta ao normal depois). Corrigido o botão de pausar que perdia o clique (o conteúdo do botão era reescrito a cada quadro). Corrigido também um erro de carregamento (coverIgnored usado antes de ser definido) que fazia a regra de insights de títulos repetidos ser ignorada.
 ✅ Arquivos baixados (TXT e Excel) vêm com a data e a quantidade de músicas no nome: 358-msc_DD-MM-AA (ex.: 358-msc_20-10-26.xlsx).
 ✅ Gráfico de quadrados: corrigido o bug das fotos paradas no meio do gráfico na máquina do tempo (banda que saía e voltava em menos de 1,2 s criava um quadrado novo sem remover o antigo, e o timer do antigo apagava o novo do controle interno, deixando-o órfão na tela). Novo botão "Estilo" no card agrupa as opções, todas no sentido positivo (caixa marcada = ligado): Mostrar nomes, Mostrar números, Mostrar sombra, Bordas redondas e Animar a troca de lugar (desmarcada = os quadrados pulam direto, sem deslizar); a sombra desliga sozinha com nomes e números desmarcados e volta quando um deles é marcado. "Tela cheia" agora abre direto a tela cheia do navegador (sem o modal; espaço pausa/continua, Esc ou clique sai) e fica na linha do título. Controles de todos os cards na ordem: botões extras, velocidade, Animar/Pausar/Retomar, Cancelar; no gráfico de quadrados os botões (Estilo, velocidade, play, Cancelar) ficam em tamanho natural, alinhados à esquerda, e o seletor de velocidade foi alinhado com os botões (altura de 40 px).
-✅ O site agora se chama Dashbeat ("Sinta a batida. Revele o impacto."): título das duas páginas, cabeçalho do painel com a logo (emblema da onda sonora recortado do banner, img/logo.png) no lugar do equalizador, favicon (img/favicon.png), banner no topo do tutorial (img/banner-transparente.png: o banner original com o fundo preto transformado em transparência e recortado, então encaixa em qualquer fundo; o original img/banner.png foi removido da pasta e continua no histórico do git), rodapés e nome do app sugerido no tutorial do Spotify. O tutorial (index.html) ganhou as cores e fontes do painel (verde esmeralda/menta, fundo floresta, Manrope e Sora) em vez do verde Spotify e cinza. Obs.: o img/logo.jpeg estava vazio (0 bytes e foi removido), então a logo (img/logo.png) e o favicon foram gerados a partir do banner, também com fundo transparente.
-✅ Cartões para compartilhar (botão "Cartões" na barra de ferramentas, js/cartoes.js): imagens PNG desenhadas em <canvas> (sem biblioteca e sem rede), em dois formatos — vertical 1080x1350 e horizontal 1920x1080 (título à esquerda, conteúdo à direita) — e em dois temas (escuro verde e claro), com nome opcional ("A playlist de Fulano") e opção de usar a playlist inteira ou o recorte dos filtros. Cartões (só aparece o que tem dado): capa em números, bandas (top 3), mapa de bandas (mesmo layout squarify do gráfico de quadrados, com a capa do álbum mais presente de cada banda — só as capas que o painel já guardou, carregadas com crossOrigin: se o servidor não liberar, o quadrado fica só com o nome e a exportação não trava), décadas (ano médio de lançamento em destaque e ano de pico), gêneros (se 30%+ das faixas têm), jornada em 6 fases (a partir de 30 faixas) e curiosidades (faixa mais longa, álbum com mais faixas, % explícitas, popularidade média). Texto nunca estoura (reduz a fonte, quebra e põe reticências), marca "Dashbeat" no rodapé, sem nome de marca do Spotify. Ações: Baixar PNG, Baixar todos (.zip, reaproveitando zipStore com o tipo MIME parametrizado) e Copiar imagem (só onde o navegador deixa). Setas do teclado trocam de cartão; tema, formato e nome ficam salvos. O cartão do mapa de bandas tem um botão "Estilo" com as mesmas opções do gráfico do painel (Mostrar nomes, números, sombra e Bordas redondas; caixa marcada = ligado; começam iguais às do painel e ficam salvas à parte; a sombra desliga sozinha com nomes e números desmarcados) e o quadrado "+N bandas" fica mais escuro no tema escuro e mais claro no tema claro. Testado por CDP: os 7 cartões nos 2 formatos, recorte, nome longo, playlist de 1 faixa, zip com PNGs válidos, capa inacessível e celular (420px).
-✅ Card de álbuns agora é "Músicas por álbum" (padrão: ordenado e com barras pela quantidade de faixas, desempate pela duração) com um alternador "Faixas | Duração" no cabeçalho que troca para a visão antiga, "Duração por álbum" (barras e ordem pelo tempo total, desempate pelas faixas). Título, texto de ajuda e valores mudam junto; a escolha fica salva. A fileira de controles do card (alternador, velocidade, Animar, Cancelar) fica com os botões em tamanho natural, alinhados à esquerda (só quebra de linha se faltar espaço).
-✅ A velocidade da animação nos cards virou um botão único (mostra a velocidade atual, ex.: "1x ▾", do mesmo tamanho dos outros botões) que abre um mini menu com 0,12x / 0,25x / 0,5x / 1x / 2x / 4x; continua universal (escolher em um card muda todos e a barra de cima) e agora também aparece no celular, onde antes ficava escondida por falta de espaço.
-✅ Botão de tocar/pausar da máquina do tempo também no cabeçalho fixo: quando a barra da máquina do tempo sai de vista (a tela desce) aparece um botão redondo de play/pause ao lado das abas (no celular, flutuando no topo junto com a etiqueta "Até a #n"), igual e sincronizado com o da barra grande; some no topo da página e na aba Insights. De quebra, corrigido o bug de celular em que a animação de entrada do cabeçalho prendia a etiqueta flutuante dentro dele (ela ficava fora da tela).
-✅ O card "Ano com mais lançamentos" virou "Ano médio de lançamento": o número grande é a média dos anos de lançamento (respeita filtros e a máquina do tempo) e a informação menor embaixo diz "Ano com mais músicas: 2004 · 30 faixas" (com "empate com +N" quando há).
-✅ Filtro por ano: clicar numa coluna do gráfico "01 · Linha do tempo" filtra o painel pelas músicas daquele ano (clicar de novo tira; dá pra somar vários anos; também funciona pelo teclado com Enter/Espaço). A coluna escolhida fica destacada e as outras escurecem mas continuam visíveis pra trocar de ano; aparece o chip "Ano 2004 ×" (e entra em "Limpar filtros", na lista de músicas filtradas, nos KPIs, nos cartões para compartilhar e esconde o gráfico de evolução, como os outros filtros). Colunas sem músicas não filtram, e se uma troca de banda/álbum deixar o ano sem faixas ele sai sozinho com um aviso. Com um ano escolhido, o gráfico de quadrados (card 02) passa a mostrar ÁLBUNS em vez de bandas (cada quadrado é um álbum, com a capa da banda que mais aparece nele; clicar filtra por álbum, o tooltip é o do álbum) e o título vira "Músicas por álbum"; ao tirar o ano ele volta para bandas e "Músicas por banda/artista". O mesmo vale quando uma banda é escolhida (clicando no ranking "Bandas/artistas do maior para o menor", no próprio gráfico de quadrados ou no filtro de banda): em vez de o quadrado ficar verde, ele "abre em leque" — os álbuns da banda que estão na playlist nascem de dentro do quadrado dela. Cada card (exceto evolução e a lista filtrada) ganhou um botão "Limpar filtros" na fileira de controles, que só aparece quando há filtro de banda, álbum, gênero ou ano ativo e limpa esses filtros (a máquina do tempo continua com o próprio cancelar).
-✅ Álbuns que são o mesmo: o site junta sozinho os álbuns do mesmo artista que só mudam na marca de edição ("Symbolic" e "Symbolic (Remastered Version)", "(Deluxe Edition)", "- 2011 Remaster", "(10th Anniversary Edition)", bonus, expanded, mono/stereo…) em um só em todo o painel, filtros, gráficos e cartões; o nome que prevalece é sempre o de MENOS caracteres. A data do álbum unificado também é sempre a MAIS ANTIGA entre as edições (a original, não a do relançamento): todas as faixas do grupo passam a valer essa data nos gráficos e filtros por ano, e a data de cada edição fica intacta na playlist e nos arquivos baixados. Álbuns que só se parecem (um nome é o começo do outro, como "Human" e "Human (Live)", ou grafia quase igual) ficam "em dúvida", e sequências ("II", "Vol. 2") nunca são juntadas. Na tela Duplicadas e covers há um seletor Músicas | Álbuns com as abas Unificados (o que o site juntou, com as edições e a opção "Não é o mesmo"), Em dúvida ("É o mesmo" / "São diferentes") e Separados por você ("Desfazer"); as respostas ficam salvas (catalogo-musical:album-merges), o painel atualiza ao fechar a tela e uma vez por sessão aparece um aviso quando há dúvidas. Os nomes originais dos álbuns continuam intactos na playlist e nos arquivos baixados (TXT/Excel); a junção só vale na visualização. Na playlist de exemplo: Slipknot (10th Anniversary Edition) e Arise (Remastered) foram juntados (117 → 115 álbuns).
-✅ Card de quadrados (02): alternador "Bandas | Álbuns" (igual ao "Faixas | Duração" do card de álbuns) na fileira de controles, à esquerda do Estilo. Sempre abre em Bandas; em Álbuns cada quadrado é um álbum (capa da banda que mais aparece nele) e o título vira "Músicas por álbum". Um ano ou uma banda escolhidos continuam abrindo a visão de álbuns em leque, e clicar em "Bandas" nesse caso volta para as bandas tirando o filtro de banda e de ano.
-✅ Capas: corrigido o escolhedor de capas da Apple (que só roda quando não há a capa exata do Spotify guardada, como num navegador/endereço novo, ex.: o GitHub Pages — o localStorage é separado por endereço, então o localhost tinha a capa certa guardada e o Pages não). Antes o texto entre parênteses era ignorado, então "Vol. 3: (The Subliminal Verses)" virava "vol 3" e a edição Deluxe ganhava da padrão, e o "Slipknot - EP" valia como o álbum "Slipknot" (a capa verde estranha). Agora a ordem é: nome igual > mesmo álbum sem marca de edição > mesmo álbum em edição (deluxe, remaster) > nome parecido; EP/single e ao vivo só valem se o álbum for um; na busca rápida só o mesmo álbum vale, o resto vai para a discografia. Capas de álbuns unificados também são achadas pelo nome de qualquer edição, e o cache de capas subiu para v3 (as da Apple guardadas pelo escolhedor antigo são descartadas e buscadas de novo; as do Spotify são mantidas). A foto de cada banda no gráfico de quadrados continua sendo a capa do álbum com mais músicas dela na playlist.
-✅ Saúde da playlist (botão "Saúde" na barra, js/saude.js; só com playlist própria, escondido no exemplo): modal com nota de 0 a 100 (anel em SVG) e 7 verificações com contagem, gravidade (ok / atenção / ajuda) e ação: (a) sem dados do Spotify, (b) sem o link guardado, (c) artistas sem gênero — os três abrem o "Atualizar dados" que já pede confirmação;  (e) "Não identificado" e (g) duração 0 s ou acima de 20 min — "Ver as N" abre a tabela das músicas; (f) prováveis duplicadas — abre Duplicadas e covers; (h) grafias parecidas do mesmo artista (Guns N' Roses x Guns N Roses, só lista). Item fixo "Conferir a ordem" com Conferir/Consertar ordem e Inverter ordem (a confirmação de inverter virou a função askReverse, usada também na tabela de Músicas). Nota = 100 menos descontos (peso × fração afetada, com 25% afetado já vale o peso inteiro; qualquer problema tira ao menos 1 ponto). Tudo certo mostra "Tudo certo!" em verde sem lista; sem nenhum dado do Spotify destaca um único "Atualizar dados". Nas listas de "Não identificado" e duração cada faixa tem botão "Editar" (título, artista, álbum, data AAAA-MM-DD/AAAA-MM/AAAA e duração m:ss; valida, pede confirmação, mantém o link e os dados do Spotify da faixa, recarrega e reabre a Saúde pra continuar). Datas só com o ano (que vêm assim do próprio Spotify) são completadas sozinhas pela Apple, sem botão: 1 busca por álbum na fila das capas/gêneros, só vale se for o mesmo álbum e o ano bater, fica guardado em catalogo-musical:apple-dates e vale como data efetiva (a data da playlist e dos arquivos baixados não muda); em silêncio: sem aviso, sem item na Saúde e sem recarregar (vale na próxima vez que o site abrir; a busca segue aos poucos). Datas só com o ano NÃO aparecem na Saúde (a Apple resolve sozinha). O gênero da Apple é provisório (só gráficos e cálculos) e o item "artistas sem gênero do Spotify" continua pendente até a pessoa buscar. Duplicadas e covers saiu da barra e vive na Saúde (abas das músicas divididas em "Para tratar" (UMA lista só, duplicadas e covers juntas, cada caso com "suspeita: repetida/cover" e a pessoa diz qual é o problema; mesmo artista: Repetida / Outra versão / Cover / Outra música; artistas diferentes: Cover / Duplicada / Outra música) e "Tratados" (com uma coluna por classificação lado a lado (4 colunas, nesta ordem: Outra música · Cover · Outra versão · Duplicadas; cada grupo mostra só música e banda, com Desfazer; "Duplicadas" guarda o que foi classificado como Duplicada a partir de um cover — nomes juntados, catalogo-musical:dups-joined — e Desfazer separa os nomes)); ÁLBUNS no mesmo layout: o site só SUGERE (não decide): "Para tratar" tem os álbuns em dúvida E os que ele acha iguais (esses já contam como um só nos gráficos, mas continuam pendentes e pesam na nota da Saúde até a pessoa classificar: Mesmo álbum / Álbuns diferentes) e "Tratados" tem 2 colunas — Álbuns diferentes · Mesmo álbum (só os confirmados, com Desfazer). A tela abre direto em "Tratados" quando não há nada para tratar, mostrando só álbum e nº de faixas, com Desfazer; botões curtos: DUPLICADAS = Repetida [abre a escolha de quais faixas apagar, com confirmação; continua na lista e pesando na nota da Saúde até a duplicada sumir] / Outra versão [sai da nota; depois o site sugere apagar alguma versão e a coluna Outra versão de Tratados tem "Apagar…"; tudo com confirmação] / Outra música; COVERS = Cover / Duplicada [os nomes são a mesma banda escrita diferente: junta os nomes e o grupo passa a Duplicadas] / Outra música), e as dúvidas do site (duplicadas, covers e álbuns em dúvida) PESAM na nota até a pessoa classificar — só chega a 100 quando tudo foi decidido; álbuns unificados só informam (duplicadas, covers, álbuns em dúvida e unificados, com os botões de marcar "Não é repetida/Não é cover/É o mesmo/São diferentes" e, nas DUPLICADAS (mesmo artista), "Mesma música, outra versão" (nos covers, de artistas diferentes, essa opção não existe: ficam "É um cover" — confirma, tira o aviso e continua contando como cover nos insights, guardado em catalogo-musical:dups-confirmed — , "Não é cover" (músicas diferentes com o mesmo nome) e a junção de nomes (o site não detectou que são a mesma banda; fica na Saúde, no item "Grafias parecidas do mesmo artista" com "Juntar" e "Nomes já juntados"/Desfazer; pergunta qual nome fica, junta os nomes em todo o painel só na visualização — o salvo e os arquivos baixados não mudam, t.artistRaw guarda o original — recarrega, e a aba Marcadas tem uma coluna "Mesma banda" com Desfazer; guardado em catalogo-musical:artist-alias; o grupo vira duplicada); a de versão pergunta se é ao vivo, remasterizada, deluxe/especial ou outra; sai das listas e não conta como cover; a aba "Tratados" mostra o tipo e tem Desfazer; guardado em catalogo-musical:dups-versions); ao fechar, volta pra Saúde). Nenhum botão busca nada sem confirmação. Testado por CDP com 5 playlists montadas (perfeita = 100, 1 música, suja, sem dados, exemplo): contagens e botões conferidos. Obs.: a página já passa de 420px de largura no celular por causa dos popovers de filtro e dos orbes do fundo (não é da Saúde).
-✅ A popularidade foi REMOVIDA do site inteiro (a pedido): não é mais guardada ao importar do Spotify, saiu da coluna das tabelas, do card de perfil (histograma), do insight de hits x lado B, dos cartões de compartilhar, do Excel e dos textos; ao salvar ou exportar, o campo antigo some dos dados. As ideias antigas acima que falam de popularidade (ex.: Last.fm no lugar dela) ficam só como histórico.
-✅ Card "06 · Estilo" (gêneros) refatorado: GENRE_ROOT_RULES agrupa sub-gêneros por raiz (Metal, Rock, Hip-hop, Electronic…); modo foco (clicar num gênero esconde os demais e mostra todos os sub-gêneros, em grade de 2 colunas quando há > 6, com scroll); buckets pequenos migram para raiz relacionada (punk→rock, blues→rock, folk→country) ou vão para Outros; sub-gêneros com as mesmas faixas são mesclados num único nome ("British / Nwobhm"); sub-gênero de nome igual à raiz some da lista; sub-gêneros com cor mint e ▸ antes do nome. Card virou full-width. Card "05 · Perfil" virou full-width horizontal e ganhou distribuição por duração (curtas < 3min / normais 3–5min / longas 5–8min / épicas > 8min) e ranking das mais longas, e distribuição por décadas — ambos sempre visíveis sem precisar de dados do Spotify. Saúde: nova verificação "tn" detecta faixas com sufixo de versão no título ("Song (Remastered)", "- Live") e sugere título limpo; detecta "gêmeas" (versão limpa já existente na playlist). genreDivergence() passa a usar allGenresBySource() (inclui TheAudioDB). Botão play da máquina do tempo movido para ao lado das abas Painel/Insights. Botão "Limpar filtros" na barra fixa do header (só aparece quando há filtro ativo, estilo azulado com .clr-btn). Barras de sub-gêneros em azul; barras do card de perfil com gradientes por seção (roxo/âmbar/rosa).
-✅ Faixas fora de álbum que são de álbum (sugestão NÃO obrigatória, não pesa na nota): TODA faixa cujo tipo não é álbum (single/EP, coletânea…) é buscada na Apple em segundo plano (1 busca por faixa, na fila das capas; só vale se a faixa existir num álbum de verdade — sem Single/EP, ao vivo, demo, coletânea ou box set —, o mais antigo, e na mesma data o sem marca de edição; guardado em catalogo-musical:apple-singles). Na Saúde aparece o item 'Singles que são de álbum' com 'Ver sugestões': lista marcada com o álbum da Apple e a faixa N de M; 'Aplicar' troca o álbum e o tipo para álbum (mantém data e demais dados), 'Manter como single' não sugere de novo (catalogo-musical:apple-singles-ignored).
-✅ Reavaliação de datas de álbuns lançados no mesmo dia: na Saúde, o item 'Álbuns próximos do mesmo artista' aparece (e PESA na nota, peso 5, depois que a checagem automática da Apple terminou e a suspeita continua, até a pessoa responder com 'Está certo', 'Editar data' do álbum inteiro ou 'Reavaliar datas') quando um álbum (com data da Apple OU do próprio Spotify) saiu no mesmo ano ou a menos de 2 meses de outro álbum do mesmo artista; a Apple busca sozinha, em segundo plano, a data dos álbuns sinalizados que ainda não conferiu (1 busca por álbum, sem gastar o Spotify) e, se trouxer a mesma data do Spotify, o álbum sai da lista sozinho; nos álbuns com data completa do Spotify, a reavaliação só muda se o Spotify trouxer outra data real; 'Reavaliar datas' confirma o custo (1 busca no Spotify por álbum + até 1 na Apple) e, por álbum: Spotify com data real (precisão dia) → corrige; mesmo ano da Apple → deixa como está; ano diferente → pede a Apple de novo: se confirmar outra data no ano certo, corrige; se voltar a mesma de antes, NÃO aceita: usa o ano do Spotify com o dia e mês da Apple e marca 'Datas para conferir à mão' (item que pesa na nota, peso 5, até a pessoa editar a data; o Editar já vem com a data montada). Nada é gravado nas músicas (catalogo-musical:date-fix e date-reviewed), só vale na visualização enquanto a data guardada for só o ano.
-✅ Álbuns em versão alternativa (deluxe, remaster, expanded…): o site percebe na hora e a APPLE procura sozinho a versão normal só com fontes grátis, em segundo plano e nesta ordem: busca de álbum na Apple, discografia do artista na Apple e MusicBrainz (data original precisa; catalogo-musical:normal-albums). Só o que NENHUMA delas achou pode ser procurado no Spotify, pelo botão 'Procurar também no Spotify (N)' que mostra o custo e pede confirmação (nada de Spotify se uma fonte grátis achou). O MusicBrainz também é a 2ª fonte grátis (depois da Apple) para completar datas só com o ano e para achar o álbum de faixas fora de álbum. Na Saúde, 'Álbuns em versão alternativa' (peso 0: NÃO diminui a nota): 'Ver sugestões' lista o álbum alternativo → versão normal (com data e de onde veio) e 'Trocar' renomeia o álbum e usa a data da versão normal; 'Manter como está' não sugere de novo. Não aparece se o site já juntou o álbum com a versão normal que está na playlist.
-✅ Saúde com nota 100%: botão "Conferir ajustes feitos" (azulado) dentro do modal; abre openHealthHistory() que lista todas as alterações manuais e automáticas agrupadas por categoria (álbuns unificados/separados, artistas mesclados, versões confirmadas, títulos ignorados, álbuns ignorados, datas pela Apple) com botão "Desfazer" por item. Título do insight "faded" corrigido para "O líder do catálogo ficou no passado".
-✅ Personalização da cor do site: botão "Cor" (ícone de paleta) na barra de ferramentas abre modal com slider de matiz (0–359), 9 swatches de cores predefinidas (Vermelho/Laranja/Amarelo/Lima/Verde/Ciano/Azul/Roxo/Rosa), "Cor automática das capas" (extrai matiz dominante das capas das bandas via canvas) e "Restaurar padrão". Toda a UI usa --h: 153 no :root, com todas as variáveis de cor derivadas via hsl(var(--h),…), então trocar o --h recolore o site inteiro. Escolha salva em localStorage. Anel do gráfico de Saúde e botão de Saúde seguem o gradiente do score (vermelho→âmbar→cor do tema). Gráfico de Evolução usa 9 paletas categóricas, uma por preset de tema; ao mover o slider, snappa no preset mais próximo e aplica essa paleta nas linhas. Nomes das linhas do gráfico de Evolução: colisão quebra horizontalmente em até 3 linhas (flex-wrap), nome composto longo usa só a primeira palavra, bandas/gêneros com 1 faixa não ganham label. Gêneros do gráfico de Evolução agrupados por raiz (Metal, Rock…) via genreToRoot().
-✅ Exportar mapa de bandas em 6 formatos: no modal de Cartões, ao selecionar o cartão "Mapa de bandas", aparece a seção "Exportar mapa como" no painel lateral com 6 formatos: Quadrado (1080×1080), Retrato (1080×1350), Story (1080×1920), Desktop (1920×1080), Banner (1500×500) e Wallpaper (2560×1440). Cada botão mostra um ícone proporcional da proporção do formato, o nome e as dimensões. O formato selecionado é salvo no localStorage. Ao clicar "Baixar PNG" com o mapa ativo, o site gera uma imagem que preenche o canvas inteiro com o treemap (sem título nem rodapé), mantendo o mesmo tema e estilo do cartão, e uma marca d'água discreta "Dashbeat" no canto inferior direito. Os outros cartões continuam usando o seletor Vertical/Horizontal como antes.
+✅ O site agora se chama Dashbeat ("Sinta a batida. Revele o impacto."): título das duas páginas, cabeçalho do painel com a logo (emblema da onda sonora recortado do banner, img/logo.png) no lugar do equalizador, favicon (img/favicon.png), banner no topo do tutorial (img/banner-transparente.png), rodapés e nome do app sugerido no tutorial do Spotify. O tutorial (index.html) ganhou as cores e fontes do painel (verde esmeralda/menta, fundo floresta, Manrope e Sora) em vez do verde Spotify e cinza.
+✅ Cartões para compartilhar (botão "Cartões" na barra de ferramentas, js/cartoes.js): imagens PNG desenhadas em <canvas> (sem biblioteca e sem rede), em dois formatos — vertical 1080x1350 e horizontal 1920x1080 — e em dois temas (escuro verde e claro), com nome opcional e opção de usar a playlist inteira ou o recorte dos filtros. Cartões: capa em números, bandas (top 3), mapa de bandas (squarify com capas), décadas, gêneros, jornada em 6 fases e curiosidades. Ações: Baixar PNG, Baixar todos (.zip) e Copiar imagem. Setas do teclado trocam de cartão; tema, formato e nome ficam salvos.
+✅ Card de álbuns agora é "Músicas por álbum" com alternador "Faixas | Duração" no cabeçalho; a fileira de controles do card fica com os botões em tamanho natural, alinhados à esquerda.
+✅ A velocidade da animação nos cards virou um botão único (mostra a velocidade atual, ex.: "1x ▾") que abre um mini menu com 0,12x / 0,25x / 0,5x / 1x / 2x / 4x; continua universal e agora também aparece no celular.
+✅ Botão de tocar/pausar da máquina do tempo também no cabeçalho fixo: quando a barra sai de vista aparece um botão redondo de play/pause ao lado das abas (no celular, flutuando no topo junto com a etiqueta "Até a #n"), igual e sincronizado com o da barra grande; some no topo da página e na aba Insights.
+✅ O card "Ano com mais lançamentos" virou "Ano médio de lançamento": o número grande é a média dos anos de lançamento e a informação menor embaixo diz "Ano com mais músicas: 2004 · 30 faixas".
+✅ Filtro por ano: clicar numa coluna do gráfico "01 · Linha do tempo" filtra o painel pelas músicas daquele ano. Com um ano escolhido, o gráfico de quadrados passa a mostrar ÁLBUNS em vez de bandas. Com uma banda escolhida, os álbuns dela "nascem de dentro" do bloco em leque. Cada card ganhou um botão "Limpar filtros" na fileira de controles.
+✅ Álbuns que são o mesmo: o site junta sozinho os álbuns do mesmo artista que só mudam na marca de edição ("Symbolic" e "Symbolic (Remastered Version)", "(Deluxe Edition)", "- 2011 Remaster", etc.) em um só em todo o painel, filtros, gráficos e cartões; o nome que prevalece é sempre o de MENOS caracteres. A data do álbum unificado é sempre a MAIS ANTIGA entre as edições.
+✅ Card de quadrados (02): alternador "Bandas | Álbuns" na fileira de controles. Um ano ou uma banda escolhidos continuam abrindo a visão de álbuns em leque.
+✅ Capas: corrigido o escolhedor de capas da Apple (antes o texto entre parênteses era ignorado). Ordem: nome igual > mesmo álbum sem marca de edição > mesmo álbum em edição > nome parecido; EP/single e ao vivo só valem se o álbum for um. Cache de capas subiu para v3.
+✅ Saúde da playlist (botão "Saúde" na barra, js/saude.js; só com playlist própria): modal com nota de 0 a 100 (anel em SVG) e verificações com contagem, gravidade e ação. Duplicadas e covers saiu da barra e vive na Saúde. Nenhum botão busca nada sem confirmação.
+✅ A popularidade foi REMOVIDA do site inteiro (a pedido): não é mais guardada ao importar do Spotify, saiu da coluna das tabelas, do card de perfil, dos cartões de compartilhar, do Excel e dos textos.
+✅ Card "06 · Estilo" (gêneros) refatorado: GENRE_ROOT_RULES agrupa sub-gêneros por raiz (Metal, Rock, Hip-hop, Electronic…); modo foco (clicar num gênero esconde os demais e mostra todos os sub-gêneros). Card "05 · Perfil" virou full-width horizontal e ganhou distribuição por duração e ranking das mais longas. Botão "Limpar filtros" na barra fixa do header.
+✅ Faixas fora de álbum que são de álbum (sugestão NÃO obrigatória): buscadas na Apple em segundo plano, sugeridas na Saúde com 'Ver sugestões' e botão 'Aplicar'.
+✅ Reavaliação de datas de álbuns lançados no mesmo dia: a Saúde detecta e oferece reavaliação via Spotify/Apple; datas conflitantes viram 'Datas para conferir à mão'.
+✅ Álbuns em versão alternativa (deluxe, remaster): Apple + MusicBrainz buscam a versão normal em background. Na Saúde, 'Álbuns em versão alternativa' lista e oferece 'Trocar'.
+✅ Saúde com nota 100%: botão "Conferir ajustes feitos" lista todas as alterações manuais e automáticas com botão "Desfazer" por item.
+✅ Personalização da cor do site: botão "Cor" na barra — slider de matiz (0–359), 9 swatches predefinidas, "Cor automática das capas" (extrai matiz dominante via canvas) e "Restaurar padrão". Toda a UI usa --h: 153 no :root. Paletas do gráfico de Evolução sincronizadas com o preset de tema.
+✅ Exportar mapa de bandas em 6 formatos: Quadrado, Retrato, Story, Desktop, Banner e Wallpaper — no modal de Cartões, ao selecionar "Mapa de bandas".
+✅ TASK 5 — FAVORITAS E ETIQUETAS: coração por música e banda; etiquetas próprias ("treino", "nostalgia"); filtros "Só favoritas" e por etiqueta na tabela e no painel; card "Suas favoritas" nos Insights; exportação JSON + colunas no Excel. Favoritar álbuns e gêneros/subgêneros também. GENRE_ADD com 3 gêneros principais. Redirecionamento direto ao painel quando já há dados. Toolbar reagrupada em 4 dropdowns. Ajustes automáticos de saúde (títulos/álbuns) com modal de confirmar/desfazer. Itens de saúde agrupados por categoria. Fases de dominância no gráfico Evolução. Card Favoritas redesenhado (donut + barras). Card Ritmo de Descoberta com play da máquina do tempo e pico dinâmico. Cobertura de álbuns (card 03b): barras verticais com % por álbum.
+✅ Pill now-playing: scroll-dock automático (IntersectionObserver), barra de progresso full-width no header, controles centralizados, barra de progresso preditiva (requestAnimationFrame), updates otimistas ao clicar próxima/anterior.
 
 =====
-PRÓXIMAS TASKS — PROMPTS DETALHADOS (fazer UMA POR VEZ, na ordem; marcar ✅ aqui e mover pra CONCLUÍDO ao terminar)
+PRÓXIMAS TASKS — ordenadas da MENOS para a MAIS prioritária
+(TASK 1 = menos urgente; TASK 49 = mais urgente — trabalhe de baixo pra cima; marcar ✅ e mover pra CONCLUÍDO ao terminar)
 =====================================================================
 Regras valem para TODAS as tasks abaixo:
 - Ler o código existente antes de mexer (js/script.js, css/style.css, painel_musical.html, js/scrollfx.js) e reaproveitar o que já existe: openModal, confirmModal, infoModal, toast, ICON, rows(), state, render(), BY_PLAYLIST, T, IS, groupBy, pct, fmtDur, faixas, esc, songTable, songCells, bindTip/showTip, buildMS, commitRows, ownKey/matchLinkIds.
@@ -70,250 +73,599 @@ Regras valem para TODAS as tasks abaixo:
 - Ao terminar: atualizar este tasks.txt (mover para CONCLUÍDO com descrição curta), NÃO commitar sozinho (só quando o usuário pedir; quando pedir commit, subir versão com bump_version.py, commitar, dar push e mandar o link do Pages https://lui13h.github.io/painel-musical/).
 
 ---------------------------------------------------------------------
-TASK 4 — O QUE MUDOU DESDE A ÚLTIMA VISITA
+TASK 1 — Footer mais transparente
+---------------------------------------------------------------------
+Ajuste visual puro: aumentar a transparência do footer do site para que se integre melhor ao fundo
+escuro. Sem mexer em conteúdo, só em CSS (opacity, background-color, backdrop-filter).
+
+---------------------------------------------------------------------
+TASK 2 — Diminuir tamanho do card "O trecho mais fértil"
+---------------------------------------------------------------------
+O card de Insights "O trecho mais fértil" está muito comprido por listar muitas bandas.
+Reduzir para mostrar no máximo 4 bandas do trecho, escondendo o resto atrás de um "ver mais".
+
+---------------------------------------------------------------------
+TASK 3 — Diminuir altura do card 05 · Perfil
+---------------------------------------------------------------------
+Reduzir o card 05 · Perfil para mostrar apenas 3 itens nos rankings (músicas mais longas, artistas)
+em vez de 4. Ajuste simples de constante ou CSS.
+
+---------------------------------------------------------------------
+TASK 4 — Exportar em CSV e JSON
+---------------------------------------------------------------------
+Adicionar dois botões no dropdown "Exportar ▾": "Baixar .csv" (colunas separadas por vírgula,
+encoding UTF-8 sem BOM) e "Baixar .json" (array de objetos com todos os campos da faixa).
+Reaproveitar a lógica de nome de arquivo (N-msc_DD-MM-AA).
+
+---------------------------------------------------------------------
+TASK 5 — Modo claro
+---------------------------------------------------------------------
+Adicionar tema claro ao site: todas as variáveis CSS de cor têm uma versão light (fundo branco
+acinzentado, texto escuro, glassmorphism mais suave). Toggle "Claro | Escuro" no modal de Cor.
+Preferência salva em localStorage. Respeitar prefers-color-scheme na primeira visita.
+
+---------------------------------------------------------------------
+TASK 6 — Separar em playlists premium e básica
+---------------------------------------------------------------------
+Dividir as funcionalidades em dois níveis: Básico (importação, estatísticas, gráficos principais)
+e Premium (Saúde, Cartões, Mapa Mundial, DNA, etc.). Decisão de negócio — implementar só quando
+houver modelo de monetização definido. Por enquanto, documentar quais recursos seriam de cada tier.
+
+---------------------------------------------------------------------
+TASK 7 — Ctrl+A Ctrl+C na tela de músicas gerar texto válido para upload
+---------------------------------------------------------------------
+Na tela de Músicas, selecionar tudo (Ctrl+A) e copiar (Ctrl+C) deve gerar uma lista de links do
+Spotify (um por linha) que o site aceite no campo de importação. Verificar se o formato atual da
+tabela já gera isso ou se precisa interceptar o evento copy e formatar o clipboard.
+
+---------------------------------------------------------------------
+TASK 8 — Mudança visual mais sutil ao filtrar banda no gráfico de quadrados
+---------------------------------------------------------------------
+Quando o usuário filtra por banda, o bloco dela no gráfico de quadrados fica coberto por um
+quadrado verde sólido. Substituir por: borda verde brilhante + leve sobreposição translúcida
+(rgba ~20% opacidade) para não tampar a foto da banda. Os outros blocos escurecem levemente.
+
+---------------------------------------------------------------------
+TASK 9 — Letras (lyrics.ovh) — idioma e nuvem de palavras
+---------------------------------------------------------------------
+Integrar lyrics.ovh (sem login, sem chave) para buscar as letras das músicas em background.
+Usar só pra estatística: detectar idioma (português, inglês, espanhol…) com heurística de
+palavras comuns e gerar card de Insights "Idioma das letras" (% por idioma) + card "Palavras
+mais repetidas" (nuvem de texto em SVG). Sem exibir a letra inteira (direito autoral).
+Guardado em catalogo-musical:lyrics-stats. Busca pausável, 1 por vez, sem barra spinner.
+
+---------------------------------------------------------------------
+TASK 10 — Setlist.fm — músicas mais tocadas ao vivo
+---------------------------------------------------------------------
+Integrar Setlist.fm API (chave gratuita — tutoriar no assistente de credenciais).
+Para cada artista único, buscar quantas vezes cada música foi tocada em shows. Card de Insights
+"Hinos de show vs lado B": "X% das suas músicas são hinos tocados em toda turnê; Y% a banda
+raramente toca ao vivo." Guardado em catalogo-musical:setlistfm. Rate limit: 2 req/seg.
+
+---------------------------------------------------------------------
+TASK 11 — Banco de dados global + compartilhar estatísticas anônimas
+---------------------------------------------------------------------
+Requer servidor (Firebase/Supabase free tier). Dois recursos: (1) cache global de links do
+Spotify por ID de faixa (evita buscas repetidas entre usuários); (2) opt-in anônimo para
+compartilhar dados agregados que alimentam sugestões automáticas de saúde de playlist para todos.
+Modal de opt-in com explicação clara do que é compartilhado.
+Task de longo prazo — implementar só quando o site tiver base de usuários.
+
+---------------------------------------------------------------------
+TASK 12 — Na busca automática: terminar fotos de álbuns antes de buscar gêneros
+---------------------------------------------------------------------
+Hoje a fila de buscas em background mistura capas e gêneros. Reorganizar a fila de prioridades:
+capas de álbum têm prioridade 1 (terminam todas primeiro), gêneros do Spotify têm prioridade 2.
+Ajuste no sistema de fila existente — sem nova busca, só reordenar.
+
+---------------------------------------------------------------------
+TASK 13 — Nomes no gráfico de linhas: quebrar linha se ultrapassar a tela
+---------------------------------------------------------------------
+No gráfico de Evolução, os labels das linhas aparecem na lateral direita. Se o nome de uma banda
+ultrapassar o limite da tela (ou do container), quebrar em até 2 linhas com word-break inteligente
+(nome composto: quebra no espaço; nome longo único: truncar com reticências + tooltip completo).
+Já existe lógica de flex-wrap — ajustar para também verificar overflow horizontal.
+
+---------------------------------------------------------------------
+TASK 14 — Desfazer (undo) a última importação/edição
+---------------------------------------------------------------------
+Guardar em memória (não em localStorage) um snapshot da playlist antes de cada ação destrutiva
+(Adicionar músicas, Substituir, Inverter ordem, edição manual de faixa). Botão "Desfazer" na barra
+de ferramentas (só ativo quando há snapshot). Confirmar antes de desfazer se a playlist mudou muito.
+Escopo: 1 nível de undo (a ação mais recente). Sem persistir entre sessões.
+
+---------------------------------------------------------------------
+TASK 15 — Mesclar duas playlists exportadas em uma
+---------------------------------------------------------------------
+Na tela de importação, nova aba "Mesclar TXT": o usuário cola ou faz upload de um arquivo TXT
+exportado por este mesmo site; o site combina as faixas da coleção ativa com as do TXT, eliminando
+duplicatas (mesmo título + mesmo artista). Preview antes de confirmar: "X faixas novas, Y já existiam."
+Sem gastar nenhuma busca no Spotify — reutiliza só os dados já no TXT.
+
+---------------------------------------------------------------------
+TASK 16 — Reordenar faixas por drag-and-drop na tabela
+---------------------------------------------------------------------
+Na tabela de Músicas (openTable), adicionar handle de arrastar (⠿) na primeira coluna.
+Arrastar uma linha reposiciona a faixa na playlist (commitRows). Funciona em desktop (HTML5 drag)
+e celular (touch events). Confirmação apenas se mais de 10 faixas forem reordenadas de uma vez.
+Respeitar que a tabela pode estar filtrada — arrastar nesse caso pede confirmação extra.
+
+---------------------------------------------------------------------
+TASK 17 — Wikidata — banda ainda ativa, nº de integrantes
+---------------------------------------------------------------------
+Via SPARQL da Wikidata (endpoint público, sem chave, 1 req/seg). Para cada artista, buscar:
+ainda ativa (disbanded date) e tipo (grupo/solo). Card de Insight novo: "X% das suas bandas
+já encerraram as atividades." Guardado em catalogo-musical:wikidata-bands. Wikidata como reserva
+quando MusicBrainz (TASK 41) não tiver o artista.
+
+---------------------------------------------------------------------
+TASK 18 — Gráfico da "curva normal" (centro/alternado)
+---------------------------------------------------------------------
+Nova visualização compatível com a máquina do tempo: gráfico de colunas onde a maior banda fica
+no centro, a segunda à esquerda, a terceira à direita, a quarta à esquerda da segunda, etc.,
+formando uma pirâmide simétrica. Altura = nº de faixas; cor = cor da banda no gráfico de Evolução.
+Aparece como alternativa no card 04 · Bandas (alternador "Ranking | Corrida | Pirâmide").
+
+---------------------------------------------------------------------
+TASK 19 — Score de Ecletismo vs Profundidade
+---------------------------------------------------------------------
+Um único número de 0 a 100 num slider visual com dois extremos nomeados: "Colecionador" (0 = vai
+fundo em poucos artistas) vs "Explorador" (100 = muitos artistas, poucas faixas de cada).
+Calculado pelo coeficiente de Gini da distribuição de faixas por artista. Aparece no KPI hero
+ao lado do total de faixas, com tooltip explicando o que significa.
+
+---------------------------------------------------------------------
+TASK 20 — PWA — instalável offline
+---------------------------------------------------------------------
+Adicionar Service Worker + manifest.json para tornar o site instalável como app. Cache das
+páginas HTML, CSS e JS (não dos dados do Spotify — esses já ficam no localStorage). Ícone 192px
+e 512px gerados a partir do favicon existente. Badge de "Instalar app" discreta no tutorial.
+Funcionar offline mostrando os dados já salvos; requisições ao Spotify falham graciosamente.
+
+---------------------------------------------------------------------
+TASK 21 — Backup na nuvem (Google Drive / Dropbox)
+---------------------------------------------------------------------
+Botão "Backup ▾" no dropdown Exportar: "Salvar no Google Drive" e "Salvar no Dropbox" (OAuth
+popup, tokens guardados em localStorage). Salva o TXT completo da playlist na nuvem com o mesmo
+nome de arquivo. "Restaurar do Drive/Dropbox" lista os backups salvos e importa o escolhido.
+Sem expor dados a terceiros além do próprio serviço de nuvem escolhido pelo usuário.
+
+---------------------------------------------------------------------
+TASK 22 — Cor automática da capa muda ao tocar a máquina do tempo
+---------------------------------------------------------------------
+Quando "Cor automática das capas" estiver ativa e a máquina do tempo estiver tocando, a cor do
+site atualiza suavemente a cada N faixas conforme a banda dominante muda. Transição CSS de 1,5s
+no --h para não piscar. Pausar a máquina congela a cor; "Voltar ao presente" restaura a cor
+calculada a partir de todas as capas.
+
+---------------------------------------------------------------------
+TASK 23 — Cards que mudaram muito ficam destacados ao adicionar músicas
+---------------------------------------------------------------------
+Após "Adicionar músicas" ou "Substituir", comparar os KPIs e rankings antes × depois (snapshot em
+memória antes da operação). Cards cujos valores mudaram acima de um threshold (ex.: artista subiu
+>2 posições, gênero passou de <10% para >15%) recebem um anel/borda pulsante por ~8 segundos e um
+chip de variação no canto ("↑ +3 faixas"). Sem animações pesadas — só CSS transition no border-color.
+
+---------------------------------------------------------------------
+TASK 24 — Reautenticar automaticamente quando o token do Spotify expira
+---------------------------------------------------------------------
+Quando qualquer chamada ao Spotify retornar 401, detectar o erro, tentar usar o refresh_token
+silenciosamente e repetir a chamada. Se o refresh falhar, abrir modal com "Sua sessão expirou"
+e botão "Reconectar ao Spotify" que reinicia o fluxo OAuth sem perder os dados já importados.
+Hoje o erro aparece só no console.
+
+---------------------------------------------------------------------
+TASK 25 — Mapa de influência entre décadas
+---------------------------------------------------------------------
+Card de Insights: detectar cadeia de influência musical com base nas décadas das bandas da playlist.
+Se há bandas dos anos 80 + 90 + 2000 que compartilham gênero, narrar: "sua playlist traça uma linha
+direta do Heavy Metal dos 80s ao Groove Metal dos 90s e ao Metal Progressivo dos 2000s." Regras de
+texto pré-definidas por gênero-raiz e década — sem IA. Aparece só com ≥ 3 décadas distintas e
+≥ 2 gêneros-raiz.
+
+---------------------------------------------------------------------
+TASK 26 — Modo Apresentação (Slideshow da Playlist)
+---------------------------------------------------------------------
+Botão "Apresentar" na barra de ferramentas. Tela cheia com slides automáticos (5 s cada, pausável):
+cada slide mostra um "capítulo" da playlist com fundo na cor do tema, capa grande do álbum dominante,
+estatística em destaque e uma frase de insight. Fonte grande, legível de longe. Ideal para mostrar
+num telão ou em festas. Setas do teclado avançam/voltam; Esc sai. Sem dependência de API.
+
+---------------------------------------------------------------------
+TASK 27 — Comparar com Top Mundial (clássicos por gênero)
+---------------------------------------------------------------------
+Lista curada embutida no JS: ~300 álbuns clássicos por gênero-raiz (Metal, Rock, etc.) baseada
+em dados abertos. Card no Insights: "você tem 7 de 20 clássicos de Thrash Metal" com barra de
+progresso e lista dos que faltam (nome + ano + artista). Sem API — lista hardcoded, atualizada
+a cada versão do site. Comparar % de cobertura por gênero.
+
+---------------------------------------------------------------------
+TASK 28 — Last.fm — popularidade real e tags de estilo
+---------------------------------------------------------------------
+Integrar Last.fm API (chave gratuita — tutoriar no assistente de credenciais). Para cada artista,
+buscar: contagem de ouvintes (listeners) e tags de estilo mais votadas. Card de Insight novo:
+"mainstream vs lado B" (artistas por quartil de ouvintes). Tags do Last.fm como fonte extra de
+gênero (mais detalhadas que o Spotify). Guardado em catalogo-musical:lastfm. Rate limit: 5 req/seg.
+
+---------------------------------------------------------------------
+TASK 29 — Layout personalizável — drag-and-drop de cards
+---------------------------------------------------------------------
+Modal "Personalizar layout" (botão na barra): lista de todos os cards do painel com toggle
+(mostrar/ocultar) e handle para reordenar por arrastar. Ordem e visibilidade salvas em
+localStorage (catalogo-musical:card-layout). Implementado em CSS/JS puro (sem sortable.js)
+com eventos pointerdown/pointermove/pointerup. Botão "Restaurar padrão" no modal.
+
+---------------------------------------------------------------------
+TASK 30 — Importar de outras plataformas
+---------------------------------------------------------------------
+Na tela de importação, nova aba "Outras plataformas": YouTube Music (colar URL de playlist →
+instrução manual de exportar CSV), Apple Music (exportar biblioteca como CSV/XML → upload do
+arquivo), Deezer (link de playlist → API pública sem login). Cada método tem tutorial em 3 passos
+igual ao do Spotify. Sem nenhum login novo — só parsear o formato que cada plataforma já exporta.
+
+---------------------------------------------------------------------
+TASK 31 — Link somente-leitura para compartilhar o painel
+---------------------------------------------------------------------
+Botão "Compartilhar" na barra: gera um link que codifica a playlist (comprimida com LZ-string)
+na URL (hash #data=…). Quem abre o link vê o painel completo no modo leitura (sem editar, sem
+importar). Limite de ~2000 faixas pela URL (acima disso, instruir a usar TXT). Toast de "link copiado".
+Sem servidor — tudo na URL.
+
+---------------------------------------------------------------------
+TASK 32 — Histórico de Versões / Time Capsule
+---------------------------------------------------------------------
+Botão "Salvar retrato" na barra: salva um snapshot nomeado ("Antes do show do Metallica") em
+catalogo-musical:snapshots (array de { name, date, rows comprimido }). Modal "Retratos" lista todos
+com data e nº de faixas. Comparar dois retratos: quais faixas entraram, saíram, subiram ou desceram
+no ranking, artistas novos. Linha do tempo dos retratos no card de Evolução (marcadores verticais).
+Mais profundo que o "O que mudou" — é histórico permanente e nomeado pelo usuário.
+
+---------------------------------------------------------------------
+TASK 33 — Alertas e Metas
+---------------------------------------------------------------------
+Modal "Metas" na barra de ferramentas: o usuário define metas do tipo "quero ter pelo menos 20
+faixas de Death Metal" ou "cobrir 50% do discurso de Pantera". Para cada meta, barra de progresso
+e % atual. Toast ao atingir ("🎯 Meta atingida: 20 faixas de Death Metal!"). Metas salvas em
+catalogo-musical:goals. Mini card no painel mostrando as metas ativas com progresso.
+Tipos de meta: artista (N faixas), gênero (N faixas ou N% da playlist), cobertura de álbum (N%).
+
+---------------------------------------------------------------------
+TASK 34 — Anotações e Memórias por faixa
+---------------------------------------------------------------------
+Na tabela de Músicas, coluna "✎" com botão por linha: abre um mini editor (textarea 200 chars)
+para anotação pessoal ("comprei esse CD com meu pai em 2003") e campo de data de memória.
+Guardado em catalogo-musical:annotations. Card de Insights "Linha do tempo de memórias" lista
+as faixas anotadas em ordem de data da memória. Exportável no JSON de etiquetas. Totalmente local
+— nunca vai à rede. O Spotify não tem nada parecido.
+
+---------------------------------------------------------------------
+TASK 35 — Lealdade de Artista + Detector de Anomalias
+---------------------------------------------------------------------
+Dois cards novos nos Insights (visão técnica):
+(A) Lealdade de Artista: para o top 10 artistas, mostrar sparkline de adições ao longo da playlist
+e score de fidelidade de 0–100 (burst = 0, distribuído = 100). Narrativa: "Metallica é uma paixão
+duradoura. Sepultura foi uma fase intensa no começo."
+(B) Detector de Anomalias: calcular o "desvio" de cada faixa em relação ao perfil médio (década,
+duração, gênero). Top 5 mais discrepantes ganham destaque: "estas faixas parecem vir de outra
+playlist." Dados necessários: year, sec, genre, posição na playlist.
+
+---------------------------------------------------------------------
+TASK 36 — Smart Playlists / Regras Automáticas
+---------------------------------------------------------------------
+Modal "Smart Playlist" na barra de ferramentas: interface de blocos de condição (Gênero É /
+Ano ENTRE / Artista NÃO É / Favorita / Etiqueta CONTÉM / Duração MAIOR QUE / Álbum É).
+Preview instantâneo da contagem e lista de faixas. Salvar como etiqueta (aplica a todas as
+faixas que atendem à regra) ou como coleção nova (TASK 42). Atualização automática ao mudar
+a playlist. O Spotify tem algo parecido só no mobile, com opções bem básicas.
+
+---------------------------------------------------------------------
+TASK 37 — Recomendações por Lacuna
+---------------------------------------------------------------------
+Card de Insights "O que você ainda não ouviu": baseado na cobertura de álbuns (já implementada)
++ no DNA da playlist (TASK 40), mostrar: "você tem 60% do discurso de Gojira — considere esses
+3 álbuns que faltam" com capa e ano. Sem IA, sem rede — puro algoritmo de cobertura + dados de
+álbuns já carregados pelo site. Top 5 artistas com maior potencial inexplorado. Aparece na aba
+Insights como card da visão simples.
+
+---------------------------------------------------------------------
+TASK 38 — QUIZ DA PLAYLIST
+---------------------------------------------------------------------
+Objetivo: modo quiz interativo — o Dashbeat usa os dados da sua própria playlist para gerar
+perguntas de trivia, tornando o site viciante e único; o Spotify nunca fez algo assim.
+
+Comportamento:
+- Botão "Quiz" na barra de ferramentas. Abre modal de tela cheia.
+- Configuração inicial: dificuldade (Fácil/Médio/Difícil), número de perguntas (5/10/20), categoria
+  (Aleatório / Artistas / Álbuns / Anos / Gêneros / Dados curiosos). Precisa de pelo menos 15 faixas.
+- Tipos de pergunta (100% baseados na playlist — sem nenhuma API):
+    • "Qual álbum tem mais faixas na sua playlist?" [4 opções: o certo + 3 aleatórios próximos]
+    • "Em que ano foi lançado [álbum]?" [4 opções: o ano certo ± variações]
+    • "Qual artista tem mais faixas na sua playlist?" [top 4 artistas embaralhados]
+    • "Esta faixa é de qual álbum?" [faixa escolhida + 3 álbuns errados do mesmo artista]
+    • "Qual gênero domina a playlist?" [top 4 gêneros]
+    • "Qual faixa é mais longa?" [4 opções com durações próximas]
+    • "Quantas faixas [artista] tem na sua playlist?" [valor certo + 3 valores próximos]
+    • "Qual artista entrou primeiro na playlist?" [artistas do top 10, embaralhados]
+    • "Qual dos artistas abaixo você NÃO tem na playlist?" [3 da playlist + 1 real de fora]
+    • "Sua playlist tem mais faixas dos anos 80, 90, 2000 ou 2010s?"
+  Dificuldade muda o tempo disponível (Fácil: ilimitado; Médio: 15s; Difícil: 8s) e os distratores.
+- UI: pergunta no centro, 4 botões (A/B/C/D), barra de timer (animação CSS), capa quando disponível.
+  Resposta certa → verde + confetti leve; errada → vermelho + revelar a certa. Teclas 1–4 e Enter.
+- Pontuação: acertos × bônus de velocidade. Tela final: "Você acertou 7 de 10 — Especialista em Metal!".
+  Badge (ouro/prata/bronze) salvo em catalogo-musical:quiz-best. Histórico dos últimos 5 resultados.
+Casos de borda: faixas sem dados (não entram em perguntas que dependem desse dado); playlist pequena
+(< 15 faixas → botão desabilitado); perguntas não repetem na mesma sessão.
+Pronto quando: 10 tipos de pergunta gerados corretamente, timer funciona, pontuação salva, testado
+por CDP clicando rápido (< 1s entre perguntas) e com playlist pequena.
+
+---------------------------------------------------------------------
+TASK 39 — GERADOR DE SETLIST
+---------------------------------------------------------------------
+Objetivo: o usuário monta um "show" ideal a partir da própria playlist — especificando duração, clima
+e regras; o Dashbeat gera a setlist otimizada e exporta. O Spotify não tem nada parecido.
+
+Comportamento:
+- Botão "Setlist" na barra de ferramentas. Abre modal de tela cheia.
+- Configuração do show:
+    • Duração total (slider: 30 min – 3 h, em passos de 15 min)
+    • Clima de abertura: "Explodir" (faixa mais intensa logo de início) | "Esquentar" (crescendo)
+    • Clima de encerramento: "Clímax" (a mais amada/mais curta no final) | "Gradual" (desacelerar)
+    • Regras opcionais: "Não repetir artista em sequência", "Equilibrar décadas", "Incluir pelo
+      menos N faixas de [artista]", "Excluir faixas explícitas", "Só faixas de álbum"
+    • Priorizar: faixas favoritas (♥) | faixas mais longas | faixas mais curtas | aleatório
+- Algoritmo (puro JS, sem rede): ordena as faixas por critérios combinados (duração-fit, variedade
+  de artista, respeito às regras), monta o setlist greedy e preenche o tempo disponível ±5%.
+- Visualização: lista numerada com capa 32px, faixa, artista, duração, e indicador de "porque entrou"
+  (♥ favorita, 🎯 único artista da década, etc.). Totalizador ao vivo: faixas, duração, cobertura
+  de artistas e décadas. Botão "Embaralhar ordem"; "Regenerar"; "Remover esta" (substituída pelo próximo).
+- Exportar: TXT com título "Setlist — [data]" + "Total: Xh Ymin". Botão "Copiar como texto" e "Baixar .txt".
+- Salvar setlist: "Salvar em etiqueta" (cria etiqueta "Setlist [nome]" nas faixas selecionadas).
+  Histórico das últimas 5 setlists em localStorage.
+Casos de borda: duração maior que a playlist inteira (usar todas e avisar); regras conflitantes (avisar
+antes de gerar); 0 faixas satisfazem todas as regras combinadas (relaxar regras uma a uma até achar
+pelo menos 10 faixas, informando o que foi relaxado); celular (controles em modal de configuração separado).
+Pronto quando: 3 configurações diferentes geram setlists diferentes e consistentes, duração dentro
+de ±5%, exportar funciona, testado por CDP 1300px e 420px.
+
+---------------------------------------------------------------------
+TASK 40 — DNA MUSICAL (Radar + Score de Coesão)
+---------------------------------------------------------------------
+Objetivo: gerar uma "assinatura visual" única da playlist — um gráfico de teia com 8 dimensões e
+um score de coesão de 0 a 100, compartilhável como cartão.
+
+Comportamento:
+- Card novo "⬡ DNA Musical" na aba Painel (full-width). Gráfico de teia (spider/radar) desenhado
+  em SVG puro com 8 eixos, cada um de 0 a 100:
+    1. Concentração de artistas — Herfindahl-Hirschman Index inverso
+    2. Amplitude temporal — dispersão dos anos de lançamento (desvio padrão normalizado)
+    3. Diversidade de gêneros — quantos gêneros-raiz distintos / total possível
+    4. Fator épico — % de faixas > 5 min
+    5. Peso explícito — % de faixas explícitas (ou 50 se sem dados)
+    6. Equilíbrio álbum/single — 100 = tudo álbum; 0 = tudo single
+    7. Ritmo de descoberta — coeficiente de variação do espaçamento entre artistas novos
+    8. Fidelidade ao topo — % das faixas do top 3 artistas
+  Área preenchida na cor do tema; os vértices têm label com ícone e valor. Hover: tooltip com dica.
+- Score de coesão (0 a 100): média ponderada das 8 dimensões; aparece no centro do radar em destaque
+  e no KPI hero. Breakdown: "Coesão de era: 94 · Diversidade: 71 · Fidelidade: 45".
+- Respeita os filtros do painel (DNA do recorte atual, não da playlist inteira).
+- Exportar como cartão: novo cartão "DNA Musical" em js/cartoes.js (radar em canvas com score no centro).
+Casos de borda: playlist com < 10 faixas (aviso "dados insuficientes"); sem dados de tipo/explícita/gênero
+(eixo fica em 50 com "?" e tooltip "dado não disponível"); celular (radar compacto 280px).
+Pronto quando: 8 eixos calculados corretamente verificados à mão com a playlist de exemplo, score de
+coesão estável, cartão exportável, testado por CDP.
+
+---------------------------------------------------------------------
+TASK 41 — MAPA MUNDIAL DAS BANDAS
+---------------------------------------------------------------------
+Objetivo: mostrar de onde vêm as bandas da playlist num mapa-múndi interativo, desenhado em SVG
+inline (mapa SVG do mundo embutido no JS como string comprimida, sem biblioteca de mapas externa).
+
+Comportamento:
+- Fonte de dados: MusicBrainz (sem login, 1 busca por segundo respeitando o rate limit).
+  Para cada artista principal único, buscar a área de origem. Guardado em catalogo-musical:mb-origins.
+  Busca em fila de baixa prioridade (depois de capas e gêneros), 1 artista por vez, silenciosa.
+- Wikidata como reserva: se o MusicBrainz não retornar país, buscar via SPARQL da Wikidata
+  (endpoint público, sem chave). Guardado na mesma chave com source: "wikidata".
+- Card novo "🌍 Origem das Bandas" (aba Painel): SVG do mapa, países com bandas pintados na cor do
+  tema com opacidade proporcional ao número de bandas. Tooltip ao passar o mouse: "Brasil — 5 bandas:
+  Sepultura, Soulfly…". Clicar no país filtra o painel por aquelas bandas (chip "País: Brasil ×").
+- Lista lateral (ou abaixo no celular): ranking de países com bandas, barras e contagem.
+- Insights novos: "X% das suas bandas vêm de [país mais frequente]"; "Y% das suas bandas ainda estão
+  ativas"; "banda mais velha: [nome] fundada em [ano]"; "média de idade das bandas quando tocaram".
+- Sem dados: card fica oculto até pelo menos 1 país ser encontrado; barras de progresso discretas
+  no rodapé mostram "buscando X de N artistas".
+Casos de borda: artista solo vs banda (type: "Person" vs "Group"); artista com múltiplos países
+(escolher o primeiro); MusicBrainz down (timeout de 5s, exponential backoff); celular (mapa compacto).
+Pronto quando: pelo menos 70% dos artistas da playlist de exemplo ganham país, mapa pinta os países
+corretos, clicar filtra, testado por CDP com network offline após os dados carregarem.
+
+---------------------------------------------------------------------
+TASK 42 — MÚLTIPLAS COLEÇÕES
+---------------------------------------------------------------------
+Objetivo: o usuário pode ter N playlists salvas no browser, trocar entre elas com um clique e
+comparar estatísticas cruzadas — como um Spotify pessoal, mas com análise profunda de cada uma.
+
+Comportamento:
+- Estrutura de dados: a chave atual "catalogo-musical:rows" vira "catalogo-musical:c:<id>:rows"
+  (onde id é um UUID curto gerado uma vez). Chave "catalogo-musical:collections" guarda o índice:
+  [{ id, name, createdAt, updatedAt, trackCount, color }]. Migração automática na primeira abertura:
+  se existir a chave antiga "catalogo-musical:rows", criar uma coleção "Minha Playlist" com o id
+  padrão e mover os dados. Todas as outras chaves auxiliares (tags, snapshot, album-merges, etc.)
+  também migram para "catalogo-musical:c:<id>:<sufixo>". Migração silenciosa, sem perder dados.
+- Seletor de coleção: dropdown no header (ao lado da logo), mostra nome e ícone colorido da coleção
+  ativa. Trocar de coleção recarrega tudo instantaneamente (sem reload de página). Limite: 10 por browser.
+- Gerenciar coleções (botão "⚙" no dropdown): modal com lista; ações: Renomear, Duplicar (copia dados
+  + tags), Exportar (TXT/Excel da coleção), Excluir (confirmação com "EXCLUIR [nome]" obrigatório),
+  Reordenar (arrastar).
+- Adicionar coleção: botão "+ Nova coleção" no dropdown → modal pede nome (1–40 chars, sem duplicar);
+  abre já na tela de importação.
+- Comparação cruzada: botão "Comparar coleções" (só aparece com ≥ 2 coleções) abre modal de tela
+  cheia com 2 seletores (Coleção A / B), mesmas métricas da TASK 48 mais: artistas em comum, faixas
+  em comum, gêneros exclusivos de cada um, e um mini treemap de bandas lado a lado. Frase-resumo no
+  topo ("Coleção A tem 358 faixas e foco em Metal; B tem 120 faixas mais diversas.").
+- Importar de outra coleção: em "Adicionar músicas", nova opção "De outra coleção" — abre seletor de
+  coleção + filtro (toda, só favoritas, por etiqueta, por gênero) e adiciona as faixas selecionadas.
+Casos de borda: localStorage cheio (aviso na criação, não na migração); coleção com 0 faixas
+(mostra tela de importação, não o painel vazio); nome repetido (bloquear com aviso inline); celular
+(seletor de coleção em gaveta lateral, não dropdown).
+Pronto quando: criar, trocar, renomear, excluir, duplicar e comparar funcionam; migração dos dados
+antigos ocorre sem perder nada; testado por CDP com 3 coleções de tamanhos diferentes.
+
+---------------------------------------------------------------------
+TASK 43 — PROJEÇÕES E ESTIMATIVAS
+---------------------------------------------------------------------
+Objetivo: o site extrapola a evolução futura da playlist usando os padrões históricos de adição —
+linhas pontilhadas no gráfico de Evolução mostram até onde cada banda vai chegar, e um novo card
+de Insights usa essas projeções para criar narrativas de passado + presente + futuro.
+
+Comportamento:
+- Modelo de projeção (JS puro, sem rede, calculado uma vez e cacheado em memória por sessão).
+  Para cada banda/gênero com ≥ 3 faixas:
+    1. Calcular a velocidade de adição: média e desvio padrão do espaçamento entre faixas
+    2. Calcular o "momentum" atual: janela dos últimos 20% da playlist — acelerou ou desacelerou?
+    3. Calcular o "potencial": quantos álbuns/faixas do artista existem que a playlist não tem ainda
+       (fonte: ALBTOTS da cobertura de álbuns). Artistas com alta cobertura têm menos potencial.
+    4. Fórmula: faixas esperadas nos próximos +N = velocidade_atual × momentum × potencial
+       (bounded: nunca projeta mais do que faixas_em_falta do artista)
+    5. Intervalo de confiança: padrão regular → faixa estreita; surtos → faixa larga
+- Gráfico de Evolução: toggle "Projeção" (novo, ao lado de "Fases") — as linhas continuam além
+  do fim da playlist com traço pontilhado por mais 20% do comprimento atual. Faixa de confiança
+  translúcida ao redor da linha. Tooltip: "projeção: +N faixas com XX% de confiança".
+- Card Insights novo "Futuro da Playlist" (só na visão técnica):
+    • "Se você continuar no mesmo ritmo, Gojira vai chegar a 25 faixas nas próximas 50 adições."
+    • "Metallica está desacelerando — era 1 nova faixa a cada 8 adições, agora 1 a cada 20."
+    • "Carcass tem 12 álbuns que você ainda não tem — maior potencial inexplorado."
+    • "Sepultura entrou em burst (#20–#35) mas parou — provável que não volte com força."
+    • "Os gêneros que crescem mais rápido hoje: Death Metal (+3 faixas nos últimos 30) e Thrash (+2)."
+    • Narrativa gerada por regras (não por IA): combinar padrões de passado, presente e futuro.
+- Toggle "Projeção" respeitado pela máquina do tempo: com a máquina ativa no frame #200 de 400,
+  a projeção começa do #200 e vai até o #240 (ponteado).
+Casos de borda: bandas com < 3 faixas (sem linha de projeção, só ponto); projeção ≤ 0 (linha
+pontilhada plana com tooltip "discografia já bem coberta"); gráfico com > 15 linhas (projeções só
+para o top 10 ativo); celular (tooltip em tap, não hover).
+Pronto quando: projeções visualmente consistentes com o histórico, toggle liga/desliga sem poluir
+o gráfico, card de insights aparece com frases coerentes, testado por CDP com e sem a máquina do tempo.
+
+---------------------------------------------------------------------
+TASK 44 — Busca global por nome de faixa
+---------------------------------------------------------------------
+Campo de busca no topo da aba Painel (ícone de lupa na barra de filtros): digitar filtra instantaneamente
+o painel pelas faixas cujo título contém o texto (case-insensitive, ignora acentos). Chip "Busca: [texto] ×"
+na linha de filtros. Combina com os outros filtros (banda, álbum, gênero, etiqueta). Resultado zero
+mostra "Nenhuma faixa encontrada com esse nome." Esc limpa a busca. Funciona também dentro da
+tabela de Músicas (já tem busca, mas unificar o comportamento).
+
+---------------------------------------------------------------------
+TASK 45 — BARRA DE CORRIDA (Bar Chart Race)
+---------------------------------------------------------------------
+Objetivo: animar a evolução do ranking de bandas/gêneros/álbuns ao longo da playlist com
+o formato icônico de "corrida de barras" (igual aos vídeos de maiores canais do YouTube).
+
+Comportamento:
+- Nova aba "Corrida" dentro do card "04 · Bandas" (ou botão de alternância "Ranking | Corrida").
+- Cada frame mostra o top 10 do momento (barras horizontais com capa, nome, valor e posição #N);
+  barras crescem/encolhem animadas; entradas e saídas com fade; a barra líder tem destaque (brilho leve).
+- Controles: play/pausa, velocidades 0,25x/0,5x/1x/2x/4x (mesmo seletor universal do site),
+  slider de posição (faixa #1 → #N), "Voltar ao início". Respeita a máquina do tempo: se ela
+  estiver ativa, a corrida começa de onde a máquina parou e anima só o trecho restante.
+- Alternador no topo: "Bandas | Gêneros | Álbuns". Respeita os filtros do painel.
+- Ao pausar, clicar numa barra filtra o painel por aquela banda/gênero/álbum (igual ao ranking normal).
+- Frame-rate alvo: 30 fps com requestAnimationFrame; skip de frames se o device atrasar (timestamp-based).
+Casos de borda: playlist com < 10 bandas (mostra todas, sem forçar top 10); mudanças bruscas de posição
+(banda que entra pela primeira vez nasce à direita e desliza para dentro); celular (barras compactas,
+nomes cortados com reticências, fonte menor).
+Pronto quando: animar do início ao fim sem pular frames no Chrome, pausar e retomar do mesmo ponto,
+clicar na barra fora do play filtra o painel, testado por CDP 1300px e 420px.
+
+---------------------------------------------------------------------
+TASK 46 — PRÉVIA DE 30S + MINI PLAYER FLUTUANTE
+---------------------------------------------------------------------
+Objetivo: tocar a prévia de 30 segundos de cada música direto no Dashbeat, sem precisar abrir o
+Spotify — usando a previewUrl gratuita da Apple Music (sem login, sem custo de API).
+
+Comportamento:
+- Na busca de capas (Apple Search API), guardar também o campo previewUrl quando vier.
+  Guardado em catalogo-musical:apple-previews como { <ownKey ou meta.id>: "<url>" }.
+  Limite de 5 MB: se estourar, descartar as mais antigas.
+- Tabela de Músicas: coluna "▶" antes da coluna de número — botão play por linha. Clicar toca;
+  clicar de novo pausa. Faixa tocando fica destacada (fundo levemente iluminado + ícone de equalizador
+  animado simples na coluna ▶).
+- Mini player flutuante (canto inferior direito, acima do botão de scroll) com: capa 40px,
+  título + artista (marquee se longo), barra de progresso fina (somente visual, não scrubável),
+  botões ◀ ▶ ↺ (anterior, próxima, aleatória dentro da lista filtrada) e ✕ (fechar/parar).
+  Sobrevive à troca de aba (Painel ↔ Insights).
+- Faixas sem previewUrl: botão ▶ desabilitado com tooltip "Prévia indisponível para esta faixa".
+- Gráfico de quadrados: o tooltip da banda ganha um botão ▶ que toca a prévia do álbum mais presente.
+- Fila: ao clicar ▶ numa faixa enquanto o player estiver tocando, substituir a fila pela lista filtrada
+  atual a partir daquela faixa. Modo aleatório mistura a lista filtrada.
+Casos de borda: previewUrl expirada (audio.error → remover do cache e mostrar "prévia expirada");
+autoplay bloqueado pelo browser (toast "clique em play para ouvir"); celular (mini player em faixa
+full-width na parte de baixo, não flutuante); sem previewUrl nenhuma (botões ▶ não aparecem na tabela).
+Pronto quando: tocar/pausar/trocar funciona, mini player persiste entre abas, testado por CDP
+com network throttle para simular timeout de áudio e em 420px.
+
+---------------------------------------------------------------------
+TASK 47 — O QUE MUDOU DESDE A ÚLTIMA VISITA
 ---------------------------------------------------------------------
 Objetivo: ao abrir o site, mostrar um resumo do que mudou na playlist desde a última vez que a pessoa viu.
 
 Comportamento:
-- Guardar um "retrato" compacto em localStorage ("catalogo-musical:snapshot"): data/hora, total de faixas, soma de segundos, lista de chaves das faixas na ordem (meta.id quando existir, senão ownKey título|artista), contagem por artista principal e por gênero, e a posição no ranking de cada artista. Só chaves e números (nada de capas), pra ficar pequeno.
-- No boot (somente com STORE): comparar a playlist atual com o retrato. Se não há retrato (primeira vez): criar em silêncio e não mostrar nada. Se não mudou nada: não mostrar nada.
-- Se mudou: faixa discreta no topo do painel (acima dos filtros), dispensável: "Desde sua última visita (há 3 dias): +12 músicas · 2 artistas novos · Gojira subiu 2 posições · +0h40 de música". Botões "Ver detalhes" e "Entendi".
-- "Ver detalhes" abre modal com seções: músicas adicionadas (songTable; clicar numa banda filtra o painel), músicas removidas (lista de chaves → título/artista guardados no retrato), artistas novos, quem subiu/desceu no ranking (setas ▲▼ e variação), gênero que mais cresceu (se houver), e "ordem alterada" quando só a ordem mudou.
-- O retrato só é atualizado quando a pessoa clica "Entendi" (ou fecha o modal de detalhes), pra recarregar a página sem querer não apagar o aviso. Depois de uma troca de playlist inteira (menos de 30% das chaves em comum) mostrar "Playlist nova" em vez de lista gigante de diferenças.
+- Guardar um "retrato" compacto em localStorage ("catalogo-musical:snapshot"): data/hora, total de
+  faixas, soma de segundos, lista de chaves das faixas na ordem (meta.id quando existir, senão ownKey
+  título|artista), contagem por artista principal e por gênero, e a posição no ranking de cada artista.
+  Só chaves e números (nada de capas), pra ficar pequeno.
+- No boot (somente com STORE): comparar a playlist atual com o retrato. Se não há retrato (primeira vez):
+  criar em silêncio e não mostrar nada. Se não mudou nada: não mostrar nada.
+- Se mudou: faixa discreta no topo do painel (acima dos filtros), dispensável: "Desde sua última visita
+  (há 3 dias): +12 músicas · 2 artistas novos · Gojira subiu 2 posições · +0h40 de música". Botões
+  "Ver detalhes" e "Entendi".
+- "Ver detalhes" abre modal com seções: músicas adicionadas (songTable; clicar numa banda filtra o
+  painel), músicas removidas (lista de chaves → título/artista guardados no retrato), artistas novos,
+  quem subiu/desceu no ranking (setas ▲▼ e variação), gênero que mais cresceu (se houver), e "ordem
+  alterada" quando só a ordem mudou.
+- O retrato só é atualizado quando a pessoa clica "Entendi" (ou fecha o modal de detalhes), pra
+  recarregar a página sem querer não apagar o aviso. Depois de uma troca de playlist inteira (menos de
+  30% das chaves em comum) mostrar "Playlist nova" em vez de lista gigante de diferenças.
 - Detalhe de data: "há 3 dias", "ontem", "há 2 horas" (Intl.RelativeTimeFormat pt-BR).
-Casos de borda: localStorage cheio ou bloqueado (não quebrar, só não mostrar), playlist enorme (guardar só chaves), músicas sem id repetidas (chave com contador), vários navegadores (cada um tem o seu retrato).
-Pronto quando: simulando adicionar, remover, reordenar e trocar a playlist (por CDP, alterando o localStorage entre cargas) o resumo bate com a diferença real e some depois do "Entendi".
+Casos de borda: localStorage cheio ou bloqueado (não quebrar, só não mostrar), playlist enorme (guardar
+só chaves), músicas sem id repetidas (chave com contador), vários navegadores (cada um tem o seu retrato).
+Pronto quando: simulando adicionar, remover, reordenar e trocar a playlist (por CDP, alterando o
+localStorage entre cargas) o resumo bate com a diferença real e some depois do "Entendi".
 
 ---------------------------------------------------------------------
-✅ TASK 5 — FAVORITAS E ETIQUETAS
----------------------------------------------------------------------
-Objetivo: a pessoa marca músicas (e bandas) com coração e etiquetas próprias ("treino", "nostalgia") e filtra o painel por elas.
-
-Comportamento:
-- Dados em chave própria ("catalogo-musical:tags"), SEM mexer no formato das linhas da playlist: objeto { músicas: { <meta.id ou ownKey>: { f: 1, t: ["treino"] } }, bandas: { <artista principal em minúsculas>: { f: 1, t: [...] } } }. Sobrevive a reordenar, adicionar e substituir a playlist porque usa o id/chave da faixa.
-- Tabela "Músicas" (openTable): nova primeira coluna com coração (clicar alterna favorita) e, na linha, um botão "etiquetas" que abre um mini popover (campo de texto + sugestões das etiquetas existentes + remover). Filtro "Só favoritas" e filtro por etiqueta na barra da tabela.
-- Painel: novo filtro múltiplo "Etiqueta" na linha de filtros (state.tags, igual ao de gênero), com chip e contador; a opção especial "♥ Favoritas". rows() passa a considerar state.tags. Etiquetas de banda valem pra todas as faixas da banda.
-- Ranking de bandas (card 04): coração pequeno ao lado do nome (clicar favorita a banda sem filtrar; o clique na linha continua filtrando).
-- Insights: um card "Suas favoritas" (só aparece se houver favoritas): % da playlist, bandas/gêneros/décadas mais presentes entre elas.
-- Limites e validação: etiqueta com 1 a 24 caracteres, sem duplicar (ignorar maiúscula/acento), máximo de 30 etiquetas; cor da etiqueta determinística pelo nome (hash → uma das cores da paleta do site).
-- Backup: botão "Exportar etiquetas" (.json) e "Importar etiquetas"; no Excel exportado, colunas "favorita" e "etiquetas".
-Casos de borda: música sem id (usa ownKey; se o id aparecer depois via Atualizar dados, migrar a chave), apagar música (limpar entradas órfãs só quando a pessoa pedir, nunca automático), playlist de exemplo (permitir, mas avisar que as marcas ficam só neste navegador).
-Pronto quando: marcar, filtrar, remover, recarregar a página e conferir que persiste; filtros combinam com banda/álbum/gênero; testado por CDP com cliques reais.
-
-✅ Extensão v1.5.11: favoritar álbuns e gêneros/subgêneros também (TAGS.albuns, TAGS.generos; isFavAlbum, isFavGenre, toggleAlbumFav, toggleGenreFav; isFavT() estendido; heart nos cards de álbuns e gêneros).
-✅ Extensão v1.5.24: GENRE_ADD com 3 gêneros principais de cada banda da playlist
-✅ Extensão v1.5.26: ao entrar no site com pelo menos 1 música salva no localStorage, redireciona direto para painel_musical.html sem passar pela tela de tutoriais.
-✅ Extensão v1.5.28: toolbar reagrupada em 4 botões categorizados — "Playlist ▾" (Músicas + Adicionar músicas), "Favoritas" (solo, sem dropdown), "Exportar ▾" (Cartões + Baixar lista), "Ferramentas ▾" (Cor + Saúde + Atualizar dados). Chevron rotaciona ao abrir; clicar fora fecha.
-✅ Extensão v1.5.29: ajustes de saúde com auto-aplicação — "Revisar títulos" e "Revisar nomes de álbuns" aplicam limpeza automaticamente e abrem modal para confirmar/desfazer por item; ajustes ficam salvos em TRACK_TITLE_CLEAN / ALB_CLEAN e são reversíveis em "Limpar ajustes".
-✅ Extensão v1.5.30: Saúde da playlist reorganizada — itens agrupados por categoria (Música / Álbum / Data / Artista); pendentes aparecem primeiro, sem pendência vão ao final; itens resolvidos mostram badge "Respondido"; gw (duração longa confirmada) e dcr (álbuns próximos confirmados) removidos da lista (redundantes); "Conferir ajustes" também reorganizado por categoria. "Desfazer" nos modais de título/álbum agora adiciona ao IGN para evitar re-flaggeamento.
-✅ Extensão v1.5.34: descrições dos itens de saúde simplificadas — cada item mostra apenas uma linha objetiva do que fazer, sem explicações de custo, fontes ou peso na nota.
-✅ Extensão v1.5.35: modal "Duplicadas e covers" simplificado — removidas descrições longas das abas de álbuns e músicas, legenda explicativa dos botões e parágrafos de "Tratados".
-✅ Extensão v1.5.36: botões "Conferir ajustes feitos" e "Limpar ajustes" aparecem no modal de Saúde assim que houver qualquer ajuste, mesmo quando ainda há problemas pendentes (antes só apareciam com nota 100%).
-✅ Extensão v1.5.37: sufixos de versão em títulos e de edição em álbuns são removidos automaticamente ao carregar a página (sem precisar clicar em "Revisar"); o botão passa a abrir o modal de conferência com "Confirmar e fechar" ou "↩ Desfazer" por item.
-✅ Extensão v1.5.38: modal de conferência de sufixos tem "Confirmar" e "↩ Desfazer" por item (sem botões globais no rodapé); confirmar remove o item da lista e fecha se for o último.
-✅ Extensão v1.5.39: rodapé removido dos modais de conferência de título e álbum — o X no topo já é suficiente para fechar.
-✅ Extensão v1.5.40: ao fechar o modal de conferência (pelo X ou ao confirmar o último item), volta pro modal de Saúde em vez de voltar ao painel.
-✅ Extensão v1.5.41: regex de sufixo de edição expandido para capturar combinações compostas como "(10th Anniversary Deluxe Edition)" — permite descritor extra (Deluxe/Special/Expanded/Limited) entre o tipo e "Edition/Version".
-✅ Extensão v1.5.42: seção "Por década" removida do card 05 · Perfil e adicionada como segunda aba ("Por ano" / "Por década") no card 01 · Linha do tempo.
-✅ Extensão v1.5.43: ao carregar a página, faixas do mesmo artista e álbum (nomes pós-tratamento) com datas diferentes recebem automaticamente a data mais antiga do grupo.
-✅ Extensão v1.5.25: modal Favoritas refeita — lista agrupada por Categoria/Banda/Álbum/Gênero, ordenação por Quantidade/Nome/Playlist, filtragem por tipo (faixas/bandas/álbuns/gêneros) e busca livre; modo compacto por padrão com botão "Mostrar todos os dados" que revela categorias. Tabela Músicas também começa compacta (só #/♥/Música/Artista/Álbum) com mesmo toggle. (41 artistas — Slipknot, Lamb of God, Exodus, Sepultura, Gojira, Metallica, Avenged Sevenfold, Death, Iron Maiden, Pantera, System Of A Down, Dream Theater, Machine Head, Burn The Priest, Chimaira, Megadeth, Mudvayne, Slayer, Testament, Korn, Children of Bodom, Accept, Carcass, Adema, Deftones, Hatebreed, HEALTH, Illdisposed, Judas Priest, Limp Bizkit, Linkin Park, Marilyn Manson, Meshuggah, Municipal Waste, Mushroomhead, Pissing Razors, Soulfly, Stone Sour, Strapping Young Lad, Three Days Grace, Trivium); garante que mesmo sem retorno das APIs os gêneros corretos aparecem.
-✅ Extensão v1.5.60: fases de dominância no gráfico Evolução — estilo "personalizado" com faixas coloridas translúcidas e rótulo de nome da banda sobre cada fase; alternador "Fases" no cabeçalho do card; algoritmo de janela deslizante (densidade ≥ 63%, span mínimo proporcional a N) com cache e gradientes de densidade.
-✅ Extensão v1.5.61: card e modal de favoritas redesenhados — card Insights com layout wide (donut + barras de artistas), modal de lista compactado (gaps, paddings e fontes reduzidos pra caber sem scroll); correção de datas erradas de Death e Megadeth.
-✅ Extensão v1.5.62: título de "Not Ready to Die" corrigido (removido sufixo "- From \"Call of the Dead\"") no DEFAULT_RAW e via TRACK_SUFFIX_RE (auto-limpeza para usuários existentes); campo `ty` adicionado ao objeto de item no modal Favoritas (para exibir "Single/EP" em vez do nome do single).
-✅ Extensão v1.5.63: faixas de single exibem "Single/EP" no lugar do nome do álbum em toda a UI (tabelas, tooltips, modal Favoritas); rótulos de fase no gráfico Evolução com cor dinâmica via _phaseTextCol (claro/escuro conforme a cor da banda) e stroke mais suave; novo card de insights "Fases de dominância" listando as fases com maior concentração de faixas por banda.
-✅ Extensão v1.5.66: card Ritmo de Descoberta — chips com 2 casas decimais (sem zeros finais), bloco de 6 zonas (grid 3×2: Familiar/Expansão/Pico) com range embutido, cores de zona invertidas (Expansão↔Familiar), ordenação do maior para o menor, "artistas" girado 180°.
-✅ Extensão v1.5.67: card Ritmo de Descoberta — play da máquina do tempo (curva anima em tempo real), pico redefinido como ponto mais distante acima da diagonal (desaparece se curva ≤ diagonal), chips do card atualizam durante a animação.
-✅ Extensão v1.5.65: storage e busca de cobertura de álbuns (ALBTOTS, queueAlbumTots, albtotKey) — semeia do m.tt do Spotify (mínimo ≈ edição padrão) e busca na Apple pelo nome canônico sem marcas de edição.
-✅ Extensão v1.5.66: card "03b · Cobertura" no painel principal — lista álbuns da maior para a menor % de faixas salvas (desempate por quantidade), com `n/tt · X%` por linha; responde a filtros; card de insight correspondente na aba Insights.
-✅ Extensão v1.5.67: cobertura de álbuns — álbuns com 1 faixa não são buscados na Apple e aparecem como chips; busca prioriza os álbuns com mais faixas primeiro.
-✅ Extensão v1.5.68: cobertura de álbuns — barras verticais (gráfico de colunas) com scroll horizontal; % acima, barra com gradiente e cor por nível (100%/50%+/abaixo), nome em 2 linhas, n/tt menor; animação de entrada; álbuns de 1 faixa e pendentes em painel lateral.
-✅ Extensão v1.5.69: cobertura de álbuns — álbuns com 1 faixa agora ficam atrás de um botão que abre modal com a lista; barras crescem até o teto do card (layout flex, fill em %); barras mais largas (46px); footer abaixo das barras.
-✅ Pill now-playing — scroll-dock automático: IntersectionObserver detecta quando o header sai da tela (threshold 0.5) e teletransporta o pill para o slot das abas; ao rolar de volta, retorna à posição original salva.
-✅ Pill now-playing — header slot completo: barra de progresso full-width no header (elemento #np-bar movido via DOM para header.top); controles (prev/pause/next) centralizados absolutamente no header; info da faixa ancorada à esquerda dos controles, crescendo para a esquerda com max-width; arte do álbum no mesmo tamanho da logo (44px); "lista editada" removido do srcline.
-✅ Pill now-playing — barra de progresso preditiva: requestAnimationFrame com currentProgressMs = lastProgressMs + (Date.now() − lastProgressTs); elimina o efeito de parar/andar entre polls; sem CSS transition no #np-prog.
-✅ Pill now-playing — updates otimistas: ao clicar próxima/anterior mostra instantaneamente a faixa da fila do Spotify (/v1/me/player/queue); guarda a faixa anterior (prevTrackData) para o botão voltar; botão voltar usa spSeekTo(0) se ≥ 3 s tocados (reinicia) e POST previous só se < 3 s (vai para a faixa anterior); _npSkipPending evita cascata de updates otimistas.
-
----------------------------------------------------------------------
-TASK 6 — COMPARAR DOIS RECORTES
+TASK 48 — COMPARAR DOIS RECORTES
 ---------------------------------------------------------------------
 Objetivo: comparar lado a lado duas fatias da MESMA playlist (ex.: Metallica x Iron Maiden, anos 90 x anos 2000, um gênero x outro).
 
 Comportamento:
-- Novo botão "Comparar" na barra de ferramentas; abre modal de tela cheia (openModal size "full") com duas colunas, A e B, e um botão "Trocar A ↔ B".
-- Cada coluna escolhe o recorte por um seletor com busca: Banda/artista, Álbum, Gênero, Década, Ano, Etiqueta (se existir a task 5) ou "Toda a playlist". Escolha única por coluna (multi-seleção fica pra depois). Sem mexer em state.* do painel (usar um filtro local: função (t) => boolean).
-- Corpo comparativo, uma linha por métrica, com barra proporcional e destaque de quem "ganha" a linha: faixas e % da playlist; duração total e média; ano mais antigo, mais novo e mediano; % explícitas e popularidade média (só se houver dado nos dois lados); nº de bandas e álbuns distintos; primeira e última adição (#) e "ritmo": mini gráfico de linhas acumuladas A x B pela ordem de adição no mesmo eixo (reaproveitar a ideia do card Evolução, 2 cores fixas); top 5 de álbuns/bandas/gêneros dentro de cada recorte, lado a lado.
-- Frase-resumo gerada por regras no topo ("Iron Maiden tem 14 faixas (3,9%) contra 27 de Metallica (7,5%); as de Iron Maiden são em média 1:20 mais longas.") com plural e vírgulas corretos.
-- Avisos: mesma escolha nos dois lados ("escolha recortes diferentes"), recorte com menos de 5 faixas ("amostra pequena: tire conclusões com cuidado"), recorte vazio.
+- Novo botão "Comparar" na barra de ferramentas; abre modal de tela cheia (openModal size "full") com
+  duas colunas, A e B, e um botão "Trocar A ↔ B".
+- Cada coluna escolhe o recorte por um seletor com busca: Banda/artista, Álbum, Gênero, Década, Ano,
+  Etiqueta ou "Toda a playlist". Escolha única por coluna. Sem mexer em state.* do painel
+  (usar um filtro local: função (t) => boolean).
+- Corpo comparativo, uma linha por métrica, com barra proporcional e destaque de quem "ganha": faixas
+  e % da playlist; duração total e média; ano mais antigo, mais novo e mediano; % explícitas (só se
+  houver dado nos dois lados); nº de bandas e álbuns distintos; primeira e última adição (#) e "ritmo":
+  mini gráfico de linhas acumuladas A x B pela ordem de adição no mesmo eixo (reaproveitar o card
+  Evolução, 2 cores fixas); top 5 de álbuns/bandas/gêneros dentro de cada recorte, lado a lado.
+- Frase-resumo gerada por regras no topo ("Iron Maiden tem 14 faixas (3,9%) contra 27 de Metallica
+  (7,5%); as de Iron Maiden são em média 1:20 mais longas.") com plural e vírgulas corretos.
+- Avisos: mesma escolha nos dois lados ("escolha recortes diferentes"), recorte com menos de 5 faixas
+  ("amostra pequena: tire conclusões com cuidado"), recorte vazio.
 - Estado do modal guardado só durante a sessão (não precisa persistir). Funciona com a playlist de exemplo.
-Casos de borda: A é subconjunto de B (ex.: banda x gênero dela) — avisar que se sobrepõem e mostrar quantas faixas estão nos dois; dados extras ausentes (linhas somem em vez de mostrar zero); celular (colunas empilhadas A sobre B).
-Pronto quando: números batem com contagens feitas à mão em dados de teste, troca A↔B inverte tudo, sobreposição é avisada, e testado por CDP em 1300px e 420px.
+Casos de borda: A é subconjunto de B (avisar que se sobrepõem e mostrar quantas faixas estão nos dois);
+dados extras ausentes (linhas somem em vez de mostrar zero); celular (colunas empilhadas A sobre B).
+Pronto quando: números batem com contagens feitas à mão em dados de teste, troca A↔B inverte tudo,
+sobreposição é avisada, e testado por CDP em 1300px e 420px.
 
-IMPORTAÇÃO / SPOTIFY
-- Importar direto de outras plataformas: YouTube Music, Apple Music, Deezer, Sound Cloud.
-- Importar a capa do álbum e exibir nas tabelas/tooltips.
-- Botão para reautenticar automaticamente quando o refresh token expirar/for revogado, em vez de só dar erro.
-
-EDIÇÃO DA PLAYLIST
-- Editar uma faixa específica direto na tabela (corrigir nome/artista/álbum sem precisar reimportar tudo).
-- Reordenar faixas manualmente (arrastar e soltar) na visão de tabela.
-- Desfazer (undo) a última importação/edição.
-- Mesclar duas playlists exportadas em uma só, sem re-digitar.
-
-DASHBOARD / VISUALIZAÇÕES
-- Modo claro (hoje só existe o tema escuro).
-- Busca por nome de faixa (hoje os filtros são só por banda e álbum).
-- Prévia de 30s da música (quando disponível na API) ao passar o mouse/tocar na faixa.
-- Comparar duas playlists lado a lado (ex.: antes/depois de um período).
-
-PLATAFORMA / INFRAESTRUTURA
-- Deixar o painel instalável como PWA (ícone, abre offline com os dados já salvos).
-- Backup/restauração na nuvem (Google Drive, Dropbox) além do localStorage atual.
-- Suporte a mais de uma playlist salva no navegador, com opção de trocar entre elas.
-- Link somente-leitura para compartilhar o painel sem dar acesso de edição.
-
-EXPORTAÇÃO
-- Exportar em CSV e JSON, além do TXT/Excel que já existem.
-
-DADOS DE FORA DO SPOTIFY (sem gastar o limite dele)
-- Apple (sem login): prévia de 30s de cada música (previewUrl, testado: toca normal no navegador) → player com fila aleatória, botão de tocar em cada linha da tabela, "ouvir" ao passar o mouse no gráfico.
-- Apple (sem login): explícita e álbum/single como reserva pra quem não tem Spotify — mesma ideia do gênero de reserva (aparece nos cálculos, mas continua "faltando" pro Atualizar dados).
-- MusicBrainz (sem login, 1 busca/seg): país de origem e ano de formação de cada banda, banda ou artista solo → "mapa musical" (bandas por país), "você ouve banda veterana ou novata", idade da banda quando lançou a música.
-- Wikidata (sem login): se a banda ainda existe ou já acabou, nº de integrantes → "X% das suas bandas já acabaram"; reserva quando o MusicBrainz não tiver o artista.
-- Last.fm (precisa de chave grátis): quantas pessoas ouvem cada música/artista no mundo → "mainstream ou lado B" de verdade, já que o Spotify não está mandando popularidade; tags de estilo bem ricas.
-- Letras (lyrics.ovh, sem login): idioma das músicas e palavras mais repetidas da playlist → "sua playlist é X% em inglês", nuvem de palavras. Cuidado: letra tem direito autoral, usar só pra estatística, sem exibir a letra.
-- Setlist.fm (precisa de chave grátis): quantas vezes cada música já foi tocada ao vivo → "suas músicas são hinos de show ou lados B que a banda nunca toca?".
-
-enquanto o site está aberto vai tocando as musicas em ordem aleatoria e o usuario pode pausar passar ou escolher qual tocar (se possivel)
-→ agora possível: só a prévia de 30s de cada música (Apple), não a música inteira
-
-ao adicionar uma nota musica vai ter um botão de tocar nova musica
-→ agora possível: mesma prévia de 30s da Apple
-
-
-
-
-ao adicionar musicas quero que o site analise se quais cards de painel e insights mudaram significaticamentes e apareçam com cores que se destaquem um pouco mais que os outros
-
-testar se alterando a ordem da playlist pelos 3 tracinhos e não pelo ordenador em cima da coluna, não é possível finalmente adicionar as musicas só colando o link da playlist
-
-✅ quero que no final da pagina dos paineis apareça um botão de visualizar inssights
-
-
-habilitar compartilhamento de playlist
-
-fazer grafico desse de musicas quadradas só que de albuns como uma segunda opção de visualização (voce escolhe se quer ver por banda ou por album)
-
-quero que quando a pessoa clicar na banda pra filtrar a mudança visual que da no grafico dos quadrados seja um pouco mais sutil em vez de tampar completamente a foto da banda com um quadrado comicamente verde
-
-pesquisa api para pegar informacoes de bandas musicais pro usuario ler sobre as as bandas que ele quiser
-
-separar em várias coleções de musicas diferentes e poder comparar umas entre as outras com insights de comparação e tabelas e mais analises ultra profissionais
-
-recomendar bandas e musicas novas com base no seu gosto atual
-
-adicionar graficos que combinem com a maquina do tempo, já pensei em pelo menos 1 -> grafico da "curva normal" a maior banda fica no meio do grafico de coluna e a segunda que vier fica do seu lado esquero, a terceira do lado direito, a quarta do lado esquedo da segunda, a quinta do lado direito da terceira, a sexta do lado esquerdo da quarta... e por aí vai.    mais um: grafico de barras tipo aqueles das corridas dos maiores canais do yt, que vai ser como se fosse uma aba nova que troca a estilização do grafico Bandas/artistas do maior para o menor-> na real para todos os graficos no estilo desse aí eu quero que tenha um grafico nesse estilo aí de corrida de colunas mostrando o top 10 da animação subindo e sendo ultrapassado (igual é com o grafico de linhas), só que com colunas
-
-extimativa de progressão (grafico parecido com o delinhas), quero que o site calcule uma linha pra cada uma das bandas levando em consideração várias coisas que voce pensar ai como parametro, mas eu também darei algumas ideias:
-quão mais velho o pico dessa banda na playlist maenos chance de subir, quando mais velha a banda mais chance de terem musicas a serem escutadas, enquanto as mais novas nao tem tanto, quanto mais perto do atual o pico, mais chance de continuar ou ter mais deles, leve em considerações curvas de acelerações e desacelerações que aconteceram no gráfico, e na pagina de insights ainda use essas projeções para formular insights, misture insgths de passado presente e futuro, projeções com mais precisão e menos precisão, sei la, seja criativo e me surpreenda
-
-✅ possibilidade de trocar a cor do site e quais tabelas mostrar e em quais posições, e quero que tenha a opção automática que deixa a cor do site de acordo com a paleta principal de cores das bandas
-
-possibilidade de trocar quais tabelas mostrar e em quais posições
-
-
-**Site / Playlists**
-
-* os dois masters são albuns diferentes mas o site não diferenciou ✅
-
-
-* Buscar uma forma de fazer uma distinção melhor dos gêneros por exemplo thrash metal, nu metal, groove metal, power metal etc ✅
-* Separar a ferramenta em playlists premium e playlists básica
-* Abrir a tela de músicas da ctrl A ctrl C tem que gerar um texto válido que o site leia no upload
-
-quero que no grafico de linhas o nomes quando forem aparecer ao lado avaliem se não precisa quebrar a linha pois está passando do tamamnho da tela e ai se necessário que quebre a linha tlgd, se não fica feio, mas é melhor do que ficar no lugar errado ne kkkkk
-
-botão limpar filtros tamnbém apareça fixado no header que desce (mas só apareça quando tiver algum filtro ativo) ✅
-
-quando der play na maquina do tempo com o ajuste de cor automatico por capa a cor do site mudar conforme a mudança da cor predominante nas capas
-
-opção de compartilhar seus numeros com o site com o aviso dizendo que nada de confidencial será compartilhado, e explicando que só vai ajudar o site a mostrar mais dados e metricas e principalmente ajudar no tratamento de saude de playlist cada vez mais automaticamente para todos os usuarios
-
-criar um banco de dados pra armazenar dados globais principalmente links das musicas pra que os usuarios gastem menos buscas do spotify
-
-elencar por genero no grafico de musicas por banda/artista de fotos sem repetir foto usando o criterio de exclusividade (se houver uma unica banda no genero vai ser usado essa foto e essa foto não pode ser a foto de mais nenhum outro genero), em casos de empate vence o que tiver mais musicas dentro do genero, nunca deixe nenhum genero sem foto
-
-
-------------------------------------------------------
-13
-Playlist
-O trecho mais fértil
-No meio da playlist — faixas #131 a #196 — foram apresentados 24 artistas novos em apenas 66 faixas: 1 novo a cada 2.8 músicas.
-
-Nenhum outro trecho chegou perto dessa densidade de descobertas.
-
-Municipal Waste
-#136 → #136 · 1 faixa
-Carcass
-#137 → #384 · 3 faixas
-Illdisposed
-#143 → #143 · 1 faixa
-Limp Bizkit
-#162 → #162 · 1 faixa
-Pissing Razors
-#168 → #168 · 1 faixa
-Mushroomhead
-#172 → #172 · 1 faixa
-#1
-início → fim
-#392
-24
-artistas novos em 66 faixas — 3.6 a cada 10
-
-diminui o tamanho desse card tirando uma das bandas dele, tá muito comprido
-------------------------------------------------------------------
-
-comente caso haja (caso tenha acontecido no grafico) o quão raro é fases de expansão depois da metade da playlist e/ou fases de familiaridade antes da metade da playlist
-
-------------------------------------------------------
-IDEIAS GENIAIS PARA PRÓXIMAS VERSÕES
-------------------------------------------------------
-
-IDEIA A — "DNA Musical" (radar/teia)
-Gráfico de teia (spider chart) com 6 dimensões simultâneas: concentração por artista,
-diversidade de décadas, % explícitas, proporção álbuns vs singles, faixas longas, ritmo
-de adição. Uma foto instantânea do "genoma" da playlist — cada um tem um formato único.
-Compartilhável como assinatura musical.
-
-IDEIA B — Detector de anomalias ("faixas fora de lugar")
-Calcula o "desvio" de cada faixa em relação ao perfil médio (década, duração, gênero).
-As 5 mais discrepantes ganham destaque no insight: "estas faixas parecem vir de outra
-playlist". Genuinamente surpreendente — o algoritmo encontra coisas que o dono não
-perceberia. Dados necessários: year, sec, genre.
-
-IDEIA C — "Lealdade do artista" ao longo do tempo
-Para os top 10 artistas, mostra se foram adicionados em burst (tudo de uma vez, febre
-passageira) ou distribuídos ao longo de toda a história (amor duradouro). Uma linha do
-tempo sparkline por artista. Usa CHI + a.rs para calcular distribuição de adições.
-
-IDEIA D — "Mapa de influência" entre décadas
-Se você tem Iron Maiden (80s) + Pantera (90s) + Gojira (2000s), o insight detecta a
-cadeia de influência e narra: "a playlist traça uma linha direta do heavy metal dos 80s
-ao metal progressivo dos 2000s". Conta a história por trás das escolhas via IS.dec + IS.art.
-
-IDEIA E — Score de coesão da playlist (0–100)
-Número calculado a partir da dispersão de décadas, gêneros e durações. Breakdown visual:
-"Coesão de era: 94 · Coesão de gênero: 71 · Diversidade de artistas: 45". Simples,
-comparável, compartilhável. Aparece no hero ou como insight próprio.
-
-IDEIA F — "Completude por década"
-Para cada década presente, mostra quantos dos ~200 álbuns canônicos daquela era estão
-na playlist (lista embutida no JS, sem API). Ex: "Anos 90: 7 de 15 clássicos — faltam
-Rust in Peace, Scenes from a Memory...". Exige curadoria manual da lista de referência.
-
-footer do site mais transparente
-
-diminuir a altura do card 5 perfil e diminuir para apenas 3 musicas e artistas nos negocios que mostram 4
-
-Na busca automática das APIs terminar de buscar a foto de todos os álbuns antes de começar a buscar os gêneros musicais
-
-concertar o pill que não ta dando mais pra tirar do header kkkk, parou de funcionar as funções do dot e de puxar normal... 
+---------------------------------------------------------------------
+TASK 49 — BUG: Concertar o pill "Now Playing"
+---------------------------------------------------------------------
+O pill de "Now Playing" parou de funcionar corretamente: as funções do dot (indicador de progresso)
+e de arrastar/puxar de volta para fora do header não funcionam mais. Investigar a causa (provável
+conflito com as últimas mudanças no header DOM / scroll-dock), restaurar o comportamento original:
+- Dot mostra progresso e muda de estado (playing/paused)
+- Arrastar o pill para fora do header retorna à posição flutuante original
+- Scroll-dock (snap para o header quando ele sai de vista) continua funcionando
+Testar por CDP com música tocando no Spotify conectado: scroll para baixo (pill vai pro header),
+scroll para cima (pill sai do header), drag out (pill flutuante), dot animado.

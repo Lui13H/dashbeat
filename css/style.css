@@ -634,17 +634,20 @@ body.leaving .wrap{opacity:0;transform:scale(.99);filter:blur(4px);transition:al
 #np-dock-slot-hd:not(:empty){flex:1;position:static;align-self:stretch;overflow:hidden}
 /* ---- header slot: Spotify-style full-width player ---- */
 #np-dock-slot-hd #now-playing.np-docked{display:flex;align-items:center;position:static!important;width:100%;height:100%;max-width:none;min-width:0;box-sizing:border-box;background:transparent;border-color:transparent;box-shadow:none;border-radius:0!important;padding:0}
-#np-dock-slot-hd #now-playing.np-docked #np-pill{position:absolute;right:calc(50% + 75px);top:50%;transform:translateY(-50%);max-width:300px;min-width:0;display:flex;align-items:center;gap:14px;padding:6px 2px 6px 12px;cursor:grab;pointer-events:auto;overflow:hidden}
+#np-dock-slot-hd #now-playing.np-docked #np-pill{position:absolute;right:calc(50% + 75px);max-width:calc(50% - 75px - var(--np-pill-l,0px));top:50%;transform:translateY(-50%);min-width:0;display:flex;align-items:center;gap:14px;padding:6px 2px 6px 12px;cursor:grab;pointer-events:auto;overflow:hidden}
 #np-dock-slot-hd #now-playing.np-docked #np-art{width:44px;height:44px;border-radius:11px;flex-shrink:0}
-#np-dock-slot-hd #now-playing.np-docked #np-info{flex:1;max-width:none;min-width:0}
-#np-dock-slot-hd #now-playing.np-docked #np-track{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#np-dock-slot-hd #now-playing.np-docked #np-artist{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#np-dock-slot-hd #now-playing.np-docked #np-controls{position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;max-height:none!important;opacity:1!important;display:flex!important;align-items:center;gap:6px;padding:6px 24px 6px 2px!important;background:none!important;border:none!important;border-radius:0!important;backdrop-filter:none!important;box-shadow:none!important;transition:none!important;min-width:auto;pointer-events:auto}
-#np-dock-slot-hd #now-playing.np-docked #np-controls button{width:34px;height:34px;border-radius:50%}
+#np-dock-slot-hd #now-playing.np-docked #np-info{flex:initial;max-width:none;min-width:0;overflow:hidden}
+#np-dock-slot-hd #now-playing.np-docked #np-track{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:none}
+#np-dock-slot-hd #now-playing.np-docked #np-artist{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:none}
+#np-dock-slot-hd #now-playing.np-docked #np-controls{position:absolute!important;left:50%!important;right:auto!important;top:50%!important;transform:translate(-50%,-50%)!important;max-height:none!important;opacity:1!important;display:flex!important;align-items:center;gap:6px;padding:6px 24px 6px 2px!important;background:none!important;border:none!important;border-radius:0!important;backdrop-filter:none!important;box-shadow:none!important;transition:none!important;min-width:auto;width:auto!important;z-index:auto!important;pointer-events:none}
+#np-dock-slot-hd #now-playing.np-docked #np-controls button{width:34px;height:34px;border-radius:50%;pointer-events:auto}
 #np-dock-slot-hd #now-playing.np-docked #np-playpause{width:42px!important;height:42px!important;background:hsl(var(--h),65%,65%)!important;color:hsl(var(--h),60%,6%)!important;box-shadow:0 0 16px hsla(var(--h),65%,55%,.35)!important;transition:transform .15s,background .15s!important}
 #np-dock-slot-hd #now-playing.np-docked #np-playpause:hover{background:hsl(var(--h),70%,75%)!important;transform:scale(1.07)!important}
 #np-dock-slot-hd #now-playing.np-docked #np-bar{display:none}
-#np-dock-slot.np-dock-ready,#np-dock-slot-hd.np-dock-ready,#np-dock-slot-band.np-dock-ready,#np-dock-slot-tabs.np-dock-ready{width:auto;min-width:140px;min-height:36px;border:1.5px dashed hsla(var(--h),65%,65%,.4);border-radius:10px;background:hsla(var(--h),50%,55%,.06)}
+#np-dock-slot.np-dock-ready,#np-dock-slot-band.np-dock-ready,#np-dock-slot-tabs.np-dock-ready{width:auto;min-width:140px;min-height:36px;border:1.5px dashed hsla(var(--h),65%,65%,.4);border-radius:10px;background:hsla(var(--h),50%,55%,.06)}
+#np-dock-slot-hd.np-dock-ready{flex:1;align-self:stretch;min-height:0;overflow:visible;position:static;border:1.5px dashed hsla(var(--h),65%,65%,.4);border-radius:8px;background:hsla(var(--h),50%,55%,.06)}
+#np-dock-slot-hd.np-dock-ready::after{content:'';position:absolute;bottom:0;left:-100vw;right:-100vw;height:3px;border-radius:0;background:hsla(var(--h),65%,65%,.3)}
+header.top:has(#np-dock-slot-hd.np-dock-ready){overflow:hidden;padding-bottom:10px;margin-bottom:8px;position:relative}
 #now-playing.np-docked{position:relative!important;bottom:auto!important;left:auto!important;top:auto!important;right:auto!important;transform:none!important;transition:box-shadow .2s,border-radius .15s!important;width:auto!important;min-width:118px;max-width:220px;background:hsla(var(--h),40%,10%,.75);border:1px solid hsla(var(--h),50%,55%,.22);border-radius:10px;box-shadow:none;backdrop-filter:none;overflow:visible}
 #now-playing.np-docked:hover,#now-playing.np-docked:focus-within{border-radius:10px 10px 0 0}
 #now-playing.np-docked #np-controls{position:absolute;top:100%;left:0;right:0;background:hsla(var(--h),20%,8%,.96);border:1px solid hsla(var(--h),50%,55%,.22);border-radius:0 0 10px 10px;backdrop-filter:blur(20px);z-index:901;min-width:118px}
