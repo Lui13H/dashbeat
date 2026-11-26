@@ -1099,6 +1099,7 @@ header.top:has(#np-dock-slot-hd.np-dock-ready){overflow:hidden;padding-bottom:10
 .dup-col::-webkit-scrollbar-thumb:hover{background:hsla(var(--h),40%,55%,.65)}
 .dup-col-hdr{font:700 11px var(--body);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);padding:0 2px 8px;display:flex;align-items:center;gap:8px;flex-shrink:0;border-bottom:1px solid var(--line-2);margin-bottom:8px;position:sticky;top:0;background:var(--bg);z-index:1}
 .dup-col-hdr em{font-style:normal}
+
 @media(max-width:680px){.dup-cols{flex-direction:column}.dup-col{flex:none;height:50vh}}
 .dup-c-wrap{display:flex;flex-direction:column;gap:8px}
 .dup-c-card{border-radius:10px;overflow:hidden;border:1px solid var(--line-2)}
@@ -1128,8 +1129,8 @@ header.top:has(#np-dock-slot-hd.np-dock-ready){overflow:hidden;padding-bottom:10
 .dcc-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#888}
 .dcc-h .dcc-dot{background:#2e9e58} .dcc-m .dcc-dot{background:hsl(var(--h),65%,65%)} .dcc-l .dcc-dot{background:#f87171}
 .dup-c-foot{display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--line);background:rgba(0,0,0,.15);flex-wrap:wrap}
-.drb{padding:2px 7px;border-radius:5px;border:1px solid transparent;background:transparent;font:500 11px var(--body);cursor:pointer;color:var(--ink-3);transition:all .12s;white-space:nowrap;line-height:1.3}
-.drb:hover{background:rgba(255,255,255,.07);color:var(--ink);border-color:var(--line-2)}
+.drb{padding:2px 7px;border-radius:5px;border:1px solid var(--line-2);background:transparent;font:500 11px var(--body);cursor:pointer;color:var(--ink-3);transition:all .12s;white-space:nowrap;line-height:1.3}
+.drb:hover{background:rgba(255,255,255,.07);color:var(--ink);border-color:var(--line)}
 .drb.on-orig{background:rgba(46,153,85,.14);border-color:rgba(46,153,85,.35);color:#2e9e58}
 .drb.on-ver{background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.25);color:#60a5fa}
 .drb.on-keep{background:rgba(130,195,50,.1);border-color:rgba(130,195,50,.25);color:#85c235}

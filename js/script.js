@@ -6823,6 +6823,7 @@ function openDups(opt = {}){
     <div class="seg" role="group" aria-label="Tipo" data-g="tab"><button type="button" data-t="dups"></button><button type="button" data-t="covers"></button><button type="button" data-t="ignored"></button></div>`;
   const md = openModal({title: "Duplicadas e covers", sub: "Títulos iguais ou parecidos (ignorando remaster, live, remix…) e álbuns que são o mesmo", body, headerExtra: seg, size: "lg",
     onClose: () => { if (albChanged){ setFlash("Álbuns atualizados: a junção das edições já vale no painel."); ssSet("health", "1"); location.reload(); } else if (opt.back) opt.back(); }});
+  md.m.style.width = "min(1480px,100%)";
   const sg = n => md.m.querySelector('.seg[data-g="' + n + '"]');
   let lastPend = tab === "ignored" ? "dups" : tab;   // última aba de "Para tratar" (pra voltar a ela)
   const albRow = (x, btns) => `<div class="alb-row"><div class="alb-main">${x}</div><div class="alb-btns">${btns}</div></div>`;
