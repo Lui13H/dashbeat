@@ -58,7 +58,7 @@ CONCLUÍDO
 ✅ TASK 5 — FAVORITAS E ETIQUETAS: coração por música e banda; etiquetas próprias ("treino", "nostalgia"); filtros "Só favoritas" e por etiqueta na tabela e no painel; card "Suas favoritas" nos Insights; exportação JSON + colunas no Excel. Favoritar álbuns e gêneros/subgêneros também. GENRE_ADD com 3 gêneros principais. Redirecionamento direto ao painel quando já há dados. Toolbar reagrupada em 4 dropdowns. Ajustes automáticos de saúde (títulos/álbuns) com modal de confirmar/desfazer. Itens de saúde agrupados por categoria. Fases de dominância no gráfico Evolução. Card Favoritas redesenhado (donut + barras). Card Ritmo de Descoberta com play da máquina do tempo e pico dinâmico. Cobertura de álbuns (card 03b): barras verticais com % por álbum.
 ✅ Pill now-playing: scroll-dock automático (IntersectionObserver), barra de progresso full-width no header, controles centralizados, barra de progresso preditiva (requestAnimationFrame), updates otimistas ao clicar próxima/anterior.
 ✅ TASK 51 — Carregamento progressivo do catálogo no "Ouvindo Agora": primeiras 40 linhas no load, IntersectionObserver + sentinela appenda 40 a 40 conforme scroll, covers carregam por batch, event delegation único para click no flat mode.
-✅ TASK 52 — Categorização individual de covers: botão "Independente" por faixa nos grupos de covers com 3+ músicas; faixa sai do grupo e vai para sub-seção "Músicas com mesmo nome (independentes)"; desfazer por faixa e "Desfazer tudo"; persistido em localStorage (cover-ind); grupo some quando sobra menos de 2 artistas distintos.
+✅ TASK 52 — Design C no modal Duplicadas e Covers: auto-sugestão com confiança (alta/média/baixa) por grupo; cards com role badges por faixa (★ Original, ✓ Manter, ✕ Remover, ♪ Versão, ◎ Cover, ≠ Diferente); badge composto no cabeçalho (repetida + outra versão quando misto); ordenação por confiança crescente; "Ajustar faixa por faixa" expande tabela com botões de papel; "Confirmar sugestão" aplica ação diretamente. Inclui botão "Independente" por faixa nos grupos de covers (cover-ind, localStorage).
 
 =====
 PRÓXIMAS TASKS — ordenadas da MENOS para a MAIS prioritária
@@ -707,33 +707,52 @@ Pronto quando: clicar no pill abre a página, Voltar fecha e restaura o painel e
 estava, Escape funciona, hash muda e volta corretamente, testado por CDP em 1300px e 420px.
 
 ---------------------------------------------------------------------
-✅ TASK 52 — CATEGORIZAÇÃO INDIVIDUAL DE COVERS
+TASK 53 — PRÉVIA DE ÁUDIO NOS TRATAMENTOS DE SAÚDE (duplicatas e covers)
 ---------------------------------------------------------------------
-Objetivo: no modal "Duplicadas e Covers" (dentro da Saúde), a aba Covers agrupa todas as músicas
-com o mesmo título como se fossem todas covers umas das outras. O problema: numa lista de 4 músicas
-chamadas "Hellraiser" de bandas diferentes, pode ser que 3 sejam covers de uma mesma composição
-e 1 seja uma música completamente independente que coincidentemente tem o mesmo nome — hoje o site
-trata o grupo inteiro como uma coisa só.
+Objetivo: nas telas de tratamento de saúde (duplicatas, covers e qualquer grupo de faixas
+similares), o usuário pode ouvir 30 segundos de cada música antes de decidir o que fazer —
+sem precisar abrir o Spotify. Essencial quando ele não lembra exatamente qual das versões é qual.
 
 Comportamento:
-- Dentro de cada grupo de covers (mesmo título, artistas diferentes), cada música ganha um seletor
-  individual: "Cover de [grupo]" / "Música independente (mesmo nome por coincidência)".
-- Ao abrir o grupo, o estado padrão é "Cover de [grupo]" para todas (igual ao comportamento atual).
-- O usuário pode marcar individualmente qualquer música como "Música independente" — ela
-  imediatamente sai do grupo visual e fica numa sub-lista "Músicas com mesmo nome (independentes)"
-  abaixo do grupo de covers.
-- Uma música marcada como independente não conta mais como cover em nenhuma estatística, card ou
-  insight do site (Saúde, card de duplicatas, etc.).
-- A marcação fica salva em localStorage ("catalogo-musical:cover-overrides") como um Set de
-  ownKeys. Recarregar a página mantém as escolhas.
-- Se todas as músicas de um grupo forem marcadas como independentes, o grupo de covers some e elas
-  ficam todas na sub-lista de "mesmo nome".
-- Botão "Desfazer" por música (volta para "Cover de [grupo]") e botão "Desfazer tudo" no cabeçalho
-  do grupo.
-Casos de borda: grupo com apenas 2 músicas onde ambas são marcadas como independentes (o "grupo"
-deixa de existir como cover, apenas como "mesmo nome"); música adicionada/removida da playlist
-(ownKey some do override → volta ao padrão); exportação Excel respeita o override (coluna Cover
-mostra "—" em vez de "✓" para músicas independentes).
-Pronto quando: marcar uma música como independente a remove visualmente do grupo de covers,
-a marcação persiste ao recarregar, a Saúde não conta mais essa música como cover, e testado com
-o caso real de 4 músicas com mesmo nome de bandas diferentes.
+- Fonte de prévia: Apple Music Search API (mesma usada pelas capas, sem login, sem custo).
+  Campo previewUrl guardado junto com a capa em catalogo-musical:apple-previews ou similar.
+  Buscar o previewUrl no momento em que o grupo é exibido, se ainda não estiver no cache.
+- Botão ▶ por faixa: aparece na tabela/lista de cada grupo (duplicatas, covers, outra versão,
+  coincidência). Clicar toca a prévia; clicar de novo pausa. Só uma prévia por vez (tocar
+  outra pausa a anterior automaticamente).
+- Indicador visual enquanto toca: faixa ativa ganha fundo levemente iluminado + ícone de
+  equalizador animado na coluna ▶ (3 barras CSS, sem JS extra).
+- Mini barra de progresso fina embaixo do botão ▶ (só enquanto está tocando; vai de 0 a 30s).
+- Faixas sem previewUrl: botão ▶ desabilitado com tooltip "Prévia indisponível".
+- Faixa de prévia expira (audio.error): remover do cache, marcar como indisponível, toast
+  discreto "prévia expirou para esta faixa".
+- A prévia para automaticamente ao fechar o modal/tela de saúde.
+- Funciona no Design C do protótipo (sugestão automática) e na implementação final da TASK 52
+  redesenhada — adicionar o botão em qualquer row de faixa dentro da Saúde.
+Casos de borda: autoplay bloqueado (toast "clique em play para ouvir"); celular (botão grande
+o suficiente para toque preciso, barra de progresso 2px); sem nenhum previewUrl na playlist
+(botões ▶ não aparecem, sem mensagem de erro — apenas ausência silenciosa).
+Pronto quando: tocar/pausar funciona para pelo menos uma faixa de cada grupo, prévia para ao
+fechar a Saúde, botão desabilitado aparece corretamente quando sem URL, testado por CDP.
+
+---------------------------------------------------------------------
+✅ TASK 52 — DESIGN C: SUGESTÃO AUTOMÁTICA DE TRATAMENTO (duplicadas e covers)
+---------------------------------------------------------------------
+Substituiu a TASK 52 original (categorização individual de covers, que ficou mantida como
+funcionalidade secundária via botão "Independente" já implementado).
+
+O que foi feito:
+- Modal "Duplicadas e Covers" exibe grupos como cards (Design C), não mais como buckets com
+  botões à direita.
+- computeDupSuggestion(x): chuta automaticamente os papéis por faixa (★ Original / ✓ Manter /
+  ✕ Remover / ♪ Versão / ◎ Cover / ≠ Diferente) com base em título/álbum, artista e duração.
+- computeDupBadges(roles): gera um ou dois selos para o cabeçalho do card (ex.: "repetida" +
+  "outra versão" quando o grupo tem casos mistos).
+- Nível de confiança por grupo: Alta (rep pura, sem versões), Média (misto ou versão), Baixa
+  (cover, coincidência de nome) — com indicador colorido no rodapé do card.
+- Ordenação: grupos de baixa confiança aparecem primeiro.
+- "Confirmar sugestão": aplica diretamente a classificação sugerida (cobre, versão, ignore) ou
+  abre openDeleteList para remoção de duplicatas.
+- "Ajustar faixa por faixa": expande o card em tabela com botões de papel por linha; clicar no
+  papel já selecionado desfaz para "keep"; só um "original" por grupo é permitido.
+- GRP_STATE: estado em memória (papéis customizados, expanded) por grupo; resetado ao fechar.

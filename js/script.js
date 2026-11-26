@@ -6863,14 +6863,94 @@ function openDups(opt = {}){
     ];
     body.innerHTML = `<div class="trt">${cols.map(([t, gs]) => `<section class="trt-c"><h4>${t} <em>${gs.length}</em></h4>${gs.length ? gs.join("") : `<p class="muted">Nada aqui.</p>`}</section>`).join("")}</div>`;
   };
+  // ── Design C: estado em memória por grupo ──
+  const GRP_STATE = {};
+  const grpSt = id => { if (!GRP_STATE[id]) GRP_STATE[id] = {roles: null, expanded: false}; return GRP_STATE[id]; };
+  const bigDurDiffC = x => { const s = x.rs.map(r => r.sec).filter(Boolean); if (s.length < 2) return false; const mn = Math.min(...s), mx = Math.max(...s); return mx - mn > 60 || (mn > 0 && (mx - mn) / mn > 0.35); };
+  const computeDupSuggestion = x => {
+    if (x.kind === "c") {
+      if (bigDurDiffC(x) || x.fuzzy) {
+        const roles = {}; x.rs.forEach(t => roles[t.n] = "different");
+        return {type: "dif", roles, conf: "l", msg: "Durações muito diferentes — provável coincidência"};
+      }
+      const sorted = [...x.rs].sort((a, b) => { const ay = a.year === NI ? 9999 : +a.year, by = b.year === NI ? 9999 : +b.year; return ay - by || a.n - b.n; });
+      const roles = {}; sorted.forEach((t, i) => roles[t.n] = i === 0 ? "original" : "cover");
+      const o = sorted[0];
+      return {type: "cov", roles, conf: "l", msg: `${o.artist} (${o.year !== NI ? o.year : "?"}) — sugerida como original`};
+    }
+    if (bigDurDiffC(x)) {
+      const roles = {}; x.rs.forEach(t => roles[t.n] = "different");
+      return {type: "dif", roles, conf: "m", msg: "Durações muito diferentes — confirme se são a mesma música"};
+    }
+    const tmp = {}; let hasVer = false;
+    x.rs.forEach(t => {
+      const s = `${t.title} ${t.album}`.toLowerCase();
+      if (/\b(live|ao\s+vivo|concerto?|showlivre)\b/.test(s)) { tmp[t.n] = "version"; hasVer = true; }
+      else if (/\b(deluxe|anniversary|remaster|expanded|bonus\s+track)\b/.test(s)) tmp[t.n] = "mrem";
+    });
+    const left = x.rs.filter(t => !tmp[t.n]);
+    Object.keys(tmp).forEach(n => { if (tmp[n] === "mrem") tmp[n] = "remove"; });
+    left.sort((a, b) => a.n - b.n);
+    if (left.length > 0) left.forEach((t, i) => tmp[t.n] = i === 0 ? (hasVer ? "original" : "keep") : "remove");
+    const nR = Object.values(tmp).filter(r => r === "remove").length;
+    const oT = x.rs.find(t => tmp[t.n] === "original");
+    const msg = oT ? `${oT.artist} (${oT.year !== NI ? oT.year : "?"}) — sugerida como original` : `Manter ${x.rs.length - nR}, remover ${nR}`;
+    return {type: hasVer ? "ver" : "rep", roles: tmp, conf: hasVer ? "m" : "h", msg};
+  };
+  const computeDupBadges = roles => {
+    const v = Object.values(roles);
+    const hasRem = v.includes("remove"), hasVer = v.includes("version"), hasCov = v.includes("cover"), hasDif = v.includes("different");
+    const bs = [];
+    if (hasRem && hasVer) { bs.push({cls: "dcb-rep", l: "repetida"}); bs.push({cls: "dcb-ver", l: "outra versão"}); }
+    else if (hasVer) bs.push({cls: "dcb-ver", l: "outra versão"});
+    else if (hasRem) bs.push({cls: "dcb-rep", l: "repetida"});
+    if (hasCov) bs.push({cls: "dcb-cov", l: "cover"});
+    if (hasDif && !hasCov) bs.push({cls: "dcb-dif", l: "coincidência"});
+    if (!bs.length) bs.push({cls: "dcb-rep", l: "repetida"});
+    return bs;
+  };
+  const renderDupCard = x => {
+    const st = grpSt(x.id), sug = computeDupSuggestion(x), roles = st.roles || sug.roles;
+    const tr = s => s.length > 36 ? s.slice(0, 35) + "…" : s;
+    const dur = t => t.sec ? durTxt(t.sec) : "—";
+    const rCls = {original: "dcr-orig", keep: "dcr-keep", remove: "dcr-rem", version: "dcr-ver", cover: "dcr-cov", different: "dcr-dif"};
+    const rBadgeCls = {original: "dcrb-orig", keep: "dcrb-keep", remove: "dcrb-rem", version: "dcrb-ver", cover: "dcrb-cov", different: "dcrb-dif"};
+    const rLabel = {original: "★ Original", keep: "✓ Manter", remove: "✕ Remover", version: "♪ Versão", cover: "◎ Cover", different: "≠ Diferente"};
+    const badges = computeDupBadges(roles);
+    const bHtml = badges.map(b => `<span class="dcb ${b.cls}">${b.l}</span>`).join("");
+    const hdr = `<div class="dup-c-head"><div class="dup-c-title">${esc(x.title)}<span class="dup-c-cnt">· ${faixas(x.rs.length)}</span>${bHtml}</div></div>`;
+    const confCls = {h: "dcc-h", m: "dcc-m", l: "dcc-l"}[sug.conf];
+    const confLabel = {h: "Alta confiança", m: "Confiança média", l: "Baixa confiança — verifique"}[sug.conf];
+    const confBtnStyle = {
+      h: "background:#2e9e58;border-color:#1e6e3c;color:#fff;",
+      m: "background:hsl(var(--h),65%,65%);border-color:hsl(var(--h),65%,50%);color:hsl(var(--h),90%,8%);",
+      l: "background:#f87171;border-color:rgba(248,113,113,.8);color:#3f0000;"
+    }[sug.conf];
+    if (st.expanded) {
+      const sameArt = new Set(x.rs.map(t => t.artist.toLowerCase().split(",")[0].trim())).size === 1;
+      const makeRoleBtns = t => {
+        const r = roles[t.n] || "keep";
+        const on = role => r === role ? ` on-${role === "original" ? "orig" : role === "version" ? "ver" : role === "remove" ? "rem" : role === "different" ? "dif" : role}` : "";
+        const covBtn = sameArt ? "" : `<button class="drb${on("cover")}" type="button" data-dc="role" data-id="${esc(x.id)}" data-n="${t.n}" data-role="cover">◎ Cover</button>`;
+        return `<button class="drb${on("original")}" type="button" data-dc="role" data-id="${esc(x.id)}" data-n="${t.n}" data-role="original">★ Original</button><button class="drb${on("version")}" type="button" data-dc="role" data-id="${esc(x.id)}" data-n="${t.n}" data-role="version">♪ Versão</button><button class="drb${on("keep")}" type="button" data-dc="role" data-id="${esc(x.id)}" data-n="${t.n}" data-role="keep">✓ Manter</button><button class="drb${on("remove")}" type="button" data-dc="role" data-id="${esc(x.id)}" data-n="${t.n}" data-role="remove">✕ Remover</button>${covBtn}<button class="drb${on("different")}" type="button" data-dc="role" data-id="${esc(x.id)}" data-n="${t.n}" data-role="different">≠ Diferente</button>`;
+      };
+      const tbl = `<div class="ptab" style="margin:0;border-radius:0;border:0;border-top:1px solid var(--line)"><table>
+        <thead><tr><th>#</th><th>Música</th><th>Artista</th><th>Ano</th><th>Dur.</th><th>Papel</th></tr></thead>
+        <tbody>${x.rs.map(t => `<tr><td class="muted">${t.n}</td><td>${esc(tr(t.title))}</td><td class="muted">${esc(t.artist)}</td><td class="muted">${t.year !== NI ? t.year : "—"}</td><td class="muted">${dur(t)}</td><td><div style="display:flex;gap:3px;flex-wrap:wrap">${makeRoleBtns(t)}</div></td></tr>`).join("")}</tbody>
+      </table></div>`;
+      return `<div class="dup-c-card">${hdr}${tbl}<div class="dup-c-foot"><div style="flex:1"></div><button class="gbtn" type="button" style="padding:5px 10px;font-size:11.5px" data-dc="col" data-id="${esc(x.id)}">↩ Voltar</button><button class="pbtn" type="button" style="padding:5px 14px;font-size:12.5px;${confBtnStyle}" data-dc="conf" data-id="${esc(x.id)}">✓ Confirmar</button></div></div>`;
+    }
+    const rows = x.rs.map(t => { const r = roles[t.n] || "keep"; return `<div class="dup-c-row ${rCls[r] || ""}"><div class="dcr-info"><div class="dcr-name">${esc(tr(t.title))}</div><div class="dcr-sub"><span class="muted">#${t.n}</span> · ${esc(t.artist)} · ${t.year !== NI ? t.year : "—"} · ${dur(t)}</div></div><span class="dcr-lbl ${rBadgeCls[r] || ""}">${rLabel[r] || r}</span></div>`; }).join("");
+    return `<div class="dup-c-card">${hdr}<div class="dup-c-sug">${rows}</div><div class="dup-c-foot"><div class="dup-c-conf ${confCls}"><span class="dcc-dot"></span>${confLabel} — ${esc(sug.msg)}</div><div style="flex:1"></div><button class="gbtn" type="button" style="padding:5px 11px;font-size:12px" data-dc="adj" data-id="${esc(x.id)}">✎ Ajustar faixa por faixa</button><button class="pbtn" type="button" style="padding:5px 14px;font-size:12.5px;${confBtnStyle}" data-dc="conf" data-id="${esc(x.id)}">✓ Confirmar sugestão</button></div></div>`;
+  };
   const draw = () => {
     md.m.querySelectorAll('.seg[data-g="kind"] button').forEach(b => { if (b.dataset.k === "albums") b.textContent = `Álbuns (${ai.doubts.length + ai.groups.filter(g => !g.confirmed).length})`; b.setAttribute("aria-pressed", b.dataset.k === kind); });
-    if (kind === "albums"){ drawAlbums(); return; }
+    if (kind === "albums"){ body.closest(".mb")?.classList.remove("mb-dupcols"); body.style.cssText = ""; drawAlbums(); return; }
     const nDone = sim.ignored.length + Object.keys(DUPMARK).length, pend = [...sim.dups, ...sim.covers].sort((a, b) => b.rs.length - a.rs.length || (a.kind === "d" ? 0 : 1) - (b.kind === "d" ? 0 : 1) || (a.fuzzy ? 1 : 0) - (b.fuzzy ? 1 : 0) || coll.compare(a.title, b.title));
     sg("state").hidden = false;
     sg("state").querySelectorAll("button").forEach(x => { const done = x.dataset.s === "done"; x.textContent = done ? `Tratados (${nDone})` : `Para tratar (${pend.length})`; x.setAttribute("aria-pressed", done === (tab === "ignored")); });
     sg("tab").hidden = true;   // em "Para tratar" duplicadas e covers vêm juntas: a pessoa é que diz qual é o problema
-    if (tab === "ignored"){ drawTreated(); return; }
+    if (tab === "ignored"){ body.closest(".mb")?.classList.remove("mb-dupcols"); body.style.cssText = ""; drawTreated(); return; }
     const list = pend;
     const B = (x, a, l, extra = "") => `<button class="gbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="${a}"${extra}>${l}</button>`;
     const P = (x, a, l, extra = "") => `<button class="pbtn dup-act" type="button" data-id="${esc(x.id)}" data-a="${a}"${extra}>${l}</button>`;
@@ -6927,18 +7007,17 @@ function openDups(opt = {}){
     };
     if (!list.length){ body.innerHTML = `<p class="muted">Nenhum caso encontrado.</p>`; }
     else {
-      const renderItems = items => items.map(x => `<div class="eyebrow dup-head" style="margin:14px 0 6px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span>${esc(x.title)} · ${faixas(x.rs.length)}${tag(x)}</span>${btn(x)}</div>${x.kind === "c" ? covTable(x) : songTable(x.rs)}`).join("");
-      const act = x => detectBestAction(x).action;
-      const buckets = [
-        {label: "Repetidas",    items: list.filter(x => act(x) === "rep")},
-        {label: "Covers",       items: list.filter(x => act(x) === "conf")},
-        {label: "Outra versão", items: list.filter(x => act(x) === "ver")},
-        {label: "Outra música", items: list.filter(x => act(x) === "ign")},
-      ].filter(b => b.items.length);
-      body.innerHTML = buckets.map(b => {
-        const hdr = `<div class="dup-grp-hdr"><span>${b.label}</span><em>${b.items.length} ${b.items.length === 1 ? "caso" : "casos"}</em></div>`;
-        return hdr + renderItems(b.items);
-      }).join("");
+      const o = {l: 0, m: 1, h: 2};
+      const sorted = [...list].sort((a, b) => o[computeDupSuggestion(b).conf] - o[computeDupSuggestion(a).conf]);
+      const sameBand = sorted.filter(x => x.kind === "d");
+      const diffBand = sorted.filter(x => x.kind === "c");
+      const col = (title, items) => `<div class="dup-col"><div class="dup-col-hdr"><span>${title}</span><em>${items.length} ${items.length === 1 ? "caso" : "casos"}</em></div><div class="dup-c-wrap">${items.length ? items.map(x => renderDupCard(x)).join("") : `<p class="muted" style="font-size:13px">Nenhum caso.</p>`}</div></div>`;
+      body.innerHTML = `<div class="dup-cols">${col("Mesma banda", sameBand)}${col("Artistas diferentes", diffBand)}</div>`;
+      const mb = body.closest(".mb");
+      if (mb) { mb.classList.add("mb-dupcols"); body.style.cssText = "flex:1;min-height:0;display:flex;flex-direction:column"; }
+      body.querySelectorAll(".dup-col").forEach(col => {
+        col.addEventListener("wheel", e => { e.preventDefault(); e.stopPropagation(); col.scrollTop += e.deltaY * 0.55; }, {passive: false});
+      });
     }
   };
   const yr = r => r.year === NI ? "ano desconhecido" : r.year;
@@ -6989,6 +7068,51 @@ function openDups(opt = {}){
     foot.querySelector("[data-o]").onclick = () => { done = true; res(pb.querySelector("input:checked").value); pm.close(); };
   });
   body.addEventListener("click", async e => {
+    const dc = e.target.closest("[data-dc]");
+    if (dc) {
+      const a = dc.dataset.dc, gid = dc.dataset.id;
+      const x = [...sim.dups, ...sim.covers].find(item => item.id === gid);
+      const st = grpSt(gid);
+      if (a === "adj") { st.expanded = true; draw(); return; }
+      if (a === "col") { st.expanded = false; draw(); return; }
+      if (a === "role") {
+        const n = +dc.dataset.n, role = dc.dataset.role;
+        if (!st.roles) st.roles = {...computeDupSuggestion(x).roles};
+        if (role === "original") Object.keys(st.roles).forEach(k => { if (st.roles[k] === "original") st.roles[k] = "cover"; });
+        st.roles[n] = st.roles[n] === role ? "keep" : role;
+        draw(); return;
+      }
+      if (a === "conf") {
+        if (!x) return;
+        const sug = computeDupSuggestion(x);
+        const roles = st.roles || sug.roles;
+        const vals = Object.values(roles);
+        const hasRem = vals.includes("remove"), hasVer = vals.includes("version");
+        const hasCov = vals.includes("cover"), hasDif = vals.includes("different"), hasOrig = vals.includes("original");
+        if (hasRem) {
+          openDeleteList(x, `As ${x.rs.length} faixas <strong>"${esc(x.title)}"</strong> são a mesma música repetida. Marque as que quer apagar. <strong>Enquanto existirem, a repetida continua pesando na nota da Saúde.</strong>`);
+          return;
+        }
+        if (hasDif && !hasOrig && !hasCov) {
+          if (!(await confirmIgnore(x))) return;
+          DUPIGN.add(gid); saveDupIgn();
+        } else if (hasCov) {
+          CONF.add(gid); saveConf();
+        } else if (hasVer) {
+          const vd = detectVersionType(x);
+          const type = vd ? vd.type : (await pickVersion(x));
+          if (!type) return;
+          DUPIGN.add(gid); VERS[gid] = type; saveVers(); saveDupIgn();
+        } else {
+          if (!(await confirmIgnore(x))) return;
+          DUPIGN.add(gid); saveDupIgn();
+        }
+        sim = similarTitles(); draw();
+        toast("Tratado. Veja em \"Tratados\" para desfazer.");
+        return;
+      }
+      return;
+    }
     const b = e.target.closest(".dup-act"); if (!b) return;
     if (b.dataset.a.startsWith("alb-")){
       const ids = b.dataset.id.split("§");
