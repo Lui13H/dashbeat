@@ -707,6 +707,35 @@ Pronto quando: clicar no pill abre a página, Voltar fecha e restaura o painel e
 estava, Escape funciona, hash muda e volta corretamente, testado por CDP em 1300px e 420px.
 
 ---------------------------------------------------------------------
+TASK 54 — INSIGHTS E CARDS DE VERSÕES CLASSIFICADAS
+---------------------------------------------------------------------
+Objetivo: aproveitar os dados de classificação de versão (já salvos em VERS no localStorage)
+para gerar insights úteis e exibir em cards no painel principal.
+
+Contexto técnico:
+- VERS[gid] = {n: type} onde type ∈ {live, remaster, deluxe, bonus, other}
+  (ou string legada para dados anteriores — versDesc() já lida com ambos)
+- VERS_LABEL mapeia cada tipo para rótulo legível (ex: "remasterizada / Remix")
+- Os dados existem desde a TASK 52 mas nunca foram usados fora da aba "Tratados"
+
+O que fazer:
+- Agregar VERS por tipo: contar quantas faixas (não grupos) são de cada tipo de versão
+  (uma por grupo quando string; múltiplas quando objeto {n: type})
+- Card de insight na Saúde ou no painel principal: "Versões na coleção"
+  · Mostra breakdown: X ao vivo · Y remasterizadas/remixes · Z deluxe · W bonus track · N outra
+  · Só aparece se ao menos 3 grupos tiverem versão classificada
+- Lista de versões por tipo: ao clicar no card, abre modal/expansão com as faixas agrupadas
+  por tipo (igual o "Tratados" mas filtrado e com contagem por tipo bem visível)
+- Insight de artista: no card de artista (ou na aba de artista) mostrar se tem muitas versões
+  ao vivo, sinalizando artista que "vive de shows" vs estúdio
+- Texto narrativo (opcional): "Você tem 12 versões ao vivo na playlist — principalmente
+  Iron Maiden e Dream Theater."
+
+Critérios de conclusão: card aparece no painel quando há dados suficientes; ao clicar mostra
+lista correta; contagem bate com o que está em "Tratados"; testado com dados mistos
+(string legada + objeto novo).
+
+---------------------------------------------------------------------
 TASK 53 — PRÉVIA DE ÁUDIO NOS TRATAMENTOS DE SAÚDE (duplicatas e covers)
 ---------------------------------------------------------------------
 Objetivo: nas telas de tratamento de saúde (duplicatas, covers e qualquer grupo de faixas

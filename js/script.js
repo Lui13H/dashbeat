@@ -3703,7 +3703,7 @@ const saveDupIgn = () => { try { localStorage.setItem(DUPIGN_KEY, JSON.stringify
 const VERS_KEY = "catalogo-musical:dups-versions";
 const VERS = (() => { try { return JSON.parse(localStorage.getItem(VERS_KEY) || "null") || {}; } catch (e) { return {}; } })();
 const saveVers = () => { try { localStorage.setItem(VERS_KEY, JSON.stringify(VERS)); } catch (e) {} };
-const VERS_LABEL = {live: "versão ao vivo", remaster: "remasterizada", deluxe: "edição deluxe/especial", bonus: "bonus track", other: "outra versão (remix, acústica…)"};
+const VERS_LABEL = {live: "versão ao vivo", remaster: "remasterizada / Remix", deluxe: "edição deluxe/especial", bonus: "bonus track", other: "outra versão (acústica…)"};
 /* "é um cover" confirmado pela pessoa: sai da lista de pendências (vai pra "Tratados") mas NÃO é ignorado, então continua contando como cover nos insights */
 const CONF_KEY = "catalogo-musical:dups-confirmed";
 const CONF = (() => { try { return new Set(JSON.parse(localStorage.getItem(CONF_KEY) || "[]")); } catch (e) { return new Set(); } })();
@@ -6793,9 +6793,10 @@ function applyAlias(canon, names){
 }
 function undoAlias(key){ delete ALIAS[key]; saveAlias(); setFlash("Nome separado de novo."); ssSet("health", "1"); location.reload(); }
 /* escolher quais faixas de um grupo apagar (sempre fica pelo menos uma); pede confirmação antes, como qualquer remoção */
-function openDeleteList(item, intro){
+function openDeleteList(item, intro, preChecked){
+  const isChk = (t, i) => preChecked ? preChecked.has(t.n) : i > 0;
   const body = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
-  body.innerHTML = `<div class="confirm"><p>${intro}</p><div class="du-rows">${item.rs.map((t, i) => `<label class="chk"><input type="checkbox" data-n="${t.n}"${i ? " checked" : ""}><span><b>#${t.n}</b> ${esc(t.title)} · ${esc(t.artist)} · ${esc(t.albumRaw === NI ? "—" : t.albumRaw)} · ${t.sec ? durTxt(t.sec) : "—"}</span></label>`).join("")}</div><p class="muted">Fica pelo menos uma faixa. Nada é apagado até você confirmar.</p></div>`;
+  body.innerHTML = `<div class="confirm"><p>${intro}</p><div class="du-rows">${item.rs.map((t, i) => `<label class="chk"><input type="checkbox" data-n="${t.n}"${isChk(t, i) ? " checked" : ""}><span><b>#${t.n}</b> ${esc(t.title)} · ${esc(t.artist)} · (${esc(t.albumRaw === NI ? "—" : t.albumRaw)}) · ${t.sec ? durTxt(t.sec) : "—"}</span></label>`).join("")}</div><p class="muted">Fica pelo menos uma faixa. Nada é apagado até você confirmar.</p></div>`;
   foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn danger" type="button" data-ok>Apagar</button>`;
   const md = openModal({title: "Quais faixas apagar?", body, foot, size: "sm"});
   const ok = foot.querySelector("[data-ok]"), boxes = [...body.querySelectorAll("input")];
@@ -6859,7 +6860,7 @@ function openDups(opt = {}){
     const cols = [
       ["Outra música", sim.ignored.filter(x => !CONF.has(x.id) && !VERS[x.id]).map(x => grp(x))],
       ["Cover", sim.ignored.filter(x => CONF.has(x.id)).map(x => grp(x))],
-      ["Outra versão", sim.ignored.filter(x => !CONF.has(x.id) && VERS[x.id]).map(x => grp(x, VERS_LABEL[VERS[x.id]]))],
+      ["Outra versão", sim.ignored.filter(x => !CONF.has(x.id) && VERS[x.id]).map(x => grp(x, versDesc(VERS[x.id])))],
       ["Duplicadas", dupCol.map(x => grp(x, "nomes juntados").replace('data-a="undo"', 'data-a="dup-undo"'))]
     ];
     body.innerHTML = `<div class="trt">${cols.map(([t, gs]) => `<section class="trt-c"><h4>${t} <em>${gs.length}</em></h4>${gs.length ? gs.join("") : `<p class="muted">Nada aqui.</p>`}</section>`).join("")}</div>`;
@@ -7055,18 +7056,33 @@ function openDups(opt = {}){
     return null;
   };
   // pergunta que tipo de versão é (ao vivo, remaster, deluxe, outra)
-  const pickVersion = item => new Promise(res => {
+  const versDesc = v => { if (!v) return ""; if (typeof v === "string") return VERS_LABEL[v] || v; const types = [...new Set(Object.values(v))]; return types.map(t => VERS_LABEL[t] || t).join(" · "); };
+  const pickVersion = (item, verTracks) => new Promise(res => {
+    verTracks = verTracks || item.rs;
     let done = false;
-    const detected = detectVersionType(item);
-    const defaultKey = detected ? detected.type : Object.keys(VERS_LABEL)[0];
+    const opts = `<option value="" disabled selected>Selecione a versão…</option>` + Object.entries(VERS_LABEL).map(([k, l]) => `<option value="${k}">${l[0].toUpperCase() + l.slice(1)}</option>`).join("");
     const pb = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
-    pb.innerHTML = `<div class="confirm"><p>Que tipo de versão são as ${item.rs.length} faixas <strong>"${esc(item.title)}"</strong>?</p>
-      <div class="du-rows">${Object.entries(VERS_LABEL).map(([k, l]) => `<label class="chk"><input type="radio" name="vers" value="${k}"${k === defaultKey ? " checked" : ""}><span>${l[0].toUpperCase() + l.slice(1)}</span></label>`).join("")}</div>
-      ${detected ? `<p class="muted" style="margin-top:8px;font-size:12.5px">Sugerido automaticamente pelo título — confirme se está certo.</p>` : ""}</div>`;
-    foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-o autofocus>Marcar</button>`;
-    const pm = openModal({title: "Mesma música, outra versão", body: pb, foot, size: "sm", onClose: () => { if (!done) res(null); }});
-    foot.querySelector("[data-c]").onclick = pm.close;
-    foot.querySelector("[data-o]").onclick = () => { done = true; res(pb.querySelector("input:checked").value); pm.close(); };
+    if (verTracks.length === 1) {
+      const detected = detectVersionType(item);
+      pb.innerHTML = `<div class="confirm"><p>Que tipo de versão é a faixa <b>#${verTracks[0].n}</b> em <strong>"${esc(item.title)}"</strong>?</p>
+        <div class="du-rows">${Object.entries(VERS_LABEL).map(([k, l]) => `<label class="chk"><input type="radio" name="vers" value="${k}"${detected && k === detected.type ? " checked" : ""}><span>${l[0].toUpperCase() + l.slice(1)}</span></label>`).join("")}</div>
+        ${detected ? `<p class="muted" style="margin-top:8px;font-size:12.5px">Sugerido automaticamente — confirme se está certo.</p>` : ""}</div>`;
+      foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-o${detected ? "" : " disabled"}>Marcar</button>`;
+      const pm = openModal({title: "Mesma música, outra versão", body: pb, foot, size: "sm", onClose: () => { if (!done) res(null); }});
+      const okBtn = foot.querySelector("[data-o]");
+      pb.addEventListener("change", () => { okBtn.disabled = !pb.querySelector("input:checked"); });
+      foot.querySelector("[data-c]").onclick = pm.close;
+      okBtn.onclick = () => { done = true; const r = {}; r[verTracks[0].n] = pb.querySelector("input:checked").value; res(r); pm.close(); };
+    } else {
+      pb.innerHTML = `<div class="confirm"><p>Classifique cada faixa marcada como versão em <strong>"${esc(item.title)}"</strong>:</p>
+        <div class="du-rows">${verTracks.map(t => `<div style="display:flex;align-items:center;gap:10px;padding:3px 0"><span style="flex:1;font-size:13px"><b>#${t.n}</b> ${esc(t.title)}${t.albumRaw && t.albumRaw !== NI ? ` <span class="muted" style="font-size:11.5px">(${esc(t.albumRaw)})</span>` : ""}</span><select data-vn="${t.n}" style="font-size:12px;padding:4px 7px;border-radius:6px;border:1px solid var(--line-2);background:var(--bg);color:var(--ink);cursor:pointer">${opts}</select></div>`).join("")}</div></div>`;
+      foot.innerHTML = `<span class="sp"></span><button class="gbtn" type="button" data-c>Cancelar</button><button class="pbtn" type="button" data-o disabled>Marcar</button>`;
+      const pm = openModal({title: "Mesma música, outra versão", body: pb, foot, size: "sm", onClose: () => { if (!done) res(null); }});
+      const okBtn = foot.querySelector("[data-o]"), sels = () => [...pb.querySelectorAll("select[data-vn]")];
+      pb.addEventListener("change", () => { okBtn.disabled = sels().some(s => !s.value); });
+      foot.querySelector("[data-c]").onclick = pm.close;
+      okBtn.onclick = () => { done = true; const r = {}; sels().forEach(sel => { r[+sel.dataset.vn] = sel.value; }); res(r); pm.close(); };
+    }
   });
   body.addEventListener("click", async e => {
     const dc = e.target.closest("[data-dc]");
@@ -7091,7 +7107,8 @@ function openDups(opt = {}){
         const hasRem = vals.includes("remove"), hasVer = vals.includes("version");
         const hasCov = vals.includes("cover"), hasDif = vals.includes("different"), hasOrig = vals.includes("original");
         if (hasRem) {
-          openDeleteList(x, `As ${x.rs.length} faixas <strong>"${esc(x.title)}"</strong> são a mesma música repetida. Marque as que quer apagar. <strong>Enquanto existirem, a repetida continua pesando na nota da Saúde.</strong>`);
+          const toRemove = new Set(Object.entries(roles).filter(([,r]) => r === "remove").map(([n]) => +n));
+          openDeleteList(x, `As ${x.rs.length} faixas <strong>"${esc(x.title)}"</strong> são a mesma música repetida. Marque as que quer apagar. <strong>Enquanto existirem, a repetida continua pesando na nota da Saúde.</strong>`, toRemove);
           return;
         }
         if (hasDif && !hasOrig && !hasCov) {
@@ -7100,10 +7117,11 @@ function openDups(opt = {}){
         } else if (hasCov) {
           CONF.add(gid); saveConf();
         } else if (hasVer) {
+          const verTracks = x.rs.filter(t => roles[t.n] === "version");
           const vd = detectVersionType(x);
-          const type = vd ? vd.type : (await pickVersion(x));
-          if (!type) return;
-          DUPIGN.add(gid); VERS[gid] = type; saveVers(); saveDupIgn();
+          const typeMap = vd ? Object.fromEntries(verTracks.map(t => [t.n, vd.type])) : (await pickVersion(x, verTracks));
+          if (!typeMap) return;
+          DUPIGN.add(gid); VERS[gid] = typeMap; saveVers(); saveDupIgn();
         } else {
           if (!(await confirmIgnore(x))) return;
           DUPIGN.add(gid); saveDupIgn();
