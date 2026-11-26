@@ -3708,6 +3708,9 @@ const VERS_LABEL = {live: "versão ao vivo", remaster: "remasterizada", deluxe: 
 const CONF_KEY = "catalogo-musical:dups-confirmed";
 const CONF = (() => { try { return new Set(JSON.parse(localStorage.getItem(CONF_KEY) || "[]")); } catch (e) { return new Set(); } })();
 const saveConf = () => { try { localStorage.setItem(CONF_KEY, JSON.stringify([...CONF])); } catch (e) {} };
+const COVER_IND_KEY = "catalogo-musical:cover-ind";
+const COVER_IND = (() => { try { return new Set(JSON.parse(localStorage.getItem(COVER_IND_KEY) || "[]")); } catch(e) { return new Set(); } })();
+const saveCoverInd = () => { try { localStorage.setItem(COVER_IND_KEY, JSON.stringify([...COVER_IND])); } catch(e) {} };
 const coverIgnored = key => DUPIGN.has("c|" + normC(key));
 const RULES = [];
 const rule = fn => RULES.push(fn);
@@ -6738,6 +6741,7 @@ function similarTitles(){
     g.get(key).push(t);
   }
   const dups = [], covers = [], ignored = [];
+  const independent = new Map();
   const put = (item) => (DUPIGN.has(item.id) || CONF.has(item.id) ? ignored : item.kind === "d" ? dups : covers).push(item);
   for (const [key, rs] of g){
     if (rs.length < 2) continue;
@@ -6745,15 +6749,20 @@ function similarTitles(){
     for (const t of rs){ const m = splitArtists(t.artist)[0]; if (!mains.has(m)) mains.set(m, []); mains.get(m).push(t); }
     for (const [m, list] of mains) if (list.length > 1) put({kind: "d", id: `d|${key}|${m}`, title: cleanTitle(list[0].title), rs: list});
     if (mains.size > 1){
-      const titles = rs.map(t => t.title.trim().toLowerCase());
+      const gid = `c|${key}`;
+      const ind = rs.filter(t => COVER_IND.has(ownKey(t.title, t.artist)));
+      if (ind.length) independent.set(gid, {title: cleanTitle(rs[0].title), rs: ind});
+      const rsFiltrado = rs.filter(t => !COVER_IND.has(ownKey(t.title, t.artist)));
+      if (new Set(rsFiltrado.map(t => splitArtists(t.artist)[0])).size < 2) continue;
+      const titles = rsFiltrado.map(t => t.title.trim().toLowerCase());
       const allSame = titles.every(t => t === titles[0]);
-      const hasDash = rs.some(t => t.title.includes("-"));
+      const hasDash = rsFiltrado.some(t => t.title.includes("-"));
       const fuzzy = !allSame && !hasDash;
-      put({kind: "c", id: `c|${key}`, title: cleanTitle(rs[0].title), rs, fuzzy});
+      put({kind: "c", id: gid, title: cleanTitle(rsFiltrado[0].title), rs: rsFiltrado, fuzzy});
     }
   }
   const by = (a, b) => b.rs.length - a.rs.length || coll.compare(a.title, b.title);
-  return {dups: dups.sort(by), covers: covers.sort(by), ignored: ignored.sort(by)};
+  return {dups: dups.sort(by), covers: covers.sort(by), ignored: ignored.sort(by), independent};
 }
 /* juntar nomes de artista que são a mesma banda: pergunta qual nome fica e aplica (só na visualização; o salvo não muda) */
 function pickBandName(names, title, lead){
@@ -6857,7 +6866,7 @@ function openDups(opt = {}){
   const draw = () => {
     md.m.querySelectorAll('.seg[data-g="kind"] button').forEach(b => { if (b.dataset.k === "albums") b.textContent = `Álbuns (${ai.doubts.length + ai.groups.filter(g => !g.confirmed).length})`; b.setAttribute("aria-pressed", b.dataset.k === kind); });
     if (kind === "albums"){ drawAlbums(); return; }
-    const nDone = sim.ignored.length + Object.keys(DUPMARK).length, pend = [...sim.dups, ...sim.covers].sort((a, b) => (b.fuzzy ? 1 : 0) - (a.fuzzy ? 1 : 0) || b.rs.length - a.rs.length || coll.compare(a.title, b.title));
+    const nDone = sim.ignored.length + Object.keys(DUPMARK).length, pend = [...sim.dups, ...sim.covers].sort((a, b) => b.rs.length - a.rs.length || (a.kind === "d" ? 0 : 1) - (b.kind === "d" ? 0 : 1) || (a.fuzzy ? 1 : 0) - (b.fuzzy ? 1 : 0) || coll.compare(a.title, b.title));
     sg("state").hidden = false;
     sg("state").querySelectorAll("button").forEach(x => { const done = x.dataset.s === "done"; x.textContent = done ? `Tratados (${nDone})` : `Para tratar (${pend.length})`; x.setAttribute("aria-pressed", done === (tab === "ignored")); });
     sg("tab").hidden = true;   // em "Para tratar" duplicadas e covers vêm juntas: a pessoa é que diz qual é o problema
@@ -6884,7 +6893,53 @@ function openDups(opt = {}){
     const tag = x => x.fuzzy
       ? ` · <span style="text-transform:none;letter-spacing:0;color:var(--ink-3)">nomes diferentes</span>`
       : ` · <span style="text-transform:none;letter-spacing:0">${x.kind === "c" ? "cover" : "repetida"}</span>`;
-    body.innerHTML = (list.length ? list.map(x => `<div class="eyebrow dup-head" style="margin:14px 0 6px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span>${esc(x.title)} · ${faixas(x.rs.length)}${tag(x)}</span>${btn(x)}</div>${songTable(x.rs)}`).join("") : `<p class="muted">Nenhum caso ${tab === "ignored" ? "ignorado" : "encontrado"}.</p>`);
+    const covTable = x => {
+      const ind = sim.independent.get(x.id) || {rs: []};
+      const canRemove = x.rs.length >= 3 || ind.rs.length > 0;
+      const dur = t => t.sec ? fmtDur(t.sec) : "—";
+      const mainNames = x.rs.map(t => splitArtists(t.artist)[0]);
+      const titleCell = t => {
+        const clean = cleanTitle(t.title);
+        const extra = t.title !== clean ? t.title.slice(clean.length).trim() : "";
+        const myMain = splitArtists(t.artist)[0].toLowerCase();
+        const mentioned = extra && mainNames.find(n => n.toLowerCase() !== myMain && n.length > 3 && extra.toLowerCase().includes(n.toLowerCase()));
+        const badge = mentioned ? `<span class="cov-hint">cover de ${esc(mentioned)}</span>` : "";
+        return `${esc(clean)}${extra ? `<span class="cov-title-extra"> ${esc(extra)}</span>` : ""}${badge}`;
+      };
+      const inRows = x.rs.map(t => `<tr>
+        <td class="cov-col-n muted">#${t.n}</td>
+        <td class="cov-col-title">${titleCell(t)}</td>
+        <td class="cov-col-artist muted">${esc(t.artist)}</td>
+        <td class="cov-col-year muted">${t.year !== NI ? t.year : "—"}</td>
+        <td class="cov-col-dur muted">${dur(t)}</td>
+        <td class="cov-col-act">${canRemove ? `<button class="gbtn dup-act cov-x-btn" type="button" data-a="ind-mark" data-ok="${esc(ownKey(t.title, t.artist))}" data-gid="${esc(x.id)}" title="Tirar do grupo">×</button>` : ""}</td>
+      </tr>`).join("");
+      const outChips = ind.rs.length ? `<div class="cov-out">
+        <span class="cov-out-lbl">Fora do grupo:</span>
+        ${ind.rs.map(t => `<span class="cov-out-chip">${esc(t.artist)} ${t.year !== NI ? t.year : ""}<button class="dup-act" type="button" data-a="ind-undo" data-ok="${esc(ownKey(t.title, t.artist))}" title="Voltar ao grupo">↩</button></span>`).join("")}
+        <button class="gbtn dup-act" type="button" data-a="ind-undo-all" data-id="${esc(x.id)}" style="font-size:11.5px;padding:2px 8px">Desfazer tudo</button>
+      </div>` : "";
+      return `<div class="ptab"><table class="cov-table">
+        <colgroup><col class="cov-col-n"><col class="cov-col-title"><col class="cov-col-artist"><col class="cov-col-year"><col class="cov-col-dur"><col class="cov-col-act"></colgroup>
+        <thead><tr><th></th><th>Música</th><th>Artista</th><th>Ano</th><th>Duração</th><th></th></tr></thead>
+        <tbody>${inRows}</tbody>
+      </table></div>${outChips}`;
+    };
+    if (!list.length){ body.innerHTML = `<p class="muted">Nenhum caso encontrado.</p>`; }
+    else {
+      const renderItems = items => items.map(x => `<div class="eyebrow dup-head" style="margin:14px 0 6px;display:flex;align-items:center;justify-content:space-between;gap:12px"><span>${esc(x.title)} · ${faixas(x.rs.length)}${tag(x)}</span>${btn(x)}</div>${x.kind === "c" ? covTable(x) : songTable(x.rs)}`).join("");
+      const act = x => detectBestAction(x).action;
+      const buckets = [
+        {label: "Repetidas",    items: list.filter(x => act(x) === "rep")},
+        {label: "Covers",       items: list.filter(x => act(x) === "conf")},
+        {label: "Outra versão", items: list.filter(x => act(x) === "ver")},
+        {label: "Outra música", items: list.filter(x => act(x) === "ign")},
+      ].filter(b => b.items.length);
+      body.innerHTML = buckets.map(b => {
+        const hdr = `<div class="dup-grp-hdr"><span>${b.label}</span><em>${b.items.length} ${b.items.length === 1 ? "caso" : "casos"}</em></div>`;
+        return hdr + renderItems(b.items);
+      }).join("");
+    }
   };
   const yr = r => r.year === NI ? "ano desconhecido" : r.year;
   const who = r => `<strong>"${esc(cleanTitle(r.title))}"</strong> de <strong>${esc(r.artist)}</strong> (${yr(r)})`;
@@ -6946,6 +7001,23 @@ function openDups(opt = {}){
       return;
     }
 
+    if (b.dataset.a === "ind-mark"){
+      COVER_IND.add(b.dataset.ok); saveCoverInd();
+      sim = similarTitles(); draw();
+      toast("Marcada como independente. Desfaça dentro do grupo se quiser reverter.");
+      return;
+    }
+    if (b.dataset.a === "ind-undo"){
+      COVER_IND.delete(b.dataset.ok); saveCoverInd();
+      sim = similarTitles(); draw();
+      return;
+    }
+    if (b.dataset.a === "ind-undo-all"){
+      const grp = sim.independent.get(b.dataset.id);
+      if (grp) grp.rs.forEach(t => COVER_IND.delete(ownKey(t.title, t.artist)));
+      saveCoverInd(); sim = similarTitles(); draw();
+      return;
+    }
     if (b.dataset.a === "dup-undo"){ undoDupMark(b.dataset.id); return; }
     if (b.dataset.a === "band"){
       const item = sim.covers.find(x => x.id === b.dataset.id);
@@ -7320,6 +7392,8 @@ function openExampleNotice(){
   let _npManuallyUndocked = false;
   let npmRafId = null;
   let npmSortKey = 'n', npmSortDir = 1, npmSearchQ = '', npmFilterArtist = '';
+  let npmPageRows = [], npmRenderedCount = 0, npmIsAppending = false, npmSentinelObs = null;
+  const NPM_BATCH = 40;
   let npmAlbumMode = 'count', npmArtistMode = 'alpha', npmYearMode = 'year';
   const npmExpandedGroups = new Set(), npmExpandedSubgroups = new Set();
   const npmHueCache = {}; // key: "artist|album" → hue 0-359 or null
@@ -7562,6 +7636,100 @@ function openExampleNotice(){
     return true;
   }
 
+  /* ---- lazy-render helpers ---- */
+  function npmMakeTrowOuter(t, ri, hidden, sgId){
+    const playing = lastTrackData && t.m && t.m.id && t.m.id === lastTrackId;
+    const artist = t.bands[0]||''; const year = t.date ? t.date.slice(0,4) : '—';
+    const dur = typeof fmtDur==='function' ? fmtDur(t.sec) : '';
+    return `<tr class="npm-trow${playing?' npm-trow--playing':''}" data-ri="${ri}"${sgId?` data-sgid="${esc(sgId)}"`:''} ${hidden?' hidden':''}>
+      <td class="npm-trow-n">${t.n}</td>
+      <td class="npm-trow-art"><div class="npm-trow-art-bg" data-artist="${esc(artist)}" data-album="${esc(t.album||'')}"></div></td>
+      <td class="npm-col-nm"><div class="npm-trow-info"><span class="npm-trow-nm">${esc(t.title)}</span><span class="npm-trow-alb">${esc(t.album&&t.album!=='—'?t.album:'')}</span></div></td>
+      <td class="npm-trow-ar">${esc(artist)}</td>
+      <td class="npm-trow-yr">${year}</td>
+      <td class="npm-trow-dur">${dur}</td>
+    </tr>`;
+  }
+
+  function npmApplyCoversBatch(container){
+    if (typeof getCover !== 'function') return;
+    const root = container || npmBrowseList;
+    root.querySelectorAll('.npm-trow-art-bg:not([data-cv])').forEach(bg => {
+      bg.dataset.cv = '1';
+      const artist = bg.dataset.artist, album = bg.dataset.album;
+      if (!artist || !album) return;
+      getCover(artist, album, url => {
+        if (!url) return;
+        bg.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
+        const hk = artist + '|' + album;
+        if (npmHueCache[hk] !== undefined) return;
+        npmHueCache[hk] = null;
+        const img = new Image(); img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const c = document.createElement('canvas'); c.width = c.height = 16;
+            c.getContext('2d').drawImage(img, 0, 0, 16, 16);
+            const d = c.getContext('2d').getImageData(0, 0, 16, 16).data;
+            const hist = new Float32Array(360);
+            for (let i = 0; i < d.length; i += 4){
+              const [r,g,b,a] = [d[i],d[i+1],d[i+2],d[i+3]]; if (a < 128) continue;
+              const max = Math.max(r,g,b), min = Math.min(r,g,b), df = max - min;
+              if (df < 20 || max < 30) continue;
+              const sat = df / max; if (sat < 0.2) continue;
+              let h;
+              if (max===r) h=((g-b)/df%6)*60;
+              else if (max===g) h=((b-r)/df+2)*60;
+              else h=((r-g)/df+4)*60;
+              h=((h%360)+360)%360;
+              hist[Math.round(h)%360] += sat;
+            }
+            let best = -1, bestV = 0;
+            for (let i = 0; i < 360; i++){
+              const v = hist[(i+359)%360] + hist[i]*2 + hist[(i+1)%360];
+              if (v > bestV){ bestV = v; best = i; }
+            }
+            npmHueCache[hk] = best >= 0 ? best : null;
+          } catch(e){}
+        };
+        img.src = url;
+      });
+    });
+  }
+
+  function npmAppendBatch(){
+    if (npmIsAppending) return;
+    const start = npmRenderedCount, end = Math.min(start + NPM_BATCH, npmPageRows.length);
+    if (start >= npmPageRows.length) return;
+    npmIsAppending = true;
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = npmPageRows.slice(start, end).map((t, i) => npmMakeTrowOuter(t, start + i, false)).join('');
+    const frag = document.createDocumentFragment();
+    while (tmp.firstChild) frag.appendChild(tmp.firstChild);
+    const sentinel = npmBrowseList.querySelector('.npm-sentinel');
+    if (sentinel) npmBrowseList.insertBefore(frag, sentinel);
+    else npmBrowseList.appendChild(frag);
+    npmRenderedCount = end;
+    npmApplyCoversBatch();
+    npmIsAppending = false;
+  }
+
+  function npmStartSentinel(){
+    if (npmSentinelObs){ npmSentinelObs.disconnect(); npmSentinelObs = null; }
+    const sentinel = document.createElement('tr');
+    sentinel.className = 'npm-sentinel';
+    sentinel.innerHTML = '<td colspan="6"></td>';
+    npmBrowseList.appendChild(sentinel);
+    npmSentinelObs = new IntersectionObserver(entries => {
+      if (!entries[0].isIntersecting) return;
+      npmAppendBatch();
+      if (npmRenderedCount >= npmPageRows.length){
+        npmSentinelObs.disconnect(); npmSentinelObs = null;
+        sentinel.remove();
+      }
+    }, {rootMargin: '200px'});
+    npmSentinelObs.observe(sentinel);
+  }
+
   /* ---- catalog browser ---- */
   function npmBuildBrowseList(){
     if (!npmBrowseList) return;
@@ -7664,19 +7832,7 @@ function openExampleNotice(){
     if (npmBrowseClear) npmBrowseClear.hidden = !hasFilter;
     if (!rows.length){ npmBrowseList.innerHTML = '<tr><td colspan="6" class="npm-browse-empty">Nenhuma faixa encontrada</td></tr>'; return; }
 
-    function npmMakeTrow(t, ri, hidden, sgId){
-      const playing = lastTrackData && t.m && t.m.id && t.m.id === lastTrackId;
-      const artist = t.bands[0]||''; const year = t.date ? t.date.slice(0,4) : '—';
-      const dur = typeof fmtDur==='function' ? fmtDur(t.sec) : '';
-      return `<tr class="npm-trow${playing?' npm-trow--playing':''}" data-ri="${ri}"${sgId?` data-sgid="${esc(sgId)}"`:''} ${hidden?' hidden':''}>
-        <td class="npm-trow-n">${t.n}</td>
-        <td class="npm-trow-art"><div class="npm-trow-art-bg" data-artist="${esc(artist)}" data-album="${esc(t.album||'')}"></div></td>
-        <td class="npm-col-nm"><div class="npm-trow-info"><span class="npm-trow-nm">${esc(t.title)}</span><span class="npm-trow-alb">${esc(t.album&&t.album!=='—'?t.album:'')}</span></div></td>
-        <td class="npm-trow-ar">${esc(artist)}</td>
-        <td class="npm-trow-yr">${year}</td>
-        <td class="npm-trow-dur">${dur}</td>
-      </tr>`;
-    }
+    const npmMakeTrow = npmMakeTrowOuter;
 
     const isGroupMode = ['artist','cor','year','sec'].includes(npmSortKey);
     if (isGroupMode){
@@ -7794,52 +7950,16 @@ function openExampleNotice(){
         el.addEventListener('click', e => { e.stopPropagation(); npmShowRowMenu(e, rows[parseInt(el.dataset.ri)]); });
       });
     } else {
-      npmBrowseList.innerHTML = rows.map((t,i) => npmMakeTrow(t,i,false)).join('');
-      npmBrowseList.querySelectorAll('.npm-trow').forEach((el,i) => {
-        el.addEventListener('click', e => npmShowRowMenu(e, rows[i]));
-      });
+      if (npmSentinelObs){ npmSentinelObs.disconnect(); npmSentinelObs = null; }
+      const scrollEl = npmBrowseList.closest('[id]');
+      if (scrollEl) scrollEl.scrollTop = 0;
+      npmPageRows = rows;
+      npmRenderedCount = 0;
+      npmBrowseList.innerHTML = '';
+      npmAppendBatch();
+      if (npmPageRows.length > NPM_BATCH) npmStartSentinel();
     }
-    if (typeof getCover === 'function'){
-      npmBrowseList.querySelectorAll('.npm-trow-art-bg').forEach(el => {
-        const artist = el.dataset.artist, album = el.dataset.album;
-        if (!artist || !album) return;
-        getCover(artist, album, url => {
-          if (!url) return;
-          el.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
-          const hk = artist + '|' + album;
-          if (npmHueCache[hk] !== undefined) return;
-          npmHueCache[hk] = null;
-          const img = new Image(); img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            try {
-              const c = document.createElement('canvas'); c.width = c.height = 16;
-              c.getContext('2d').drawImage(img, 0, 0, 16, 16);
-              const d = c.getContext('2d').getImageData(0, 0, 16, 16).data;
-              const hist = new Float32Array(360);
-              for (let i = 0; i < d.length; i += 4){
-                const [r,g,b,a] = [d[i],d[i+1],d[i+2],d[i+3]]; if (a < 128) continue;
-                const max = Math.max(r,g,b), min = Math.min(r,g,b), df = max - min;
-                if (df < 20 || max < 30) continue;
-                const sat = df / max; if (sat < 0.2) continue;
-                let h;
-                if (max===r) h=((g-b)/df%6)*60;
-                else if (max===g) h=((b-r)/df+2)*60;
-                else h=((r-g)/df+4)*60;
-                h=((h%360)+360)%360;
-                hist[Math.round(h)%360] += sat;
-              }
-              let best = -1, bestV = 0;
-              for (let i = 0; i < 360; i++){
-                const v = hist[(i+359)%360] + hist[i]*2 + hist[(i+1)%360];
-                if (v > bestV){ bestV = v; best = i; }
-              }
-              npmHueCache[hk] = best >= 0 ? best : null;
-            } catch(e){}
-          };
-          img.src = url;
-        });
-      });
-    }
+    if (isGroupMode) npmApplyCoversBatch();
   }
 
   async function npmPlayTrack(id){
@@ -7991,6 +8111,14 @@ function openExampleNotice(){
   if (npmSearchInp) npmSearchInp.addEventListener('input', () => { npmSearchQ = npmSearchInp.value.trim(); npmBuildBrowseList(); });
   if (npmFiltArtist) npmFiltArtist.addEventListener('change', () => { npmFilterArtist = npmFiltArtist.value; npmBuildBrowseList(); npmFiltArtist.blur(); });
   if (npmFiltGenre) npmFiltGenre.addEventListener('change', () => { npmBuildBrowseList(); npmFiltGenre.blur(); });
+  if (npmBrowseList) npmBrowseList.addEventListener('click', e => {
+    const row = e.target.closest('.npm-trow');
+    if (!row) return;
+    const ri = +row.dataset.ri;
+    const t = npmPageRows[ri];
+    if (!t) return;
+    npmShowRowMenu(e, t);
+  });
 
   /* ---- copy / open ---- */
   if (npmCopyNm) npmCopyNm.addEventListener('click', () => {

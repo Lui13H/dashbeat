@@ -57,6 +57,8 @@ CONCLUÍDO
 ✅ Exportar mapa de bandas em 6 formatos: Quadrado, Retrato, Story, Desktop, Banner e Wallpaper — no modal de Cartões, ao selecionar "Mapa de bandas".
 ✅ TASK 5 — FAVORITAS E ETIQUETAS: coração por música e banda; etiquetas próprias ("treino", "nostalgia"); filtros "Só favoritas" e por etiqueta na tabela e no painel; card "Suas favoritas" nos Insights; exportação JSON + colunas no Excel. Favoritar álbuns e gêneros/subgêneros também. GENRE_ADD com 3 gêneros principais. Redirecionamento direto ao painel quando já há dados. Toolbar reagrupada em 4 dropdowns. Ajustes automáticos de saúde (títulos/álbuns) com modal de confirmar/desfazer. Itens de saúde agrupados por categoria. Fases de dominância no gráfico Evolução. Card Favoritas redesenhado (donut + barras). Card Ritmo de Descoberta com play da máquina do tempo e pico dinâmico. Cobertura de álbuns (card 03b): barras verticais com % por álbum.
 ✅ Pill now-playing: scroll-dock automático (IntersectionObserver), barra de progresso full-width no header, controles centralizados, barra de progresso preditiva (requestAnimationFrame), updates otimistas ao clicar próxima/anterior.
+✅ TASK 51 — Carregamento progressivo do catálogo no "Ouvindo Agora": primeiras 40 linhas no load, IntersectionObserver + sentinela appenda 40 a 40 conforme scroll, covers carregam por batch, event delegation único para click no flat mode.
+✅ TASK 52 — Categorização individual de covers: botão "Independente" por faixa nos grupos de covers com 3+ músicas; faixa sai do grupo e vai para sub-seção "Músicas com mesmo nome (independentes)"; desfazer por faixa e "Desfazer tudo"; persistido em localStorage (cover-ind); grupo some quando sobra menos de 2 artistas distintos.
 
 =====
 PRÓXIMAS TASKS — ordenadas da MENOS para a MAIS prioritária
@@ -659,37 +661,16 @@ Pronto quando: números batem com contagens feitas à mão em dados de teste, tr
 sobreposição é avisada, e testado por CDP em 1300px e 420px.
 
 ---------------------------------------------------------------------
-TASK 51 — CARREGAMENTO PROGRESSIVO DO CATÁLOGO NA PÁGINA "OUVINDO AGORA"
+TASK 49 — BUG: Concertar o pill "Now Playing"
 ---------------------------------------------------------------------
-Prompt de implementação: https://claude.ai/artifact/FjWTibaPh2NHRif9tT3nfT  (seção TASK 51)
-Objetivo: o browse do catálogo (coluna direita / aba "Catálogo" no celular) dentro do Ouvindo Agora
-não pode renderizar todas as músicas de uma vez — com playlists grandes isso trava o site inteiro.
-A solução é renderizar só as linhas visíveis e ir adicionando mais conforme a pessoa desce.
-
-Comportamento:
-- Na abertura da página, renderizar apenas as primeiras 40 linhas da lista filtrada.
-- Um IntersectionObserver observa um elemento-sentinela invisível no fim da lista; quando esse
-  sentinela aparece na tela, as próximas 40 linhas são adicionadas ao DOM (append, não substituir).
-- Resultado: o DOM nunca tem mais do que ~80 linhas a mais do que o visível, sem reimplementar
-  toda a lógica de scroll virtual.
-- Cada linha exibe só o que a coluna precisa mostrar: número, capa pequena (20px), título,
-  artista, duração e indicador de etiqueta (coração/estrela se houver). Sem popularidade, sem
-  gênero, sem explícita, sem álbum — esses dados não são usados nessa view.
-- Quando qualquer coisa muda a ordem ou o conteúdo da lista — campo de busca, select de
-  artista/gênero, clique em cabeçalho de coluna pra reordenar — a lista é zerada, as primeiras
-  40 linhas da nova seleção/ordem são renderizadas, o scroll da lista volta ao topo e o sentinela
-  é re-observado. Nunca reordenar as linhas já no DOM: sempre descartar e reconstruir do zero.
-- Contador "X de Y músicas" no topo da lista já mostra o total filtrado desde o início (calculado
-  sem renderizar as linhas).
-- Funciona igual ao comportamento de hoje para playlists pequenas (< 40 músicas) sem nenhum
-  salto visual.
-Casos de borda: filtro que retorna 0 músicas (mensagem "Nenhuma faixa encontrada");
-scroll rápido até o fim antes do append terminar (sentinela sai e volta → não duplicar linhas,
-usar flag `isAppending`); redimensionar a janela no meio do scroll (re-checar se o sentinela
-ainda está visível e completar o batch se necessário).
-Pronto quando: abrir com playlist de 1 000+ músicas não trava nem pisca, scroll suave até o fim
-sem saltos, busca e filtro resetam a lista instantaneamente, testado por CDP com 1 300 músicas
-e throttle de CPU 4× desligado.
+O pill de "Now Playing" parou de funcionar corretamente: as funções do dot (indicador de progresso)
+e de arrastar/puxar de volta para fora do header não funcionam mais. Investigar a causa (provável
+conflito com as últimas mudanças no header DOM / scroll-dock), restaurar o comportamento original:
+- Dot mostra progresso e muda de estado (playing/paused)
+- Arrastar o pill para fora do header retorna à posição flutuante original
+- Scroll-dock (snap para o header quando ele sai de vista) continua funcionando
+Testar por CDP com música tocando no Spotify conectado: scroll para baixo (pill vai pro header),
+scroll para cima (pill sai do header), drag out (pill flutuante), dot animado.
 
 ---------------------------------------------------------------------
 TASK 50 — TRANSFORMAR O MODAL "OUVINDO AGORA" EM PÁGINA PRÓPRIA
@@ -726,13 +707,33 @@ Pronto quando: clicar no pill abre a página, Voltar fecha e restaura o painel e
 estava, Escape funciona, hash muda e volta corretamente, testado por CDP em 1300px e 420px.
 
 ---------------------------------------------------------------------
-TASK 49 — BUG: Concertar o pill "Now Playing"
+✅ TASK 52 — CATEGORIZAÇÃO INDIVIDUAL DE COVERS
 ---------------------------------------------------------------------
-O pill de "Now Playing" parou de funcionar corretamente: as funções do dot (indicador de progresso)
-e de arrastar/puxar de volta para fora do header não funcionam mais. Investigar a causa (provável
-conflito com as últimas mudanças no header DOM / scroll-dock), restaurar o comportamento original:
-- Dot mostra progresso e muda de estado (playing/paused)
-- Arrastar o pill para fora do header retorna à posição flutuante original
-- Scroll-dock (snap para o header quando ele sai de vista) continua funcionando
-Testar por CDP com música tocando no Spotify conectado: scroll para baixo (pill vai pro header),
-scroll para cima (pill sai do header), drag out (pill flutuante), dot animado.
+Objetivo: no modal "Duplicadas e Covers" (dentro da Saúde), a aba Covers agrupa todas as músicas
+com o mesmo título como se fossem todas covers umas das outras. O problema: numa lista de 4 músicas
+chamadas "Hellraiser" de bandas diferentes, pode ser que 3 sejam covers de uma mesma composição
+e 1 seja uma música completamente independente que coincidentemente tem o mesmo nome — hoje o site
+trata o grupo inteiro como uma coisa só.
+
+Comportamento:
+- Dentro de cada grupo de covers (mesmo título, artistas diferentes), cada música ganha um seletor
+  individual: "Cover de [grupo]" / "Música independente (mesmo nome por coincidência)".
+- Ao abrir o grupo, o estado padrão é "Cover de [grupo]" para todas (igual ao comportamento atual).
+- O usuário pode marcar individualmente qualquer música como "Música independente" — ela
+  imediatamente sai do grupo visual e fica numa sub-lista "Músicas com mesmo nome (independentes)"
+  abaixo do grupo de covers.
+- Uma música marcada como independente não conta mais como cover em nenhuma estatística, card ou
+  insight do site (Saúde, card de duplicatas, etc.).
+- A marcação fica salva em localStorage ("catalogo-musical:cover-overrides") como um Set de
+  ownKeys. Recarregar a página mantém as escolhas.
+- Se todas as músicas de um grupo forem marcadas como independentes, o grupo de covers some e elas
+  ficam todas na sub-lista de "mesmo nome".
+- Botão "Desfazer" por música (volta para "Cover de [grupo]") e botão "Desfazer tudo" no cabeçalho
+  do grupo.
+Casos de borda: grupo com apenas 2 músicas onde ambas são marcadas como independentes (o "grupo"
+deixa de existir como cover, apenas como "mesmo nome"); música adicionada/removida da playlist
+(ownKey some do override → volta ao padrão); exportação Excel respeita o override (coluna Cover
+mostra "—" em vez de "✓" para músicas independentes).
+Pronto quando: marcar uma música como independente a remove visualmente do grupo de covers,
+a marcação persiste ao recarregar, a Saúde não conta mais essa música como cover, e testado com
+o caso real de 4 músicas com mesmo nome de bandas diferentes.

@@ -1069,6 +1069,26 @@ header.top:has(#np-dock-slot-hd.np-dock-ready){overflow:hidden;padding-bottom:10
 .pf .legend strong{color:var(--ink)}
 .empty-in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:0 18px;color:var(--ink-2);font-size:14px;line-height:1.5}
 .empty-in p{margin:0;max-width:380px}
+.dup-grp-hdr{display:flex;align-items:center;gap:10px;margin:20px 0 4px;padding-bottom:6px;border-bottom:1px solid var(--line-2)}
+.dup-grp-hdr:first-child{margin-top:4px}
+.dup-grp-hdr span{font:700 12px var(--body);color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em}
+.dup-grp-hdr em{font-style:normal;font-size:11.5px;color:var(--ink-3)}
+.cov-table col.cov-col-n{width:52px}
+.cov-table col.cov-col-title{width:auto}
+.cov-table col.cov-col-artist{width:22%}
+.cov-table col.cov-col-year{width:48px}
+.cov-table col.cov-col-dur{width:56px}
+.cov-table col.cov-col-act{width:32px}
+.cov-table thead th{padding:4px 10px;font:600 11px var(--body);color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;text-align:left;border-bottom:1px solid var(--line-2)}
+.cov-x-btn{font-size:14px;line-height:1;padding:1px 7px;opacity:.45;color:var(--ink)}
+.cov-x-btn:hover{opacity:1;color:var(--red,#f87171)}
+.cov-title-extra{color:var(--ink-3);font-size:12px}
+.cov-hint{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:600;background:hsla(var(--h),40%,20%,.7);color:hsl(var(--h),60%,72%)}
+.cov-out{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;padding:7px 10px;border-radius:8px;background:hsla(var(--h),15%,10%,.5);border:1px solid var(--line-2)}
+.cov-out-lbl{font:600 11px var(--body);color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.cov-out-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 8px;border-radius:20px;border:1px solid var(--line-2);font-size:12.5px;color:var(--ink-2);background:hsla(var(--h),10%,14%,.7)}
+.cov-out-chip button{background:none;border:none;cursor:pointer;font-size:13px;color:var(--ink-3);padding:0 2px;line-height:1}
+.cov-out-chip button:hover{color:var(--ink)}
 .du-rows{display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:12px 14px;border:1px solid var(--line-2);border-radius:12px;background:rgba(0,0,0,.2)}
 .du-rows > div,.du-rows label span{font-size:13.5px;color:var(--ink-2)}
 .du-rows b{font:700 16px var(--display);color:var(--ink);margin-right:6px}
