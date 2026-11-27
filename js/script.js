@@ -6883,22 +6883,30 @@ function openDups(opt = {}){
     }
     if (bigDurDiffC(x)) {
       const roles = {}; x.rs.forEach(t => roles[t.n] = "different");
-      return {type: "dif", roles, conf: "m", msg: "Durações muito diferentes — confirme se são a mesma música"};
+      return {type: "dif", roles, conf: "x", msg: "Durações muito diferentes — confirme se são a mesma música"};
     }
     const tmp = {}; let hasVer = false;
     x.rs.forEach(t => {
-      const s = `${t.title} ${t.album}`.toLowerCase();
-      if (/\b(live|ao\s+vivo|concerto?|showlivre)\b/.test(s)) { tmp[t.n] = "version"; hasVer = true; }
-      else if (/\b(deluxe|anniversary|remaster|expanded|bonus\s+track)\b/.test(s)) tmp[t.n] = "mrem";
+      const titleHasSuffix = cleanTitle(t.title) !== t.title || /\s+-\s+/.test(t.title);
+      const keywordVer = /\b(live|ao\s+vivo|concerto?|showlivre|remix|acoustic|acústico|instrumental)\b/.test(t.title.toLowerCase());
+      // R1: parêntese não-numérico e não-feat indica versão alternativa
+      const parenVer = /\([^0-9)][^)]*\)/i.test(t.title) && !/\(feat\./i.test(t.title) && !/\(ft\./i.test(t.title) && !/\(with\s/i.test(t.title);
+      if (titleHasSuffix || keywordVer || parenVer) { tmp[t.n] = "version"; hasVer = true; }
     });
     const left = x.rs.filter(t => !tmp[t.n]);
-    Object.keys(tmp).forEach(n => { if (tmp[n] === "mrem") tmp[n] = "remove"; });
-    left.sort((a, b) => a.n - b.n);
-    if (left.length > 0) left.forEach((t, i) => tmp[t.n] = i === 0 ? (hasVer ? "original" : "keep") : "remove");
+    // R3: entre os tracks limpos, prefere o mais antigo como original
+    left.sort((a, b) => { const ay = a.year === NI ? 9999 : +a.year, by = b.year === NI ? 9999 : +b.year; return ay - by || a.n - b.n; });
+    if (left.length > 0) {
+      left.forEach((t, i) => tmp[t.n] = i === 0 ? (hasVer ? "original" : "keep") : "remove");
+    } else if (hasVer) {
+      // R2: todos têm marcador de versão — o mais antigo vira original
+      const byYear = [...x.rs].sort((a, b) => { const ay = a.year === NI ? 9999 : +a.year, by = b.year === NI ? 9999 : +b.year; return ay - by || a.n - b.n; });
+      byYear.forEach((t, i) => tmp[t.n] = i === 0 ? "original" : "version");
+    }
     const nR = Object.values(tmp).filter(r => r === "remove").length;
     const oT = x.rs.find(t => tmp[t.n] === "original");
     const msg = oT ? `${oT.artist} (${oT.year !== NI ? oT.year : "?"}) — sugerida como original` : `Manter ${x.rs.length - nR}, remover ${nR}`;
-    return {type: hasVer ? "ver" : "rep", roles: tmp, conf: hasVer ? "m" : "h", msg};
+    return {type: hasVer ? "ver" : "rep", roles: tmp, conf: "h", msg};
   };
   const computeDupBadges = roles => {
     const v = Object.values(roles);
@@ -6922,12 +6930,13 @@ function openDups(opt = {}){
     const badges = computeDupBadges(roles);
     const bHtml = badges.map(b => `<span class="dcb ${b.cls}">${b.l}</span>`).join("");
     const hdr = `<div class="dup-c-head"><div class="dup-c-title">${esc(x.title)}<span class="dup-c-cnt">· ${faixas(x.rs.length)}</span>${bHtml}</div></div>`;
-    const confCls = {h: "dcc-h", m: "dcc-m", l: "dcc-l"}[sug.conf];
-    const confLabel = {h: "Alta confiança", m: "Confiança média", l: "Baixa confiança — verifique"}[sug.conf];
+    const confCls = {h: "dcc-h", m: "dcc-m", l: "dcc-l", x: "dcc-x"}[sug.conf];
+    const confLabel = {h: "Alta confiança", m: "Confiança média", l: "Baixa confiança — verifique", x: "Confiança mínima"}[sug.conf];
     const confBtnStyle = {
       h: "background:#2e9e58;border-color:#1e6e3c;color:#fff;",
       m: "background:hsl(var(--h),65%,65%);border-color:hsl(var(--h),65%,50%);color:hsl(var(--h),90%,8%);",
-      l: "background:#f87171;border-color:rgba(248,113,113,.8);color:#3f0000;"
+      l: "background:#f87171;border-color:rgba(248,113,113,.8);color:#3f0000;",
+      x: "background:#555;border-color:#444;color:#ccc;"
     }[sug.conf];
     if (st.expanded) {
       const sameArt = new Set(x.rs.map(t => t.artist.toLowerCase().split(",")[0].trim())).size === 1;
@@ -6944,12 +6953,15 @@ function openDups(opt = {}){
       return `<div class="dup-c-card">${hdr}${tbl}<div class="dup-c-foot"><div style="flex:1"></div><button class="gbtn" type="button" style="padding:5px 10px;font-size:11.5px" data-dc="col" data-id="${esc(x.id)}">↩ Voltar</button><button class="pbtn" type="button" style="padding:5px 14px;font-size:12.5px;${confBtnStyle}" data-dc="conf" data-id="${esc(x.id)}">✓ Confirmar</button></div></div>`;
     }
     const rows = x.rs.map(t => { const r = roles[t.n] || "keep"; return `<div class="dup-c-row ${rCls[r] || ""}"><div class="dcr-info"><div class="dcr-name">${esc(tr(t.title))}</div><div class="dcr-sub"><span class="muted">#${t.n}</span> · ${esc(t.artist)} · ${t.year !== NI ? t.year : "—"} · ${dur(t)}</div></div><span class="dcr-lbl ${rBadgeCls[r] || ""}">${rLabel[r] || r}</span></div>`; }).join("");
-    return `<div class="dup-c-card">${hdr}<div class="dup-c-sug">${rows}</div><div class="dup-c-foot"><div class="dup-c-conf ${confCls}"><span class="dcc-dot"></span>${confLabel} — ${esc(sug.msg)}</div><div style="flex:1"></div><button class="gbtn" type="button" style="padding:5px 11px;font-size:12px" data-dc="adj" data-id="${esc(x.id)}">✎ Ajustar faixa por faixa</button><button class="pbtn" type="button" style="padding:5px 14px;font-size:12.5px;${confBtnStyle}" data-dc="conf" data-id="${esc(x.id)}">✓ Confirmar sugestão</button></div></div>`;
+    return `<div class="dup-c-card">${hdr}<div class="dup-c-sug">${rows}</div><div class="dup-c-foot"><div class="dup-c-conf ${confCls}"><span class="dcc-dot"></span><span>${confLabel} — ${esc(sug.msg)}</span></div><div style="flex:1"></div><button class="gbtn" type="button" style="padding:5px 11px;font-size:12px" data-dc="adj" data-id="${esc(x.id)}">✎ Ajustar faixa por faixa</button><button class="pbtn" type="button" style="padding:5px 14px;font-size:12.5px;${confBtnStyle}" data-dc="conf" data-id="${esc(x.id)}">✓ Confirmar sugestão</button></div></div>`;
   };
   const draw = () => {
     md.m.querySelectorAll('.seg[data-g="kind"] button').forEach(b => { if (b.dataset.k === "albums") b.textContent = `Álbuns (${ai.doubts.length + ai.groups.filter(g => !g.confirmed).length})`; b.setAttribute("aria-pressed", b.dataset.k === kind); });
     if (kind === "albums"){ body.closest(".mb")?.classList.remove("mb-dupcols"); body.style.cssText = ""; drawAlbums(); return; }
-    const nDone = sim.ignored.length + Object.keys(DUPMARK).length, pend = [...sim.dups, ...sim.covers].sort((a, b) => b.rs.length - a.rs.length || (a.kind === "d" ? 0 : 1) - (b.kind === "d" ? 0 : 1) || (a.fuzzy ? 1 : 0) - (b.fuzzy ? 1 : 0) || coll.compare(a.title, b.title));
+    const nDone = sim.ignored.length + Object.keys(DUPMARK).length;
+    const _hasVerMark = x => x.rs.some(t => cleanTitle(t.title) !== t.title || /\s+-\s+/.test(t.title) || /\b(live|ao\s+vivo|concerto?|showlivre|remix|acoustic|acústico|instrumental)\b/.test(t.title.toLowerCase()) || (/\([^0-9)][^)]*\)/i.test(t.title) && !/\(feat\./i.test(t.title) && !/\(ft\./i.test(t.title) && !/\(with\s/i.test(t.title)));
+    const _sortPri = x => { if (x.kind === "c") return (bigDurDiffC(x) || x.fuzzy) ? 4 : 3; if (bigDurDiffC(x)) return 2; return _hasVerMark(x) ? 1 : 0; };
+    const pend = [...sim.dups, ...sim.covers].sort((a, b) => _sortPri(a) - _sortPri(b) || b.rs.length - a.rs.length || coll.compare(a.title, b.title));
     sg("state").hidden = false;
     sg("state").querySelectorAll("button").forEach(x => { const done = x.dataset.s === "done"; x.textContent = done ? `Tratados (${nDone})` : `Para tratar (${pend.length})`; x.setAttribute("aria-pressed", done === (tab === "ignored")); });
     sg("tab").hidden = true;   // em "Para tratar" duplicadas e covers vêm juntas: a pessoa é que diz qual é o problema

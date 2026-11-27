@@ -785,3 +785,5 @@ O que foi feito:
 - "Ajustar faixa por faixa": expande o card em tabela com botões de papel por linha; clicar no
   papel já selecionado desfaz para "keep"; só um "original" por grupo é permitido.
 - GRP_STATE: estado em memória (papéis customizados, expanded) por grupo; resetado ao fechar.
+
+quero que o nome que aparece no widget seja o mesmo que aparece dentro do modal de ouvindo agora (tratado)
