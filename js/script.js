@@ -6810,7 +6810,7 @@ function openDeleteList(item, intro, preChecked, onDone){
       html: `<p>Vão sair da playlist: ${gone.map(t => `<strong>${esc(t.title)}</strong> (#${t.n}, ${esc(t.artist)})`).join(", ")}.</p><p>A playlist fica com <strong>${faixas(NN - gone.length)}</strong>, renumeradas mantendo a ordem. Painel e insights serão recalculados.</p><p class="muted">Para guardar a lista antes, exporte primeiro.</p>`,
       extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}});
     if (!go) return;
-    ssSet("health", "1");
+    ssSet("dups", "1");
     commitRows(currentRows().filter(r => !del.has(r[0])), `${faixas(gone.length)} removida${gone.length > 1 ? "s" : ""} · playlist com ${faixas(NN - gone.length)}`);
     md.close(); if (onDone) onDone();
   };
@@ -7122,11 +7122,20 @@ function openDups(opt = {}){
           }
           if (hasRem) {
             const toRemove = new Set(Object.entries(roles).filter(([,r]) => r === "remove").map(([n]) => +n));
+            const gone = x.rs.filter(t => toRemove.has(t.n));
             if (typeMap) { VERS[gid] = typeMap; saveVers(); }
-            openDeleteList(x, `As ${x.rs.length} faixas <strong>"${esc(x.title)}"</strong> são a mesma música repetida. Marque as que quer apagar. <strong>Enquanto existirem, a repetida continua pesando na nota da Saúde.</strong>`, toRemove, () => {
-              if (typeMap) { DUPIGN.add(gid); saveDupIgn(); toast("Tratado. Veja em \"Tratados\" para desfazer."); }
-              sim = similarTitles(); draw();
+            const go = await confirmModal({
+              title: `Apagar ${faixas(gone.length)} marcada${gone.length > 1 ? "s" : ""} como repetida${gone.length > 1 ? "s" : ""}?`,
+              danger: true, ok: "Apagar",
+              html: `<p>${gone.map(t => `<strong>${esc(t.title)}</strong> (#${t.n} · ${esc(t.artist)})`).join(", ")} vai sair da playlist.</p><p>A playlist fica com <strong>${faixas(NN - gone.length)}</strong>, renumeradas mantendo a ordem.</p><p class="muted">Para guardar a lista antes, exporte primeiro.</p>`,
+              extra: {label: `${ICON.down} Exportar atual`, run: () => exportTxt()}
             });
+            if (!go) return;
+            ssSet("dups", "1");
+            commitRows(currentRows().filter(r => !toRemove.has(r[0])), `${faixas(gone.length)} removida${gone.length > 1 ? "s" : ""} · playlist com ${faixas(NN - gone.length)}`);
+            if (typeMap) { DUPIGN.add(gid); saveDupIgn(); }
+            sim = similarTitles(); draw();
+            toast("Tratado. Veja em \"Tratados\" para desfazer.");
             return;
           }
           DUPIGN.add(gid); VERS[gid] = typeMap; saveVers(); saveDupIgn();

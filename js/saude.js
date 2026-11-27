@@ -1963,11 +1963,14 @@ function autoApplySuffixClean(){
 }
 
 if (STORE){
-  if (!autoFixAlbumDates() && !autoApplySuffixClean() && ssGet("health") === "1"){
-    ssDel("health");
-    if (ssGet("tt-clean-undo") === "1"){ ssDel("tt-clean-undo"); setTimeout(openTrackTitleUndo, 1300); }
-    else if (ssGet("alb-clean-undo") === "1"){ ssDel("alb-clean-undo"); setTimeout(openAlbumNameUndo, 1300); }
-    else { setTimeout(openHealth, 1300); }
+  if (!autoFixAlbumDates() && !autoApplySuffixClean()){
+    if (ssGet("dups") === "1"){ ssDel("dups"); setTimeout(() => openDups({kind: "songs", back: openHealth}), 1300); }
+    else if (ssGet("health") === "1"){
+      ssDel("health");
+      if (ssGet("tt-clean-undo") === "1"){ ssDel("tt-clean-undo"); setTimeout(openTrackTitleUndo, 1300); }
+      else if (ssGet("alb-clean-undo") === "1"){ ssDel("alb-clean-undo"); setTimeout(openAlbumNameUndo, 1300); }
+      else { setTimeout(openHealth, 1300); }
+    }
   }
 }
 /* busca automática de datas originais: roda em background assim que a página carrega (ou seja, logo após qualquer
