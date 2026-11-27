@@ -306,6 +306,17 @@ arquivo), Deezer (link de playlist → API pública sem login). Cada método tem
 igual ao do Spotify. Sem nenhum login novo — só parsear o formato que cada plataforma já exporta.
 
 ---------------------------------------------------------------------
+TASK 55 — Importar playlist diretamente do Spotify via API
+---------------------------------------------------------------------
+Na tela de importação, nova aba "Minhas playlists": lista as playlists salvas/seguidas na conta
+do Spotify do usuário (GET /me/playlists, paginado) com capa, nome e nº de faixas. Clicar numa
+playlist importa todas as faixas de uma vez usando o fluxo já existente de importação por link
+(sem nova lógica de busca — só pega o link de cada faixa da resposta do Spotify). Requer login
+com Spotify (token já disponível se o usuário conectou); se não conectado, mostra botão
+"Conectar ao Spotify primeiro". Guardado em catalogo-musical:sp-playlists-cache (TTL 5 min).
+Sem nova busca além do /me/playlists e dos /playlists/{id}/tracks necessários.
+
+---------------------------------------------------------------------
 TASK 31 — Link somente-leitura para compartilhar o painel
 ---------------------------------------------------------------------
 Botão "Compartilhar" na barra: gera um link que codifica a playlist (comprimida com LZ-string)
@@ -672,39 +683,11 @@ conflito com as últimas mudanças no header DOM / scroll-dock), restaurar o com
 Testar por CDP com música tocando no Spotify conectado: scroll para baixo (pill vai pro header),
 scroll para cima (pill sai do header), drag out (pill flutuante), dot animado.
 
----------------------------------------------------------------------
-TASK 50 — TRANSFORMAR O MODAL "OUVINDO AGORA" EM PÁGINA PRÓPRIA
----------------------------------------------------------------------
-Prompt de implementação: https://claude.ai/artifact/FjWTibaPh2NHRif9tT3nfT  (seção TASK 50)
-Objetivo: o modal "Ouvindo Agora" (que abre ao clicar no pill) vira uma página dedicada dentro do
-Dashbeat, em vez de um overlay modal. Isso dá mais espaço pra respirar e uma base sólida pra todas
-as funções novas que virão (pré-visualização de áudio, fila editável, letras, etc.).
-
-Comportamento:
-- A "página" funciona como uma view SPA: ao clicar no pill (ou em qualquer gatilho do modal atual),
-  o conteúdo principal (painel, insights) some e a página Ouvindo Agora ocupa toda a tela — sem overlay,
-  sem scroll bloqueado, sem backdrop. URL ganha hash #ouvindo-agora (window.location.hash) pra
-  permitir voltar com o botão Voltar do browser.
-- Botão "← Voltar ao painel" no canto superior esquerdo; pressionar Escape ou o botão Voltar do
-  browser retorna à view anterior (preservando filtros, posição de scroll e aba ativa do painel).
-- Layout da página: coluna esquerda (capa grande, info, barra de progresso, controles, ações,
-  fila de reprodução) e coluna direita (browse completo do catálogo com busca e filtros) — mesmo
-  conteúdo de hoje, mas sem as limitações de altura de um modal.
-- O pill continua visível sobre a página Ouvindo Agora (como hoje sobre o modal): serve de âncora
-  visual de que a música ainda está tocando.
-- Em celular: layout de coluna única, coluna direita (browse) vira aba "Catálogo" na mesma página,
-  alternando com a view principal via tabs no topo.
-- Toda a lógica de `openNpModal` / `closeNpModal` vira `openNpPage` / `closeNpPage`;
-  `npmBg.hidden` vira `npPageEl.hidden`; body.overflow não é mais alterado.
-- O estado `npmIsOpen` continua existindo (renomear para `npPageOpen`) pra que o pill e outros
-  gatilhos saibam que a página está visível.
-- Animação de entrada: a página desliza de baixo pra cima (transform translateY) em 250ms;
-  saída desliza de volta. Mesmo efeito do modal atual, sem o backdrop escuro.
-Casos de borda: pill clicado quando já está na página (não faz nada); hash mudado manualmente
-(só reagir se for #ouvindo-agora); botão Voltar do browser depois de navegar pra outra aba pelo
-browse (voltar vai pra página Ouvindo Agora, não direto pro painel).
-Pronto quando: clicar no pill abre a página, Voltar fecha e restaura o painel exatamente como
-estava, Escape funciona, hash muda e volta corretamente, testado por CDP em 1300px e 420px.
+✅ TASK 50 — TRANSFORMAR O MODAL "OUVINDO AGORA" EM PÁGINA PRÓPRIA
+Modal vira view SPA com slide-up (translateY), hash #ouvindo-agora, botão "← Voltar ao painel",
+Escape e botão Voltar do browser fecham corretamente. Tabs mobile (Tocando / Catálogo) em ≤640px.
+Pill fica visível acima da página (z-index 960). Sem body.overflow. openNpModal→openNpPage,
+closeNpModal→closeNpPage. Nome da faixa no pill agora passa por npmCleanTitle (fix junto).
 
 ---------------------------------------------------------------------
 TASK 54 — INSIGHTS E CARDS DE VERSÕES CLASSIFICADAS
@@ -785,5 +768,3 @@ O que foi feito:
 - "Ajustar faixa por faixa": expande o card em tabela com botões de papel por linha; clicar no
   papel já selecionado desfaz para "keep"; só um "original" por grupo é permitido.
 - GRP_STATE: estado em memória (papéis customizados, expanded) por grupo; resetado ao fechar.
-
-quero que o nome que aparece no widget seja o mesmo que aparece dentro do modal de ouvindo agora (tratado)

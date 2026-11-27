@@ -7526,6 +7526,7 @@ function openExampleNotice(){
   const npmTTot = document.getElementById('npm-t-tot');
   const npmPBar = document.getElementById('npm-pbar');
   const npmPFill = document.getElementById('npm-pfill');
+  const npBar = document.getElementById('np-bar');
   const npmPrev2 = document.getElementById('npm-prev2');
   const npmBk15 = document.getElementById('npm-bk15');
   const npmPP2 = document.getElementById('npm-pp2');
@@ -7548,7 +7549,7 @@ function openExampleNotice(){
   const npmOpenSp = document.getElementById('npm-open-sp');
   const npmCat = document.getElementById('npm-cat');
   const npmQList = document.getElementById('npm-q-list');
-  const npmClose = document.getElementById('npm-close');
+  const npmClose = null; /* removed: replaced by npm-back */
 
   const PLAY_PATH = 'M8 5v14l11-7z';
   const PAUSE_PATH = 'M6 19h4V5H6zm8-14v14h4V5z';
@@ -7629,7 +7630,7 @@ function openExampleNotice(){
   function _npOptimisticTrack(track){
     _npSkipPending = true;
     prevTrackData = lastTrackData;
-    npTrack.textContent = track.name;
+    npTrack.textContent = npmCleanTitle(track.name);
     npArtist.textContent = track.artists.map(a => a.name).join(', ');
     const imgs = track.album && track.album.images;
     if (imgs && imgs.length) npArt.style.backgroundImage = `url("${imgs[0].url}")`;
@@ -7640,9 +7641,9 @@ function openExampleNotice(){
     el.classList.add('np-fade');
     el.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
-    if (npmIsOpen) openNpModal();
+    if (npmIsOpen) openNpPage(false);
   }
-  let seekTimer = null, seekTargetPos = null;
+  let seekTimer = null, seekTargetPos = null, _seekTs = 0;
   function _applySeekBars(pos){
     if (!lastDurationMs) return;
     const pct = (pos / lastDurationMs * 100) + '%';
@@ -7657,17 +7658,21 @@ function openExampleNotice(){
       const token = await spotifyUserToken(); if (!token) return;
       await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${pos}`, {method:'PUT', headers:{Authorization:`Bearer ${token}`}});
       lastProgressMs = pos; lastProgressTs = Date.now();
-      requestAnimationFrame(() => { npProg.style.transition = ''; });
     } catch(e){}
+    requestAnimationFrame(() => { npProg.style.transition = ''; });
   }
   function spSeek(deltaMs){
     seekTargetPos = Math.round(Math.max(0, Math.min((seekTargetPos ?? currentProgressMs()) + deltaMs, lastDurationMs)));
+    _seekTs = Date.now();
+    lastProgressMs = seekTargetPos; lastProgressTs = _seekTs;
     _applySeekBars(seekTargetPos);
     clearTimeout(seekTimer);
     seekTimer = setTimeout(_execSeek, 300);
   }
   function spSeekTo(posMs){
     seekTargetPos = Math.round(Math.max(0, Math.min(posMs, lastDurationMs)));
+    _seekTs = Date.now();
+    lastProgressMs = seekTargetPos; lastProgressTs = _seekTs;
     _applySeekBars(seekTargetPos);
     clearTimeout(seekTimer);
     seekTimer = setTimeout(_execSeek, 300);
@@ -7709,7 +7714,7 @@ function openExampleNotice(){
     setPlaying(!isPlaying);
     setTimeout(poll, 1000);
   });
-  el.addEventListener('click', () => { if (lastTrackId && !npWasDragging) openNpModal(); });
+  el.addEventListener('click', () => { if (lastTrackId && !npWasDragging) openNpPage(); });
 
   /* ---- progress update RAF (modal) ---- */
   function npmTickProgress(){
@@ -7729,6 +7734,27 @@ function openExampleNotice(){
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     spSeekTo(Math.round(pct * lastDurationMs));
   });
+
+  /* ---- header bar click + drag to seek ---- */
+  if (npBar) {
+    let _npBarDrag = false;
+    const _npBarSeek = e => {
+      if (!lastDurationMs) return;
+      const rect = npBar.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      spSeekTo(Math.round(pct * lastDurationMs));
+    };
+    npBar.addEventListener('pointerdown', e => {
+      if (!lastDurationMs) return;
+      e.stopPropagation();
+      _npBarDrag = true;
+      npBar.setPointerCapture(e.pointerId);
+      _npBarSeek(e);
+    });
+    npBar.addEventListener('pointermove', e => { if (_npBarDrag) _npBarSeek(e); });
+    npBar.addEventListener('pointerup', () => { _npBarDrag = false; });
+    npBar.addEventListener('pointercancel', () => { _npBarDrag = false; });
+  }
 
   /* ---- modal controls ---- */
   if (npmPrev2) npmPrev2.addEventListener('click', () => { if (ctrlLocked || !checkSkipRate()) return; spCtrl('POST', 'previous'); });
@@ -7776,7 +7802,7 @@ function openExampleNotice(){
         const sec = Math.round((track.duration_ms || 0) / 1000);
         const year = track.album && track.album.release_date ? track.album.release_date.slice(0, 4) : '';
         const newRow = [null, track.name, artist, track.album ? track.album.name : '', sec, year];
-        try { commitRows([...RAW0, newRow], true); toast('Faixa salva no catálogo!'); closeNpModal(); }
+        try { commitRows([...RAW0, newRow], true); toast('Faixa salva no catálogo!'); closeNpPage(); }
         catch(e){ toast('Não foi possível salvar'); }
       };
       npmSaveFav._prevHandler = handler;
@@ -8383,7 +8409,7 @@ function openExampleNotice(){
     const filterBtn = npmCat.querySelector('.npm-cat-filter-btn');
     if (filterBtn){
       filterBtn.addEventListener('click', () => {
-        closeNpModal();
+        closeNpPage();
         if (typeof showTab === 'function') showTab('painel');
         if (typeof clearFilters === 'function') clearFilters();
         if (typeof toggle === 'function') toggle('band', displayArtist);
@@ -8397,10 +8423,18 @@ function openExampleNotice(){
     npmUpdateSaveFav(inCatalog, exactTrack || null);
   }
 
-  /* ---- open / close modal ---- */
-  function openNpModal(){
+  /* ---- open / close page ---- */
+  const npmBack = document.getElementById('npm-back');
+  const npmMobTabs = document.querySelectorAll('.npm-mtab');
+  const npmLeftCol = document.getElementById('npm-left');
+  const npmRightCol = document.getElementById('npm-right');
+
+  function openNpPage(pushState = true){
     if (!npmBg || !lastTrackData) return;
+    const wasOpen = npmIsOpen;
     npmIsOpen = true;
+    if (pushState && !wasOpen) history.pushState({npmOpen: true}, '', '#ouvindo-agora');
+    if (!wasOpen) document.body.classList.add('npm-page-open');
     /* populate from stored data */
     const track = lastTrackData;
     if (npmArt2) npmArt2.style.backgroundImage = npArt.style.backgroundImage;
@@ -8416,28 +8450,47 @@ function openExampleNotice(){
       const names = typeof ALL_BANDS !== 'undefined' ? ALL_BANDS : [...new Set(T.flatMap(t => t.bands))].sort((a,b) => a.localeCompare(b));
       names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; npmFiltArtist.appendChild(o); });
     }
-    /* show */
-    npmBg.hidden = false;
-    requestAnimationFrame(() => npmBg.classList.add('npm-on'));
-    document.body.style.overflow = 'hidden';
+    if (!wasOpen){
+      /* reset mobile tabs to "Tocando" on first open */
+      npmMobTabs.forEach((t, i) => t.classList.toggle('npm-mtab-on', i === 0));
+      if (npmLeftCol) npmLeftCol.classList.remove('npm-col-hidden');
+      if (npmRightCol) npmRightCol.classList.add('npm-col-hidden');
+      /* show with slide-up */
+      npmBg.hidden = false;
+      requestAnimationFrame(() => npmBg.classList.add('npm-on'));
+      /* start RAF loop */
+      if (npmRafId) cancelAnimationFrame(npmRafId);
+      npmTickProgress();
+    }
     /* async + browse */
     npmFetchQueue();
     npmBuildBrowseList();
-    /* start RAF loop */
-    if (npmRafId) cancelAnimationFrame(npmRafId);
-    npmTickProgress();
   }
-  function closeNpModal(){
-    if (!npmBg) return;
+  function closeNpPage(goBack = true){
+    if (!npmBg || !npmIsOpen) return;
     npmIsOpen = false;
+    document.body.classList.remove('npm-page-open');
     npmBg.classList.remove('npm-on');
     if (npmRafId){ cancelAnimationFrame(npmRafId); npmRafId = null; }
-    document.body.style.overflow = '';
-    setTimeout(() => { if (!npmIsOpen) npmBg.hidden = true; }, 300);
+    setTimeout(() => { if (!npmIsOpen) npmBg.hidden = true; }, 280);
+    if (goBack && location.hash === '#ouvindo-agora') history.back();
   }
-  if (npmClose) npmClose.addEventListener('click', closeNpModal);
-  if (npmBg) npmBg.addEventListener('click', e => { if (e.target === npmBg) closeNpModal(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && npmIsOpen){ e.stopPropagation(); closeNpModal(); } }, true);
+  if (npmBack) npmBack.addEventListener('click', () => closeNpPage());
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && npmIsOpen){ e.stopPropagation(); closeNpPage(); } }, true);
+  window.addEventListener('popstate', () => {
+    if (npmIsOpen && location.hash !== '#ouvindo-agora') closeNpPage(false);
+  });
+  npmMobTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      npmMobTabs.forEach(t => t.classList.remove('npm-mtab-on'));
+      tab.classList.add('npm-mtab-on');
+      const col = tab.dataset.col;
+      if (npmLeftCol) npmLeftCol.classList.toggle('npm-col-hidden', col !== 'left');
+      if (npmRightCol) npmRightCol.classList.toggle('npm-col-hidden', col !== 'right');
+    });
+  });
+  /* clean hash on load if page was refreshed with #ouvindo-agora */
+  if (location.hash === '#ouvindo-agora') history.replaceState(null, '', location.pathname + location.search);
   document.addEventListener('keydown', e => {
     if (!npmIsOpen || e.key !== 'Backspace') return;
     const t = e.target;
@@ -8462,15 +8515,15 @@ function openExampleNotice(){
       const d = await r.json();
       if (!d || !d.item){ el.hidden = true; return; }
       setPlaying(d.is_playing);
-      lastProgressMs = d.progress_ms;
-      lastProgressTs = Date.now();
+      const _inSeekCooldown = Date.now() - _seekTs < 1500;
+      if (!_inSeekCooldown) { lastProgressMs = d.progress_ms; lastProgressTs = Date.now(); }
       const track = d.item;
       const isNewTrack = track.id !== lastTrackId;
       if (isNewTrack) prevTrackData = lastTrackData;
       lastDurationMs = track.duration_ms;
       lastTrackData = track;
       if (d.device) lastVolumePercent = d.device.volume_percent ?? lastVolumePercent;
-      npTrack.textContent = track.name;
+      npTrack.textContent = npmCleanTitle(track.name);
       npArtist.textContent = track.artists.map(a => a.name).join(', ');
       const imgs = track.album && track.album.images;
       if (imgs && imgs.length) npArt.style.backgroundImage = `url("${imgs[0].url}")`;
@@ -8490,11 +8543,11 @@ function openExampleNotice(){
         el.hidden = false;
         requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('np-fade')));
         if (el.dataset.npRestoreDocked){ const _sk = el.dataset.npRestoreDocked; delete el.dataset.npRestoreDocked; setTimeout(() => npDock(_sk === 'header' ? npDockSlotHd : npDockSlot), 0); }
-        /* update modal if open */
-        if (npmIsOpen){ openNpModal(); }
+        /* update page if open */
+        if (npmIsOpen){ openNpPage(false); }
         fetchQueue();
       } else {
-        npProg.style.width = pct;
+        if (!_inSeekCooldown) npProg.style.width = pct;
         el.hidden = false;
         if (el.dataset.npRestoreDocked){ const _sk = el.dataset.npRestoreDocked; delete el.dataset.npRestoreDocked; setTimeout(() => npDock(_sk === 'header' ? npDockSlotHd : npDockSlot), 0); }
       }
