@@ -7014,8 +7014,10 @@ function openDups(opt = {}){
       const sorted = [...list].sort((a, b) => o[computeDupSuggestion(b).conf] - o[computeDupSuggestion(a).conf]);
       const sameBand = sorted.filter(x => x.kind === "d");
       const diffBand = sorted.filter(x => x.kind === "c");
-      const col = (title, items) => `<div class="dup-col"><div class="dup-col-hdr"><span>${title}</span><em>${items.length} ${items.length === 1 ? "caso" : "casos"}</em></div><div class="dup-c-wrap">${items.length ? items.map(x => renderDupCard(x)).join("") : `<p class="muted" style="font-size:13px">Nenhum caso.</p>`}</div></div>`;
-      body.innerHTML = `<div class="dup-cols">${col("Mesma banda", sameBand)}${col("Artistas diferentes", diffBand)}</div>`;
+      const treatedOfKind = k => sim.ignored.filter(x => x.kind === k);
+      const col = (title, items, k) => { const tr = treatedOfKind(k); const revBtn = tr.length ? `<button class="dup-col-rev dup-act" type="button" data-a="rev-col" data-kind="${k}">Reverter (${tr.length})</button>` : ""; return `<div class="dup-col"><div class="dup-col-hdr"><span>${title}</span><em>${items.length} ${items.length === 1 ? "caso" : "casos"}</em>${revBtn}</div><div class="dup-c-wrap">${items.map(x => renderDupCard(x)).join("")}</div></div>`; };
+      const activeCols = [["Mesma banda", sameBand, "d"], ["Artistas diferentes", diffBand, "c"]].filter(([, items]) => items.length);
+      body.innerHTML = `<div class="dup-cols">${activeCols.map(([t, items, k]) => col(t, items, k)).join("")}</div>`;
       const mb = body.closest(".mb");
       if (mb) { mb.classList.add("mb-dupcols"); body.style.cssText = "flex:1;min-height:0;display:flex;flex-direction:column"; }
       body.querySelectorAll(".dup-col").forEach(col => {
@@ -7184,6 +7186,12 @@ function openDups(opt = {}){
       const names = item && mainNames(item);
       const canon = item && await pickBandName(names, "Duplicada: qual nome fica?", `Os artistas de <strong>"${esc(item.title)}"</strong> são a <strong>mesma banda</strong> escrita de jeitos diferentes? Então é a mesma música, <strong>duplicada</strong>. Escolha o <strong>nome que fica</strong> (depois ela aparece em Duplicadas):`);
       if (canon){ DUPMARK[item.id] = {title: item.title, names: names.map(n => n.name.toLowerCase()), canon}; saveDupMark(); applyAlias(canon, names); }
+      return;
+    }
+    if (b.dataset.a === "rev-col"){
+      const k = b.dataset.kind;
+      sim.ignored.filter(x => x.kind === k).forEach(x => { DUPIGN.delete(x.id); CONF.delete(x.id); delete VERS[x.id]; });
+      saveDupIgn(); saveConf(); saveVers(); sim = similarTitles(); draw();
       return;
     }
     if (b.dataset.a === "rep"){
