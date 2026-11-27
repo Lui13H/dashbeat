@@ -3703,7 +3703,7 @@ const saveDupIgn = () => { try { localStorage.setItem(DUPIGN_KEY, JSON.stringify
 const VERS_KEY = "catalogo-musical:dups-versions";
 const VERS = (() => { try { return JSON.parse(localStorage.getItem(VERS_KEY) || "null") || {}; } catch (e) { return {}; } })();
 const saveVers = () => { try { localStorage.setItem(VERS_KEY, JSON.stringify(VERS)); } catch (e) {} };
-const VERS_LABEL = {live: "versão ao vivo", remaster: "remasterizada / Remix", deluxe: "edição deluxe/especial", bonus: "bonus track", other: "outra versão (acústica…)"};
+const VERS_LABEL = {live: "versão ao vivo", remaster: "remasterizada / Remix", deluxe: "edição deluxe/especial", bonus: "bonus track", other: "outra versão (acústica, demo, instrumental…)"};
 /* "é um cover" confirmado pela pessoa: sai da lista de pendências (vai pra "Tratados") mas NÃO é ignorado, então continua contando como cover nos insights */
 const CONF_KEY = "catalogo-musical:dups-confirmed";
 const CONF = (() => { try { return new Set(JSON.parse(localStorage.getItem(CONF_KEY) || "[]")); } catch (e) { return new Set(); } })();
@@ -6793,7 +6793,7 @@ function applyAlias(canon, names){
 }
 function undoAlias(key){ delete ALIAS[key]; saveAlias(); setFlash("Nome separado de novo."); ssSet("health", "1"); location.reload(); }
 /* escolher quais faixas de um grupo apagar (sempre fica pelo menos uma); pede confirmação antes, como qualquer remoção */
-function openDeleteList(item, intro, preChecked){
+function openDeleteList(item, intro, preChecked, onDone){
   const isChk = (t, i) => preChecked ? preChecked.has(t.n) : i > 0;
   const body = document.createElement("div"), foot = document.createElement("div"); foot.className = "mfrow";
   body.innerHTML = `<div class="confirm"><p>${intro}</p><div class="du-rows">${item.rs.map((t, i) => `<label class="chk"><input type="checkbox" data-n="${t.n}"${isChk(t, i) ? " checked" : ""}><span><b>#${t.n}</b> ${esc(t.title)} · ${esc(t.artist)} · (${esc(t.albumRaw === NI ? "—" : t.albumRaw)}) · ${t.sec ? durTxt(t.sec) : "—"}</span></label>`).join("")}</div><p class="muted">Fica pelo menos uma faixa. Nada é apagado até você confirmar.</p></div>`;
@@ -6812,6 +6812,7 @@ function openDeleteList(item, intro, preChecked){
     if (!go) return;
     ssSet("health", "1");
     commitRows(currentRows().filter(r => !del.has(r[0])), `${faixas(gone.length)} removida${gone.length > 1 ? "s" : ""} · playlist com ${faixas(NN - gone.length)}`);
+    md.close(); if (onDone) onDone();
   };
 }
 function openDups(opt = {}){
@@ -7106,21 +7107,28 @@ function openDups(opt = {}){
         const vals = Object.values(roles);
         const hasRem = vals.includes("remove"), hasVer = vals.includes("version");
         const hasCov = vals.includes("cover"), hasDif = vals.includes("different"), hasOrig = vals.includes("original");
-        if (hasRem) {
-          const toRemove = new Set(Object.entries(roles).filter(([,r]) => r === "remove").map(([n]) => +n));
-          openDeleteList(x, `As ${x.rs.length} faixas <strong>"${esc(x.title)}"</strong> são a mesma música repetida. Marque as que quer apagar. <strong>Enquanto existirem, a repetida continua pesando na nota da Saúde.</strong>`, toRemove);
-          return;
-        }
-        if (hasDif && !hasOrig && !hasCov) {
+        if (hasDif && !hasOrig && !hasCov && !hasVer) {
           if (!(await confirmIgnore(x))) return;
           DUPIGN.add(gid); saveDupIgn();
-        } else if (hasCov) {
+        } else if (hasCov && !hasVer && !hasRem) {
           CONF.add(gid); saveConf();
-        } else if (hasVer) {
-          const verTracks = x.rs.filter(t => roles[t.n] === "version");
-          const vd = detectVersionType(x);
-          const typeMap = vd ? Object.fromEntries(verTracks.map(t => [t.n, vd.type])) : (await pickVersion(x, verTracks));
-          if (!typeMap) return;
+        } else if (hasVer || hasRem) {
+          let typeMap = null;
+          if (hasVer) {
+            const verTracks = x.rs.filter(t => roles[t.n] === "version");
+            const vd = detectVersionType(x);
+            typeMap = vd ? Object.fromEntries(verTracks.map(t => [t.n, vd.type])) : (await pickVersion(x, verTracks));
+            if (!typeMap) return;
+          }
+          if (hasRem) {
+            const toRemove = new Set(Object.entries(roles).filter(([,r]) => r === "remove").map(([n]) => +n));
+            if (typeMap) { VERS[gid] = typeMap; saveVers(); }
+            openDeleteList(x, `As ${x.rs.length} faixas <strong>"${esc(x.title)}"</strong> são a mesma música repetida. Marque as que quer apagar. <strong>Enquanto existirem, a repetida continua pesando na nota da Saúde.</strong>`, toRemove, () => {
+              if (typeMap) { DUPIGN.add(gid); saveDupIgn(); toast("Tratado. Veja em \"Tratados\" para desfazer."); }
+              sim = similarTitles(); draw();
+            });
+            return;
+          }
           DUPIGN.add(gid); VERS[gid] = typeMap; saveVers(); saveDupIgn();
         } else {
           if (!(await confirmIgnore(x))) return;
