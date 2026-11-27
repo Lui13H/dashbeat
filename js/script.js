@@ -7118,7 +7118,7 @@ function openDups(opt = {}){
           let typeMap = null;
           if (hasVer) {
             const verTracks = x.rs.filter(t => roles[t.n] === "version");
-            const vd = detectVersionType(x);
+            const vd = !st.roles && detectVersionType(x);
             typeMap = vd ? Object.fromEntries(verTracks.map(t => [t.n, vd.type])) : (await pickVersion(x, verTracks));
             if (!typeMap) return;
           }
