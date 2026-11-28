@@ -671,17 +671,8 @@ dados extras ausentes (linhas somem em vez de mostrar zero); celular (colunas em
 Pronto quando: números batem com contagens feitas à mão em dados de teste, troca A↔B inverte tudo,
 sobreposição é avisada, e testado por CDP em 1300px e 420px.
 
----------------------------------------------------------------------
-TASK 49 — BUG: Concertar o pill "Now Playing"
----------------------------------------------------------------------
-O pill de "Now Playing" parou de funcionar corretamente: as funções do dot (indicador de progresso)
-e de arrastar/puxar de volta para fora do header não funcionam mais. Investigar a causa (provável
-conflito com as últimas mudanças no header DOM / scroll-dock), restaurar o comportamento original:
-- Dot mostra progresso e muda de estado (playing/paused)
-- Arrastar o pill para fora do header retorna à posição flutuante original
-- Scroll-dock (snap para o header quando ele sai de vista) continua funcionando
-Testar por CDP com música tocando no Spotify conectado: scroll para baixo (pill vai pro header),
-scroll para cima (pill sai do header), drag out (pill flutuante), dot animado.
+✅ TASK 49 — BUG: Concertar o pill "Now Playing"
+Dot, scroll-dock, drag e barra de progresso do header corrigidos e funcionando.
 
 ✅ TASK 50 — TRANSFORMAR O MODAL "OUVINDO AGORA" EM PÁGINA PRÓPRIA
 Modal vira view SPA com slide-up (translateY), hash #ouvindo-agora, botão "← Voltar ao painel",
